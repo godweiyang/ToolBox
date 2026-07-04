@@ -123,16 +123,31 @@ class AnimatedGifEncoder {
     private fun analyzePixels() {
         val len = pixels.size
         indexedPixels = ByteArray(len)
-        val nq = NeuQuant(pixels, len, sample)
-        colorTab = nq.process()  // IntArray(256),每项 0xRRGGBB
-        usedEntry = BooleanArray(256)
-        for (i in 0 until colorTab.size) {
-            colorTab[i] = colorTab[i] and 0xffffff
+        // 用固定 6x6x6 RGB 调色板(216 色)+ 40 级灰度,替代 NeuQuant。
+        // NeuQuant 移植版有难以定位的 bug 导致调色板退化为灰度(黑白)。
+        // 固定调色板确定彩色,且量化 O(1) 每像素,无需遍历。
+        if (colorTab.size != 256) colorTab = IntArray(256)
+        val levels = intArrayOf(0, 51, 102, 153, 204, 255)
+        var idx = 0
+        for (ri in 0..5) for (gi in 0..5) for (bi in 0..5) {
+            colorTab[idx++] = (levels[ri] shl 16) or (levels[gi] shl 8) or levels[bi]
         }
+        // 216-255 填灰度(40 级)
+        for (i in 216 until 256) {
+            val v = (i - 216) * 255 / 39
+            colorTab[i] = (v shl 16) or (v shl 8) or v
+        }
+        usedEntry = BooleanArray(256) { true }
+        // 直接量化:每通道按 6 级归一,组合成调色板索引
         for (i in 0 until len) {
-            val idx = nq.map(pixels[i] and 0xffffff)
-            indexedPixels[i] = idx.toByte()
-            usedEntry[idx] = true
+            val p = pixels[i]
+            val r = (p shr 16) and 0xff
+            val g = (p shr 8) and 0xff
+            val b = p and 0xff
+            val ri = ((r * 5 + 128) / 255).coerceIn(0, 5)
+            val gi = ((g * 5 + 128) / 255).coerceIn(0, 5)
+            val bi = ((b * 5 + 128) / 255).coerceIn(0, 5)
+            indexedPixels[i] = (ri * 36 + gi * 6 + bi).toByte()
         }
         colorDepth = 8
         palSize = 7

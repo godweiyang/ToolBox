@@ -107,9 +107,10 @@ object GifConverter {
                 val frameMs = safeStart + i * intervalMs
                 val frameUs = frameMs * 1000L
                 var frame: Bitmap? = null
-                // 重试 2 次，部分机型偶发返回 null
+                // 用 OPTION_CLOSEST(非 SYNC)取最接近指定时间的帧,不限关键帧。
+                // OPTION_CLOSEST_SYNC 只返回 I帧,长 GOP 视频多个时间戳会返回同一帧 → GIF 不动。
                 for (retry in 0 until 2) {
-                    frame = retriever.getFrameAtTime(frameUs, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
+                    frame = retriever.getFrameAtTime(frameUs, MediaMetadataRetriever.OPTION_CLOSEST)
                     if (frame != null) break
                 }
                 if (frame == null) {
