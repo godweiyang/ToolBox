@@ -20,6 +20,12 @@
     <!-- 分贝仪:麦克风录音 -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
 
+    <!-- 文件互传:前台服务保活 -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <!-- 文件互传:WiFi 状态信息（获取局域网 IP） -->
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+
     <application
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
@@ -66,6 +72,16 @@
         <activity
             android:name=".DecibelMeterActivity"
             android:exported="false" />
+
+        <activity
+            android:name=".FileShareActivity"
+            android:exported="false" />
+
+        <!-- 局域网文件互传 HTTP server，前台 Service 保活 -->
+        <service
+            android:name=".FileShareService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
     </application>
 
 </manifest>

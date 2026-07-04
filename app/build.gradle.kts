@@ -12,8 +12,8 @@ android {
         applicationId = "com.example.videodownloader"
         minSdk = 26
         targetSdk = 34
-        versionCode = 8
-        versionName = "1.4.0"
+        versionCode = 9
+        versionName = "1.5.0"
     }
 
     buildTypes {
@@ -56,4 +56,7 @@ dependencies {
 
     // ZXing 二维码生成（仅 core，体积小）
     implementation("com.google.zxing:core:3.5.3")
+
+    // NanoHTTPD：嵌入式 HTTP server，用于局域网文件互传
+    implementation("org.nanohttpd:nanohttpd:2.3.1")
 }

@@ -118,4 +118,23 @@
     <string name="db_level_normal">正常</string>
     <string name="db_level_loud">较吵</string>
     <string name="db_level_very_loud">很吵</string>
+
+    <!-- 局域网文件互传工具 -->
+    <string name="tool_fileshare_title">局域网文件互传</string>
+    <string name="tool_fileshare_desc">手机开 HTTP server，电脑浏览器扫码即可互传文件</string>
+    <string name="fs_status_off">服务未启动</string>
+    <string name="fs_status_on">服务运行中</string>
+    <string name="fs_btn_start">启动服务</string>
+    <string name="fs_btn_stop">停止服务</string>
+    <string name="fs_qr_hint">电脑浏览器扫码或访问下方地址</string>
+    <string name="fs_addr_hint">访问地址</string>
+    <string name="fs_received">已接收文件</string>
+    <string name="fs_no_files">暂无接收文件</string>
+    <string name="fs_perm_denied">需要存储权限才能读写文件</string>
+    <string name="fs_start_fail">启动失败，端口可能被占用</string>
+    <string name="fs_received_count">已接收 %1$d 个文件</string>
+    <string name="fs_open_browser">在电脑浏览器输入上方地址，或用手机扫二维码</string>
+    <string name="fs_same_wifi_hint">请确保手机和电脑在同一个 WiFi 网络</string>
+    <string name="fs_channel_name">文件互传服务</string>
+    <string name="fs_channel_desc">保持 HTTP server 运行，电脑可访问手机</string>
 </resources>

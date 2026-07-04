@@ -85,6 +85,13 @@ class MainActivity : AppCompatActivity() {
             iconRes = android.R.drawable.ic_btn_speak_now,
             bgColorRes = R.color.tool_decibel_bg,
             launcher = { ctx -> Intent(ctx, DecibelMeterActivity::class.java) }
+        ),
+        Tool(
+            title = getString(R.string.tool_fileshare_title),
+            desc = getString(R.string.tool_fileshare_desc),
+            iconRes = android.R.drawable.stat_sys_upload,
+            bgColorRes = R.color.tool_fileshare_bg,
+            launcher = { ctx -> Intent(ctx, FileShareActivity::class.java) }
         )
     )
 }

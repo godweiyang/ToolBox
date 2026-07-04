@@ -8,4 +8,5 @@
     <color name="tool_ninegrid_bg">#FF6F00</color>
     <color name="tool_gifreverse_bg">#00897B</color>
     <color name="tool_decibel_bg">#5E35B1</color>
+    <color name="tool_fileshare_bg">#0288D1</color>
 </resources>
