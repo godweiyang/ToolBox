@@ -44,6 +44,128 @@ object DownloadManager {
     }
 
     /**
+     * B站 dash 流下载：下载视频 m4s + 音频 m4s 到临时文件，用 BiliMuxer 合成 mp4，写入相册。
+     *
+     * 进度分配：下载视频 0-40%，下载音频 40-70%，合成 70-100%。
+     *
+     * @param videoUrl 视频 m4s 直链
+     * @param audioUrl 音频 m4s 直链
+     * @param displayName 文件名（不带扩展名）
+     * @param onProgress 总进度 0..100
+     */
+    suspend fun downloadDash(
+        context: Context,
+        videoUrl: String,
+        audioUrl: String,
+        displayName: String,
+        onProgress: (Int) -> Unit = {}
+    ): Result = withContext(Dispatchers.IO) {
+        // 临时文件存放地：cacheDir
+        val cacheDir = context.cacheDir
+        val tmpVideo = File(cacheDir, "bili_video_${System.currentTimeMillis()}.m4s")
+        val tmpAudio = File(cacheDir, "bili_audio_${System.currentTimeMillis()}.m4s")
+        val tmpMux = File(cacheDir, "bili_mux_${System.currentTimeMillis()}.mp4")
+        try {
+            // 1. 下载视频流（0-40%）
+            Log.i(TAG, "下载 B站视频流…")
+            val vOk = downloadToTemp(videoUrl, tmpVideo) { p ->
+                onProgress((p * 0.4).toInt().coerceIn(0, 40))
+            }
+            if (!vOk) return@withContext Result.Failure("视频流下载失败")
+
+            // 2. 下载音频流（40-70%）
+            Log.i(TAG, "下载 B站音频流…")
+            val aOk = downloadToTemp(audioUrl, tmpAudio) { p ->
+                onProgress(40 + (p * 0.3).toInt().coerceIn(0, 30))
+            }
+            if (!aOk) return@withContext Result.Failure("音频流下载失败")
+
+            // 3. 合成（70-100%）
+            Log.i(TAG, "合成 mp4…")
+            val muxOk = BiliMuxer.mux(tmpVideo, tmpAudio, tmpMux) { p ->
+                onProgress(70 + (p * 0.3).toInt().coerceIn(0, 30))
+            }
+            if (!muxOk || !tmpMux.exists() || tmpMux.length() == 0L) {
+                return@withContext Result.Failure("合成 mp4 失败")
+            }
+
+            // 4. 写入相册
+            val fileName = sanitizeFileName(displayName) + ".mp4"
+            val (uri, output) = openOutput(context, fileName)
+                ?: return@withContext Result.Failure("无法创建输出文件")
+            output.use { os ->
+                tmpMux.inputStream().use { input ->
+                    input.copyTo(os)
+                }
+                os.flush()
+            }
+            onProgress(100)
+            Log.i(TAG, "B站 dash 下载合成完成: $fileName")
+            Result.Success(fileName, uri)
+        } catch (e: Exception) {
+            Log.e(TAG, "B站 dash 下载异常", e)
+            Result.Failure(e.message ?: "下载异常")
+        } finally {
+            // 清理临时文件
+            tmpVideo.delete()
+            tmpAudio.delete()
+            tmpMux.delete()
+        }
+    }
+
+    /** 下载 URL 到临时文件，返回是否成功。[onProgress] 0..100 */
+    private suspend fun downloadToTemp(
+        url: String,
+        dest: File,
+        onProgress: (Int) -> Unit = {}
+    ): Boolean = withContext(Dispatchers.IO) {
+        try {
+            val req = Request.Builder()
+                .url(url)
+                .header("User-Agent", "Mozilla/5.0 (Linux; Android 13) " +
+                    "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Mobile Safari/537.36")
+                .header("Referer", "https://www.bilibili.com/")
+                .header("Accept", "*/*")
+                .header("Range", "bytes=0-") // B站 m4s 用 Range 请求更稳
+                .get()
+                .build()
+
+            client.newCall(req).execute().use { resp ->
+                if (!resp.isSuccessful && resp.code != 206) {
+                    Log.e(TAG, "下载失败 HTTP ${resp.code}")
+                    return@withContext false
+                }
+                val body = resp.body ?: return@withContext false
+                val total = body.contentLength().takeIf { it > 0 } ?: -1L
+                dest.outputStream().use { os ->
+                    body.byteStream().use { input ->
+                        val buf = ByteArray(8 * 1024)
+                        var read: Int
+                        var downloaded = 0L
+                        var lastReported = -1
+                        while (input.read(buf).also { read = it } != -1) {
+                            os.write(buf, 0, read)
+                            downloaded += read
+                            if (total > 0) {
+                                val pct = (downloaded * 100 / total).toInt().coerceIn(0, 100)
+                                if (pct != lastReported) {
+                                    lastReported = pct
+                                    onProgress(pct)
+                                }
+                            }
+                        }
+                        os.flush()
+                    }
+                }
+                true
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "下载到临时文件失败: ${e.message}")
+            false
+        }
+    }
+
+    /**
      * @param videoUrl 视频直链
      * @param displayName 想要的文件名（不带扩展名）
      * @param onProgress 进度回调，percent ∈ [0,100]

@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">视频下载器</string>
-    <string name="subtitle_hint">支持抖音 / 快手 / 小红书分享链接，自动提取无水印视频</string>
+    <string name="subtitle_hint">支持抖音 / 快手 / 小红书 / B站分享链接，自动提取视频直链下载</string>
     <string name="label_input">粘贴分享文本（包含链接即可，会自动提取）</string>
-    <string name="hint_input">粘贴抖音 / 快手 / 小红书分享文本，例如：\n1.02 复制打开抖音… https://v.douyin.com/xxxxx/\n或：… http://xhslink.com/o/xxxxx 复制后打开小红书</string>
+    <string name="hint_input">粘贴抖音 / 快手 / 小红书 / B站分享文本，例如：\n1.02 复制打开抖音… https://v.douyin.com/xxxxx/\n或：… http://xhslink.com/o/xxxxx 复制后打开小红书\n或：【…】 https://b23.tv/xxxxx</string>
     <string name="btn_paste">粘贴剪贴板</string>
     <string name="btn_clear">清空</string>
     <string name="btn_download">解析并下载</string>

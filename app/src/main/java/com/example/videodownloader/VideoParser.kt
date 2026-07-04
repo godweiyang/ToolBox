@@ -59,8 +59,9 @@ object VideoParser {
         }
     }
 
-    /** 入口：根据分享文本解析视频信息 */
-    suspend fun parse(shareText: String): Result<VideoInfo> = runCatching {
+    /** 入口：根据分享文本解析视频信息。
+     *  [context] 用于读取 B站登录 cookie（SESSDATA），可传 null 表示不登录 */
+    suspend fun parse(shareText: String, context: android.content.Context? = null): Result<VideoInfo> = runCatching {
         withContext(Dispatchers.IO) {
             val shareUrl = extractShareUrl(shareText)
                 ?: throw IllegalStateException("未在文本中找到链接")
@@ -73,6 +74,7 @@ object VideoParser {
                 "douyin" -> parseDouyin(shareUrl)
                 "kuaishou" -> parseKuaishou(shareUrl)
                 "xiaohongshu" -> parseXiaohongshu(shareUrl)
+                "bilibili" -> parseBilibili(shareUrl, context)
                 else -> throw UnsupportedOperationException("暂不支持该平台: $shareUrl")
             }
         }
@@ -84,6 +86,7 @@ object VideoParser {
         url.contains("v.kuaishou.com") || url.contains("kuaishou.com") -> "kuaishou"
         url.contains("xhslink.com") || url.contains("xiaohongshu.com") -> "xiaohongshu"
         url.contains("ixigua.com") -> "douyin" // 西瓜视频走抖音相同思路
+        url.contains("b23.tv") || url.contains("bilibili.com") -> "bilibili"
         else -> "unknown"
     }
 
@@ -390,6 +393,135 @@ object VideoParser {
         return null
     }
 
+    // ===================== B站解析 =====================
+
+    /**
+     * B站解析（高清版）：
+     * 1. 短链 b23.tv/xxx  302 → bilibili.com/video/BVxxx
+     * 2. H5 页面 __INITIAL_STATE__ 取 bvid/cid/title/author
+     * 3. 调 playurl API（fnval=16 dash，qn=127 4K，fourk=1）拿 dash 流
+     *    - 带 SESSDATA cookie（如有）→ 1080p/4K
+     *    - 无 cookie → 480p（非登录态上限）
+     * 4. 从 dash.video 选 id 最大的（最高清），dash.audio 选 id 最大的（最高音质）
+     * 5. 返回 VideoInfo(isDash=true)，由 DownloadManager 下载两个 m4s 后用 BiliMuxer 合成
+     */
+    private fun parseBilibili(shareUrl: String, context: android.content.Context?): VideoInfo {
+        // 1. 短链 302 拿到最终 URL
+        val resolvedUrl = resolveFirstRedirect(shareUrl) ?: shareUrl
+        Log.i(TAG, "B站跳转后 URL: $resolvedUrl")
+
+        // 2. 请求 H5 页面
+        val html = httpGet(resolvedUrl)
+        if (html.isBlank()) throw IllegalStateException("B站页面获取失败")
+
+        // 标题兜底
+        val htmlTitle = Regex("""<title>([^<]+)</title>""").find(html)
+            ?.groupValues?.get(1)?.trim()
+            ?.substringBefore("_哔哩哔哩")
+            ?.substringBefore("_bilibili")
+            ?.trim()
+            ?.ifBlank { null }
+
+        // 3. 提取 __INITIAL_STATE__
+        val stateJson = extractJsonObject(html, "__INITIAL_STATE__")
+            ?: throw IllegalStateException("B站 __INITIAL_STATE__ 提取失败")
+
+        val title = deepFindString(stateJson, "title")?.takeIf { it.isNotBlank() }
+            ?: htmlTitle ?: "B站视频"
+        val author = deepFindString(stateJson, "name")
+            ?: deepFindString(stateJson, "nickname")
+            ?: "未知UP主"
+        val bvid = deepFindString(stateJson, "bvid")
+            ?: Regex("""/video/(BV[A-Za-z0-9]+)""").find(resolvedUrl)?.groupValues?.get(1)
+            ?: throw IllegalStateException("B站 bvid 提取失败")
+        val cid = deepFindString(stateJson, "cid")
+            ?: throw IllegalStateException("B站 cid 提取失败")
+        Log.i(TAG, "B站 bvid=$bvid cid=$cid")
+
+        // 4. 调 playurl API
+        val cookie = context?.let { BiliCookieStore.getCookieHeader(it) }
+        val qualityLabel = if (cookie != null) "高清(登录态)" else "480P(未登录)"
+        Log.i(TAG, "B站 cookie: ${if (cookie != null) "有" else "无"}，画质预期: $qualityLabel")
+
+        val apiUrl = "https://api.bilibili.com/x/player/playurl?bvid=$bvid" +
+            "&cid=$cid&qn=127&fnval=16&fnver=0&fourk=1"
+        val resp = httpGetWithCookie(apiUrl, cookie, "https://www.bilibili.com/video/$bvid")
+        val root = JsonParser.parseString(resp).asJsonObject
+        val code = root.safeInt("code") ?: -1
+        if (code != 0) {
+            throw IllegalStateException("B站 playurl API 失败: code=$code ${root.safeStr("message")}")
+        }
+        val data = root.safeObj("data") ?: throw IllegalStateException("B站 playurl 无 data")
+        val dash = data.safeObj("dash")
+            ?: throw IllegalStateException("B站 playurl 未返回 dash 流（可能该视频不支持 dash）")
+
+        val realQn = data.safeInt("quality") ?: 0
+        val realLabel = qualityLabelForQn(realQn)
+        Log.i(TAG, "B站实际画质 qn=$realQn ($realLabel)")
+
+        // 5. 从 dash.video 选最高清晰度（按 id 降序，avc 优先于 hevc 以保兼容性）
+        val videos = dash.getAsJsonArray("video") ?: throw IllegalStateException("dash 无视频流")
+        var bestVideo = videos[0].asJsonObject
+        for (i in 1 until videos.size()) {
+            val cur = videos[i].asJsonObject
+            val curId = cur.safeInt("id") ?: 0
+            val bestId = bestVideo.safeInt("id") ?: 0
+            // 优先选 id 大的；id 相同时选 avc（codecs 含 avc1）以兼容 MediaMuxer
+            if (curId > bestId || (curId == bestId && (cur.safeStr("codecs")?.contains("avc1") == true))) {
+                bestVideo = cur
+            }
+        }
+        val videoUrl = (bestVideo.safeStr("baseUrl") ?: bestVideo.safeStr("base_url"))
+            ?.replace("\\u002F", "/")?.replace("\\/", "/")
+            ?: throw IllegalStateException("dash 视频流无 url")
+        val w = bestVideo.safeInt("width") ?: 0
+        val h = bestVideo.safeInt("height") ?: 0
+        Log.i(TAG, "B站视频流: id=${bestVideo.safeInt("id")} ${w}x${h} ${bestVideo.safeStr("codecs")}")
+
+        // 6. 从 dash.audio 选最高音质（按 id 降序）
+        val videoUrlFinal = videoUrl
+        val audioUrlFinal: String
+        val audios = dash.getAsJsonArray("audio")
+        if (audios != null && audios.size() > 0) {
+            var bestAudio = audios[0].asJsonObject
+            for (i in 1 until audios.size()) {
+                val cur = audios[i].asJsonObject
+                val curId = cur.safeInt("id") ?: 0
+                val bestId = bestAudio.safeInt("id") ?: 0
+                if (curId > bestId) bestAudio = cur
+            }
+            audioUrlFinal = (bestAudio.safeStr("baseUrl") ?: bestAudio.safeStr("base_url"))
+                ?.replace("\\u002F", "/")?.replace("\\/", "/")
+                ?: ""
+            Log.i(TAG, "B站音频流: id=${bestAudio.safeInt("id")} ${bestAudio.safeStr("codecs")}")
+        } else {
+            audioUrlFinal = ""
+        }
+
+        return VideoInfo(
+            title = title,
+            author = author,
+            videoUrl = videoUrlFinal,
+            coverUrl = "",
+            platform = "bilibili",
+            isDash = audioUrlFinal.isNotBlank(),
+            audioUrl = audioUrlFinal,
+            qualityLabel = "$realLabel ${w}x${h}"
+        )
+    }
+
+    /** B站 qn 码 → 清晰度中文名 */
+    private fun qualityLabelForQn(qn: Int): String = when (qn) {
+        120 -> "4K"
+        116 -> "1080P60"
+        112 -> "1080P+"
+        80 -> "1080P"
+        64 -> "720P"
+        32 -> "480P"
+        16 -> "360P"
+        else -> "QN$qn"
+    }
+
     // ===================== 工具方法 =====================
 
     private fun httpGet(url: String): String {
@@ -402,6 +534,26 @@ object VideoParser {
             .get()
             .build()
         // 用跟随重定向的 client，避免 share 页 302 时拿到空 body
+        return redirectClient.newCall(req).execute().use { resp ->
+            if (!resp.isSuccessful && !resp.isRedirect) {
+                throw IllegalStateException("HTTP ${resp.code}")
+            }
+            resp.body?.string() ?: ""
+        }
+    }
+
+    /** 带 cookie 和自定义 referer 的 GET（用于 B站 playurl API） */
+    private fun httpGetWithCookie(url: String, cookie: String?, referer: String): String {
+        val builder = Request.Builder()
+            .url(url)
+            .header("User-Agent", UA_MOBILE)
+            .header("Accept", "*/*")
+            .header("Accept-Language", "zh-CN,zh;q=0.9")
+            .header("Referer", referer)
+        if (!cookie.isNullOrBlank()) {
+            builder.header("Cookie", cookie)
+        }
+        val req = builder.get().build()
         return redirectClient.newCall(req).execute().use { resp ->
             if (!resp.isSuccessful && !resp.isRedirect) {
                 throw IllegalStateException("HTTP ${resp.code}")
@@ -546,6 +698,32 @@ object VideoParser {
         return null
     }
 
+    /** 在 JSON 树里递归查找第一个 key == targetKey 的数组 */
+    private fun deepFindArray(
+        element: com.google.gson.JsonElement,
+        targetKey: String
+    ): com.google.gson.JsonArray? {
+        when {
+            element.isJsonObject -> {
+                val obj = element.asJsonObject
+                if (obj.has(targetKey) && obj.get(targetKey).isJsonArray) {
+                    return obj.getAsJsonArray(targetKey)
+                }
+                for ((_, v) in obj.entrySet()) {
+                    val r = deepFindArray(v, targetKey)
+                    if (r != null) return r
+                }
+            }
+            element.isJsonArray -> {
+                for (e in element.asJsonArray) {
+                    val r = deepFindArray(e, targetKey)
+                    if (r != null) return r
+                }
+            }
+        }
+        return null
+    }
+
     // ---- Gson 便捷扩展 ----
     private fun com.google.gson.JsonObject.safeObj(key: String): com.google.gson.JsonObject? =
         if (this.has(key) && this.get(key).isJsonObject) this.getAsJsonObject(key) else null
@@ -553,4 +731,9 @@ object VideoParser {
     private fun com.google.gson.JsonObject.safeStr(key: String): String? =
         if (this.has(key) && this.get(key).isJsonPrimitive && !this.get(key).isJsonNull)
             this.get(key).asString else null
+
+    private fun com.google.gson.JsonObject.safeInt(key: String): Int? =
+        if (this.has(key) && this.get(key).isJsonPrimitive && !this.get(key).isJsonNull) {
+            try { this.get(key).asInt } catch (_: Exception) { null }
+        } else null
 }

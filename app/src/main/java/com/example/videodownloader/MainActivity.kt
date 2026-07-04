@@ -3,6 +3,7 @@ package com.example.videodownloader
 import android.Manifest
 import android.content.ClipboardManager
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
@@ -30,6 +31,19 @@ class MainActivity : AppCompatActivity() {
             log("缺少存储权限，无法保存视频。请在系统设置里授予存储权限。")
             toast("缺少存储权限")
         }
+    }
+
+    /** B站登录回调 */
+    private val biliLoginLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == RESULT_OK) {
+            log("B站登录成功")
+            toast("B站登录成功")
+        } else {
+            log("B站登录取消")
+        }
+        refreshBiliStatus()
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -63,6 +77,40 @@ class MainActivity : AppCompatActivity() {
                 return@setOnClickListener
             }
             ensurePermissionsThenDownload()
+        }
+
+        binding.btnBiliLogin.setOnClickListener {
+            // 长按登出，点击登录
+            if (BiliCookieStore.isLoggedIn(this)) {
+                toast("已登录，长按按钮可登出")
+            } else {
+                val intent = Intent(this, BiliLoginActivity::class.java)
+                biliLoginLauncher.launch(intent)
+            }
+        }
+
+        binding.btnBiliLogin.setOnLongClickListener {
+            if (BiliCookieStore.isLoggedIn(this)) {
+                BiliCookieStore.clear(this)
+                log("已登出 B站")
+                toast("已登出")
+                refreshBiliStatus()
+            } else {
+                val intent = Intent(this, BiliLoginActivity::class.java)
+                biliLoginLauncher.launch(intent)
+            }
+            true
+        }
+
+        refreshBiliStatus()
+    }
+
+    /** 刷新 B站登录状态显示 */
+    private fun refreshBiliStatus() {
+        binding.tvBiliStatus.text = if (BiliCookieStore.isLoggedIn(this)) {
+            "B站：已登录（1080P+）"
+        } else {
+            "B站：未登录（480P）"
         }
     }
 
@@ -98,7 +146,7 @@ class MainActivity : AppCompatActivity() {
             binding.tvProgress.text = "解析中…"
             log("====================")
 
-            val parseResult = VideoParser.parse(input)
+            val parseResult = VideoParser.parse(input, applicationContext)
             val video = parseResult.getOrElse { e ->
                 log("解析失败：${e.message}")
                 setUiBusy(false)
@@ -109,18 +157,49 @@ class MainActivity : AppCompatActivity() {
             log("标题：${video.title}")
             log("作者：${video.author}")
             log("平台：${video.platform}")
+            if (video.qualityLabel.isNotBlank()) {
+                log("画质：${video.qualityLabel}")
+            }
             log("视频直链：${video.videoUrl}")
-            log("开始下载…")
-            binding.tvProgress.text = "下载中 0%"
+            if (video.isDash) {
+                log("音频直链：${video.audioUrl}")
+                log("B站高清 dash 模式：下载视频+音频 → 合成 mp4")
+            }
 
-            val result = DownloadManager.download(
-                context = applicationContext,
-                videoUrl = video.videoUrl,
-                displayName = video.title
-            ) { percent ->
-                runOnUiThread {
-                    binding.progressBar.progress = percent
-                    binding.tvProgress.text = "下载中 $percent%"
+            val result = if (video.isDash) {
+                // B站 dash：下载音视频 + 合成
+                binding.tvProgress.text = "下载视频流 0%"
+                log("下载视频流…")
+                DownloadManager.downloadDash(
+                    context = applicationContext,
+                    videoUrl = video.videoUrl,
+                    audioUrl = video.audioUrl,
+                    displayName = video.title
+                ) { percent ->
+                    runOnUiThread {
+                        binding.progressBar.progress = percent
+                        val stage = when {
+                            percent < 40 -> "下载视频流"
+                            percent < 70 -> "下载音频流"
+                            percent < 100 -> "合成 mp4"
+                            else -> "完成"
+                        }
+                        binding.tvProgress.text = "$stage $percent%"
+                    }
+                }
+            } else {
+                // 普通：单 mp4 直链
+                log("开始下载…")
+                binding.tvProgress.text = "下载中 0%"
+                DownloadManager.download(
+                    context = applicationContext,
+                    videoUrl = video.videoUrl,
+                    displayName = video.title
+                ) { percent ->
+                    runOnUiThread {
+                        binding.progressBar.progress = percent
+                        binding.tvProgress.text = "下载中 $percent%"
+                    }
                 }
             }
 
