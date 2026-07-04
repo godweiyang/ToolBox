@@ -209,14 +209,17 @@ class AnimatedGifEncoder {
     }
 
     private fun writePalette() {
+        // colorTab 来自 NeuQuant.mapPixels(): IntArray(256 * 3),
+        // 每个元素是单个通道值(0-255),按 R,G,B,R,G,B,... 排列。
+        // GIF 调色板 = 256 项 × 3 字节 = 768 字节,直接按字节写。
+        // ⚠ 不能把每个 int 当完整 RGB 写 3 字节,否则会写 2304 字节,
+        // 多出的 1536 字节把后续 LZW 数据全部错位,导致 GIF 一片空白/损坏。
         val o = out ?: return
         for (i in colorTab.indices) {
             o.write(colorTab[i] and 0xff)
-            o.write((colorTab[i] shr 8) and 0xff)
-            o.write((colorTab[i] shr 16) and 0xff)
         }
-        // 补齐到 256 项
-        val n = 3 * (256 - colorTab.size / 3)
+        // 补齐到 256 项 × 3 字节 = 768 字节(NeuQuant 已满 256 项,通常无需补)
+        val n = 3 * 256 - colorTab.size
         for (i in 0 until n) o.write(0)
     }
 

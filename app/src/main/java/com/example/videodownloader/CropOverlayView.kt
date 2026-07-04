@@ -178,7 +178,12 @@ class CropOverlayView @JvmOverloads constructor(
                 lastX = event.x
                 lastY = event.y
                 dragMode = hitTest(event.x, event.y)
-                return dragMode != DRAG_NONE
+                if (dragMode != DRAG_NONE) {
+                    // 阻止父级(ScrollView)拦截后续触摸事件,避免拖框时整个页面跟着滚
+                    parent?.requestDisallowInterceptTouchEvent(true)
+                    return true
+                }
+                return false
             }
             MotionEvent.ACTION_MOVE -> {
                 if (dragMode == DRAG_NONE) return false
@@ -191,6 +196,10 @@ class CropOverlayView @JvmOverloads constructor(
                 return true
             }
             MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                if (dragMode != DRAG_NONE) {
+                    // 恢复,允许父级正常处理触摸
+                    parent?.requestDisallowInterceptTouchEvent(false)
+                }
                 dragMode = DRAG_NONE
                 return true
             }
