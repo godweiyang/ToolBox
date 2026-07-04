@@ -18,11 +18,12 @@
     <string name="log_initial">等待操作…\n</string>
 
     <!-- 二维码工具 -->
-    <string name="qr_input_label">输入文本或链接</string>
+    <string name="qr_input_label">粘贴文本或链接（任意文本均可，链接会自动生成二维码）</string>
     <string name="qr_input_hint">例如：https://github.com 或任意文本</string>
     <string name="qr_btn_generate">生成二维码</string>
     <string name="qr_btn_save">保存到相册</string>
-    <string name="qr_btn_paste">粘贴</string>
+    <string name="qr_btn_paste">粘贴剪贴板</string>
+    <string name="qr_btn_clear">清空</string>
     <string name="qr_section_style">样式设置</string>
     <string name="qr_fore_color">前景色</string>
     <string name="qr_back_color">背景色</string>

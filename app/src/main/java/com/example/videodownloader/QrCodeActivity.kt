@@ -161,6 +161,13 @@ class QrCodeActivity : AppCompatActivity() {
             }
         }
 
+        binding.btnQrClear.setOnClickListener {
+            binding.etQrInput.setText("")
+            currentQrBitmap = null
+            binding.ivQrPreview.setImageDrawable(null)
+            binding.btnSave.isEnabled = false
+        }
+
         binding.btnGenerate.setOnClickListener {
             generate()
         }
