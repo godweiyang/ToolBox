@@ -32,4 +32,15 @@
         android:clipToPadding="false"
         android:scrollbars="none" />
 
+    <TextView
+        android:id="@+id/tvVersion"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center"
+        android:paddingTop="8dp"
+        android:paddingBottom="4dp"
+        android:text="v1.1.2"
+        android:textColor="#999999"
+        android:textSize="11sp" />
+
 </LinearLayout>

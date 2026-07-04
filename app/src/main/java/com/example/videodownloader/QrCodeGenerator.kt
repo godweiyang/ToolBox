@@ -58,17 +58,19 @@ object QrCodeGenerator {
         return try {
             val hints = mapOf(
                 EncodeHintType.ERROR_CORRECTION to ecLevel,
+                // ZXing 的 MARGIN 是模块数（quiet zone），我们用调用方传的 margin
                 EncodeHintType.MARGIN to margin,
                 EncodeHintType.CHARACTER_SET to "UTF-8"
             )
-            val bitMatrix = QRCodeWriter().encode(content, BarcodeFormat.QR_CODE, sizePx, sizePx, hints)
+            // 关键：传 1x1 让 ZXing 返回"纯模块矩阵"，bitMatrix.width 就是模块数（不含 margin）
+            // 这样我们自己控制每个模块的像素大小，避免 ZXing 把 sizePx 当像素渲染导致的语义混乱
+            val bitMatrix = QRCodeWriter().encode(content, BarcodeFormat.QR_CODE, 1, 1, hints)
 
             val matrixWidth = bitMatrix.width
             val matrixHeight = bitMatrix.height
 
-            // 计算每个模块的像素大小，确保整数倍，避免边缘锯齿
-            // 至少为 1px，防止低分辨率下 moduleSize=0 导致圆点画不出来
-            val moduleSize = (sizePx / matrixWidth).coerceAtLeast(1)
+            // 每个模块的像素大小：按目标尺寸计算，至少 8px 保证圆点清晰可见
+            val moduleSize = (sizePx / matrixWidth).coerceAtLeast(8)
             val renderSize = moduleSize * matrixWidth
 
             val bitmap = Bitmap.createBitmap(renderSize, renderSize, Bitmap.Config.ARGB_8888)
@@ -88,8 +90,8 @@ object QrCodeGenerator {
             }
 
             if (roundDot) {
-                // 圆点样式：每个模块画一个圆，半径取模块边长的一半，稍大一点视觉更连贯
-                val radius = moduleSize / 2f * 0.95f
+                // 圆点样式：每个模块画一个圆，半径取模块边长的一半
+                val radius = moduleSize / 2f
                 for (x in 0 until matrixWidth) {
                     for (y in 0 until matrixHeight) {
                         if (bitMatrix.get(x, y)) {

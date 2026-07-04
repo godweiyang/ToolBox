@@ -28,6 +28,18 @@ class MainActivity : AppCompatActivity() {
         }
         binding.rvTools.layoutManager = GridLayoutManager(this, 2)
         binding.rvTools.adapter = adapter
+
+        // 底部显示版本号，方便用户确认当前安装的版本
+        binding.tvVersion.text = "v${getVersionName()}"
+    }
+
+    /** 从 PackageInfo 读取 versionName，避免硬编码 */
+    private fun getVersionName(): String = try {
+        val pm = packageManager
+        val pkgInfo = pm.getPackageInfo(packageName, 0)
+        pkgInfo.versionName ?: "unknown"
+    } catch (e: Exception) {
+        "unknown"
     }
 
     /** 工具清单：新增工具在这里加一行即可 */
