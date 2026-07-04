@@ -9,6 +9,9 @@
 | 🎬 视频下载 | 抖音 / 快手 / 小红书 / B站 视频下载(无水印 / B站高清) |
 | ▦ 二维码生成 | 输入文本/链接,自定义颜色样式生成二维码,支持 Logo |
 | 🎞️ 视频转 GIF | 导入本地视频,选取时间段和区域,生成 GIF 表情包 |
+| ▦ 九宫格切图 | 把一张图切成 3×3,发朋友圈九宫格 |
+| 🔄 GIF 倒放 | 把 GIF 反过来播,趣味效果 |
+| 🔊 分贝仪 | 用麦克风测量环境噪音分贝 |
 
 ---
 
@@ -171,6 +174,89 @@ bitmap.recycle()  逐帧回收防 OOM
 
 ---
 
+## 九宫格切图原理
+
+```
+用户选图片
+  ▼
+BitmapFactory.decodeStream  解码原图(可能很大)
+  ▼
+居中裁剪为正方形  (取宽高较短边,居中 crop)
+  ▼
+尺寸 > 1080px 时降采样缩放到 1080×1080(防 OOM)
+  ▼
+按 3×3 切成 9 张子 Bitmap
+  │ Bitmap.createBitmap(square, col*pieceSize, row*pieceSize, pieceSize, pieceSize)
+  │ 最后一行/列吃掉余数,避免缝隙
+  ▼
+GridLayout 预览 9 张图(每格 110dp)
+  ▼
+一键全部保存到 Pictures/NineGrid/  (PNG,MediaStore)
+```
+
+**用途**:发朋友圈九宫格——按顺序选 9 张发出去,拼起来是一张完整的图。
+
+---
+
+## GIF 倒放原理
+
+```
+用户选 GIF → 读 byte[]
+  ▼
+Movie.decodeByteArray  (android.graphics.Movie,系统 API,零依赖)
+  │ 解析 GIF 元数据:width / height / duration
+  ▼
+按帧数等间隔抽帧(默认 20 帧,可调 6-54)
+  │ for i in 0 until N:
+  │   t = i * duration / N
+  │   movie.setTime(t)
+  │   movie.draw(canvas, 0, 0)  → Bitmap
+  ▼
+frames.reverse()  反转帧序列
+  ▼
+AnimatedGifEncoder  重新编码
+  │ delay = duration / N / 10  (单位 1/100 秒)
+  │ NeuQuant 256 色量化 + LZW 压缩
+  ▼
+ByteArrayOutputStream  →  byte[]
+  ▼
+写入 MediaStore(Pictures/GifOutput/,image/gif)
+```
+
+**技术栈**:`android.graphics.Movie`(系统 GIF 解码,高版本 deprecated 但仍可用)+ 复用 `AnimatedGifEncoder` 编码。
+
+**效果**:正向播完 → 立即反向播 → 循环,适合做"鬼畜"表情包。
+
+---
+
+## 分贝仪原理
+
+```
+用户点"开始测量" → 申请 RECORD_AUDIO 权限
+  ▼
+AudioRecord(MIC, 44100Hz, MONO, PCM_16BIT)
+  │ 后台线程循环读取 PCM 数据
+  ▼
+计算 RMS(均方根)
+  │ rms = sqrt(Σ(sample²) / N)
+  ▼
+dBFS = 20 · log10(rms / 32767)   (范围 -∞ ~ 0)
+  ▼
+近似 SPL = dBFS + 90              (粗略校准,0 dBFS ≈ 90 dB SPL)
+  │ 结果限制在 0-120 dB
+  ▼
+主线程 Handler 更新 UI(每 100ms 一次)
+  │ - 当前 dB 大数字
+  │ - 等级标签:< 30 安静 / < 60 正常 / < 85 较吵 / ≥ 85 很吵
+  │ - 最小 / 最大 / 平均统计
+  ▼
+用户点"停止" → release AudioRecord
+```
+
+**校准说明**:手机麦克风无标准 SPL 校准,数值为**近似值**,仅用于相对比较环境噪音。不同手机麦克风灵敏度差异较大,绝对值可能有 ±10 dB 偏差。
+
+---
+
 ## 架构:工具百宝箱
 
 ```
@@ -184,9 +270,15 @@ MainActivity (工具列表入口,RecyclerView 网格)
   │   └── BiliMuxer            DASH 合成
   ├── QrCodeActivity (二维码工具)
   │   └── QrCodeGenerator.kt   ZXing 生成 + 美化
-  └── VideoToGifActivity (视频转 GIF 工具)
-      ├── GifConverter.kt       抽帧 + 裁剪 + 缩放 + 编码
-      └── AnimatedGifEncoder.kt GIF 编码器(Apache 2.0)
+  ├── VideoToGifActivity (视频转 GIF 工具)
+  │   ├── GifConverter.kt       抽帧 + 裁剪 + 缩放 + 编码
+  │   ├── CropOverlayView.kt   可拖拽裁剪框自定义 View(8 手柄 + 三分线)
+  │   └── AnimatedGifEncoder.kt GIF 编码器(Apache 2.0)
+  ├── NineGridActivity (九宫格切图工具)
+  ├── GifReverseActivity (GIF 倒放工具)
+  │   └── 复用 AnimatedGifEncoder + android.graphics.Movie
+  └── DecibelMeterActivity (分贝仪工具)
+      └── AudioRecord + RMS → dBFS → 近似 SPL
 ```
 
 **新增工具只需 3 步**:
@@ -243,14 +335,22 @@ ToolBox/
         │   │
         │   ├── VideoToGifActivity.kt       # 视频转 GIF 工具 UI
         │   ├── GifConverter.kt             # 抽帧 + 裁剪 + 缩放 + GIF 编码(协程异步)
-        │   └── AnimatedGifEncoder.kt       # GIF 编码器(Apache 2.0,NeuQuant + LZW)
+        │   ├── CropOverlayView.kt          # 可拖拽裁剪框自定义 View(8 手柄 + 三分线 + 尺寸标签)
+        │   ├── AnimatedGifEncoder.kt       # GIF 编码器(Apache 2.0,NeuQuant + LZW)
+        │   │
+        │   ├── NineGridActivity.kt         # 九宫格切图工具 UI
+        │   ├── GifReverseActivity.kt       # GIF 倒放工具(Movie 解码 + 反转 + 重新编码)
+        │   └── DecibelMeterActivity.kt     # 分贝仪(AudioRecord + RMS → dBFS → SPL)
         └── res/
             ├── layout/
             │   ├── activity_main.xml             # 工具列表页
             │   ├── item_tool.xml                 # 工具卡片
             │   ├── activity_video_downloader.xml # 视频下载页
             │   ├── activity_qrcode.xml           # 二维码页
-            │   └── activity_video_to_gif.xml     # 视频转 GIF 页
+            │   ├── activity_video_to_gif.xml     # 视频转 GIF 页
+            │   ├── activity_nine_grid.xml        # 九宫格切图页
+            │   ├── activity_gif_reverse.xml      # GIF 倒放页
+            │   └── activity_decibel_meter.xml    # 分贝仪页
             ├── drawable/ic_launcher_background.xml  # 图标渐变背景
             ├── drawable/ic_launcher_foreground.xml  # 图标工具箱前景
             ├── mipmap-anydpi-v26/ic_launcher.xml
@@ -376,10 +476,35 @@ B站:
 1. 打开本应用,点击"视频转 GIF"工具卡片
 2. 点"选择视频"从相册导入本地视频
 3. 拖动"起""止"两个 SeekBar 选时间段,拖动时视频自动跳到对应帧预览(左上角显示当前时间)
-4. 在预览图上拖拽白色裁剪框的边或角调整裁剪区域(内部拖动可整体移动,带三分线辅助构图)
+4. 在预览图上拖拽白色裁剪框的边或角调整裁剪区域(内部拖动可整体移动,带三分线辅助构图,左上角实时显示裁剪尺寸)
 5. 调整帧率(默认 14 fps)、输出宽度(默认 480 px)、GIF 画质(默认 10,越小越好)
 6. 点"生成 GIF",等进度条到 100%
 7. GIF 保存到相册的 `Pictures/GifOutput/` 目录
+
+### 九宫格切图
+
+1. 打开本应用,点击"九宫格切图"工具卡片
+2. 点"选择图片"从相册导入图片
+3. 自动居中裁剪为正方形并切成 3×3 共 9 张,在 GridLayout 预览
+4. 点"全部保存到相册",9 张 PNG 保存到 `Pictures/NineGrid/`
+5. 在朋友圈按顺序选这 9 张发出去,拼起来是一张完整的图
+
+### GIF 倒放
+
+1. 打开本应用,点击"GIF 倒放"工具卡片
+2. 点"选择 GIF"从相册导入 GIF(左侧显示原图首帧)
+3. 调整"抽取帧数"(默认 20,越多越流畅,范围 6-54)
+4. 点"生成倒放 GIF",等进度条到 100%(右侧显示倒放首帧)
+5. 点"保存到相册",GIF 保存到 `Pictures/GifOutput/`
+
+### 分贝仪
+
+1. 打开本应用,点击"分贝仪"工具卡片
+2. 点"开始测量",首次会请求麦克风权限,允许即可
+3. 对着麦克风说话或放到噪音源旁,实时显示当前分贝 + 等级 + 最小/最大/平均
+4. 点"停止测量"结束
+
+> 手机麦克风无标准 SPL 校准,数值为近似值,仅用于相对比较环境噪音。
 
 ## 权限说明
 
@@ -388,7 +513,8 @@ B站:
 | `INTERNET` | 视频下载:访问短链、解析接口、下载视频 |
 | `WRITE_EXTERNAL_STORAGE`(≤Android 9) | 旧版本写入相册 |
 | `READ_MEDIA_VIDEO`(Android 13+) | 视频转 GIF:从相册选视频 / 视频媒体细粒度权限 |
-| `READ_MEDIA_IMAGES`(Android 13+) | 二维码:从相册选 Logo |
+| `READ_MEDIA_IMAGES`(Android 13+) | 二维码:从相册选 Logo;九宫格:从相册选图;GIF 倒放:从相册选 GIF |
+| `RECORD_AUDIO` | 分贝仪:麦克风录音测量噪音 |
 
 Android 10/11/12 通过 MediaStore 写入,无需存储权限;
 Android 13+ 申请细粒度媒体权限。
@@ -419,6 +545,20 @@ Android 13+ 申请细粒度媒体权限。
 - `MediaMetadataRetriever.getFrameAtTime` 在部分国产 ROM 上偶发返回 null,
   已加重试但仍可能丢个别帧(表现为 GIF 略卡)。
 - 超长视频(>30s)建议截取片段再转,否则耗时和内存压力较大。
+
+### 九宫格切图
+- 自动居中裁剪为正方形,非正方形原图的边缘会被裁掉。
+- 切图尺寸基于原图(降采样到 1080px),发朋友圈时建议选高清原图。
+
+### GIF 倒放
+- 用 `android.graphics.Movie` 解码,部分超大 GIF 可能解码失败。
+- 帧数抽太少会卡顿,抽太多会增大文件体积,建议默认 20 帧。
+- 倒放后 GIF 颜色可能略有损失(重新编码时 256 色量化)。
+
+### 分贝仪
+- 手机麦克风无标准 SPL 校准,数值为近似值,不同手机灵敏度差异可能 ±10 dB。
+- 后台运行或锁屏时测量会停止(AudioRecord 在后台受限)。
+- 麦克风被其他应用占用时会初始化失败。
 
 ## 仅供学习交流
 
