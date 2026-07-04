@@ -53,4 +53,7 @@ dependencies {
 
     // JSON 解析
     implementation("com.google.code.gson:gson:2.11.0")
+
+    // ZXing 二维码生成（仅 core，体积小）
+    implementation("com.google.zxing:core:3.5.3")
 }

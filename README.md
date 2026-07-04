@@ -1,23 +1,47 @@
-# VideoDownload 视频下载器
+# 工具百宝箱 ToolBox
 
-一个 Android 应用，粘贴抖音 / 快手 / 小红书 / B站的分享文本即可自动提取视频并下载到手机相册。
+一个轻量级 Android 工具集合应用。采用"工具百宝箱"架构,主页是工具卡片列表,点击进入对应工具,后续可逐步扩展新工具。
+
+## 当前工具
+
+| 工具 | 功能 |
+|---|---|
+| 🎬 视频下载 | 抖音 / 快手 / 小红书 / B站 视频下载(无水印 / B站高清) |
+| ▦ 二维码生成 | 输入文本/链接,自定义颜色样式生成二维码,支持 Logo |
+
+---
 
 ## 功能特性
 
-- **一键粘贴**：直接粘贴分享文本，自动用正则提取其中的链接，无需手动挑
-- **多平台支持**：
-  - 抖音（含西瓜视频）
+### 🎬 视频下载
+
+- **一键粘贴**:直接粘贴分享文本,自动用正则提取其中的链接,无需手动挑
+- **多平台支持**:
+  - 抖音(含西瓜视频)
   - 快手
   - 小红书
-  - B站（b23.tv 短链 / bilibili.com 完整链接）
-- **无水印下载**：抖音 / 快手 / 小红书均解析原始视频直链，下载的是无水印版本
-- **B站高清画质**：支持 DASH 音视频分离流，登录后可下载 1080P+ 画质，自动用 MediaMuxer 合成 mp4
-- **B站登录**：内置 WebView 登录页，抓取 SESSDATA cookie 调 playurl 接口拿最高清晰度（未登录仅 480P）
-- **自动入库相册**：视频保存到 `Movies/VideoDownloader/`，自动通知 MediaStore 刷新相册
-- **实时进度**：解析和下载过程均有日志与进度条展示
-- **多级兜底**：每个平台都准备了多条解析路径，应对官方接口变更
+  - B站(b23.tv 短链 / bilibili.com 完整链接)
+- **无水印下载**:抖音 / 快手 / 小红书均解析原始视频直链,下载的是无水印版本
+- **B站高清画质**:支持 DASH 音视频分离流,登录后可下载 1080P+ 画质,自动用 MediaMuxer 合成 mp4
+- **B站登录**:内置 WebView 登录页,抓取 SESSDATA cookie 调 playurl 接口拿最高清晰度(未登录仅 480P)
+- **自动入库相册**:视频保存到 `Movies/VideoDownloader/`,自动通知 MediaStore 刷新相册
+- **实时进度**:解析和下载过程均有日志与进度条展示
+- **多级兜底**:每个平台都准备了多条解析路径,应对官方接口变更
 
-## 平台解析原理
+### ▦ 二维码生成
+
+- **文本/链接输入**:粘贴或手动输入任意内容
+- **前景色 / 背景色**:各 6 种预设色板,一键切换
+- **点阵样式**:方块 / 圆点两种风格
+- **容错等级**:L(7%) / M(15%) / Q(25%) / H(30%)
+- **边距调节**:0-8 模块(SeekBar)
+- **中心 Logo**:从相册选图,自动白底圆角缩放,加 Logo 自动切到 H 容错
+- **保存相册**:PNG 格式,存到 `Pictures/QrCode/`
+- **实时预览**:任意样式改动自动重新生成
+
+---
+
+## 平台解析原理(视频下载)
 
 ### 抖音
 
@@ -25,7 +49,7 @@
 分享文本
   │ 正则提取 https://v.douyin.com/xxx/
   ▼
-短链 GET（不跟随重定向）
+短链 GET(不跟随重定向)
   │ 读取 Location: .../share/video/{video_id}/
   ▼
 GET https://www.iesdouyin.com/web/api/v2/aweme/iteminfo/?item_ids={video_id}
@@ -37,7 +61,7 @@ GET https://www.iesdouyin.com/web/api/v2/aweme/iteminfo/?item_ids={video_id}
 下载并写入 MediaStore(Movies/VideoDownloader/)
 ```
 
-兜底：iteminfo 接口失效时，直接请求 share 页 HTML，正则搜索
+兜底:iteminfo 接口失效时,直接请求 share 页 HTML,正则搜索
 `"play_addr":{"url_list":["..."]}` / `_ROUTER_DATA` / mp4 直链。
 
 ### 小红书
@@ -46,17 +70,17 @@ GET https://www.iesdouyin.com/web/api/v2/aweme/iteminfo/?item_ids={video_id}
 分享文本
   │ 正则提取 http://xhslink.com/o/xxx
   ▼
-短链 GET（不跟随重定向）
+短链 GET(不跟随重定向)
   │ 读取 Location: https://www.xiaohongshu.com/discovery/item/{noteId}?xsec_token=xxx
-  │ ⚠ xsec_token 是访问凭证，必须原样保留
+  │ ⚠ xsec_token 是访问凭证,必须原样保留
   ▼
-GET 跳转后的完整 URL（含 xsec_token）
+GET 跳转后的完整 URL(含 xsec_token)
   │ HTML 里有 window.__INITIAL_STATE__ = {...}
   ▼
 用花括号平衡计数提取完整 JSON
-  │ 递归查找字段：
-  │   - masterUrl（完整直链，优先）
-  │   - originVideoKey（拼接 https://sns-video-bd.xhscdn.com/{key}）
+  │ 递归查找字段:
+  │   - masterUrl(完整直链,优先)
+  │   - originVideoKey(拼接 https://sns-video-bd.xhscdn.com/{key})
   ▼
 下载并写入相册
 ```
@@ -71,43 +95,67 @@ GET 跳转后的完整 URL（含 xsec_token）
 分享文本
   │ 正则提取 https://b23.tv/xxx 或 https://www.bilibili.com/video/BVxxx
   ▼
-短链 GET（不跟随重定向）
+短链 GET(不跟随重定向)
   │ 读取 Location: https://www.bilibili.com/video/BVxxx
   │ 提取 BV 号
   ▼
 GET https://api.bilibili.com/x/web-interface/view?bvid={BV}
-  │ 拿到 cid（视频 cid）
+  │ 拿到 cid(视频 cid)
   ▼
 GET https://api.bilibili.com/x/player/playurl?bvid=&cid=&qn=127&fnval=16&fourk=1
-  │   qn=127  请求 4K（最高画质）
-  │   fnval=16  请求 DASH 格式（音视频分离）
-  │   带 SESSDATA cookie（登录态）→ 解锁 1080P+
+  │   qn=127  请求 4K(最高画质)
+  │   fnval=16  请求 DASH 格式(音视频分离)
+  │   带 SESSDATA cookie(登录态)→ 解锁 1080P+
   ▼
-DASH 流：dash.video[] / dash.audio[] 各选 id 最大的轨道
-  │ 视频优先 avc1 编码（MediaMuxer 兼容性最好）
+DASH 流:dash.video[] / dash.audio[] 各选 id 最大的轨道
+  │ 视频优先 avc1 编码(MediaMuxer 兼容性最好)
   ▼
 下载视频 m4s (0-40%) + 音频 m4s (40-70%)
   ▼
-BiliMuxer：MediaExtractor 读两条 m4s 轨道 → MediaMuxer 按时间戳交错写入 → mp4 (70-100%)
+BiliMuxer:MediaExtractor 读两条 m4s 轨道 → MediaMuxer 按时间戳交错写入 → mp4 (70-100%)
   ▼
 写入相册
 ```
 
-**清晰度说明**：
-- 未登录：仅 480P（B站服务端限制）
-- 普通账号登录：最高 1080P
-- 大会员账号登录：最高 4K / HDR
+**清晰度说明**:
+- 未登录:仅 480P(B站服务端限制)
+- 普通账号登录:最高 1080P
+- 大会员账号登录:最高 4K / HDR
 
-**登录方式**：主界面"B站登录"按钮 → 内置 WebView 加载官方登录页 →
+**登录方式**:视频下载页"B站登录"按钮 → 内置 WebView 加载官方登录页 →
 登录成功后从 CookieManager 提取 SESSDATA 持久化到 SharedPreferences。
 长按"B站登录"按钮可登出。
+
+---
+
+## 架构:工具百宝箱
+
+```
+MainActivity (工具列表入口,RecyclerView 网格)
+  │ 点击卡片 → startActivity(tool.launcher(this))
+  ├── VideoDownloaderActivity (视频下载工具)
+  │   ├── VideoParser.kt       多平台解析
+  │   ├── DownloadManager.kt   下载 + 入库
+  │   ├── BiliLoginActivity    B站登录
+  │   ├── BiliCookieStore      cookie 持久化
+  │   └── BiliMuxer            DASH 合成
+  └── QrCodeActivity (二维码工具)
+      └── QrCodeGenerator.kt   ZXing 生成 + 美化
+```
+
+**新增工具只需 3 步**:
+1. 写 `XxxActivity.kt` + `activity_xxx.xml`
+2. AndroidManifest 注册
+3. `MainActivity.getTools()` 里加一行 `Tool(...)`
+
+---
 
 ## 文件结构
 
 ```
 VideoDownload/
 ├── settings.gradle.kts          # 工程设置
-├── build.gradle.kts             # 顶层构建（AGP 8.1.4 + Kotlin 1.9.24）
+├── build.gradle.kts             # 顶层构建(AGP 8.1.4 + Kotlin 1.9.24)
 ├── gradle.properties            # Gradle / AndroidX 配置
 ├── gradle/
 │   └── wrapper/
@@ -117,20 +165,31 @@ VideoDownload/
 ├── .gitignore
 ├── README.md
 └── app/
-    ├── build.gradle.kts         # 模块构建（compileSdk 34, minSdk 26）
+    ├── build.gradle.kts         # 模块构建(compileSdk 34, minSdk 26)
     ├── proguard-rules.pro
     └── src/main/
         ├── AndroidManifest.xml
         ├── java/com/example/videodownloader/
-        │   ├── MainActivity.kt       # UI + 流程编排（粘贴→解析→下载→入库）
-        │   ├── VideoInfo.kt          # 数据类（含 DASH 字段）
-        │   ├── VideoParser.kt        # 链接提取 + 多平台多策略解析
-        │   ├── DownloadManager.kt    # 下载 + MediaStore 入库（含 DASH 合成流程）
-        │   ├── BiliCookieStore.kt    # B站 SESSDATA cookie 持久化（SharedPreferences）
-        │   ├── BiliLoginActivity.kt  # B站 WebView 登录页
-        │   └── BiliMuxer.kt          # DASH m4s 音视频合成（MediaExtractor + MediaMuxer）
+        │   ├── MainActivity.kt             # 工具百宝箱入口(工具列表)
+        │   ├── Tool.kt                     # 工具数据类
+        │   ├── ToolAdapter.kt              # 工具列表适配器
+        │   │
+        │   ├── VideoDownloaderActivity.kt  # 视频下载工具 UI
+        │   ├── VideoInfo.kt                # 视频数据类(含 DASH 字段)
+        │   ├── VideoParser.kt              # 链接提取 + 多平台多策略解析
+        │   ├── DownloadManager.kt          # 下载 + MediaStore 入库(含 DASH 合成流程)
+        │   ├── BiliCookieStore.kt          # B站 SESSDATA cookie 持久化
+        │   ├── BiliLoginActivity.kt        # B站 WebView 登录页
+        │   ├── BiliMuxer.kt                # DASH m4s 音视频合成(MediaExtractor + MediaMuxer)
+        │   │
+        │   ├── QrCodeActivity.kt           # 二维码工具 UI
+        │   └── QrCodeGenerator.kt          # ZXing 二维码生成 + 美化
         └── res/
-            ├── layout/activity_main.xml
+            ├── layout/
+            │   ├── activity_main.xml             # 工具列表页
+            │   ├── item_tool.xml                 # 工具卡片
+            │   ├── activity_video_downloader.xml # 视频下载页
+            │   └── activity_qrcode.xml           # 二维码页
             ├── drawable/ic_launcher_foreground.xml
             ├── mipmap-anydpi-v26/ic_launcher.xml
             ├── mipmap-anydpi-v26/ic_launcher_round.xml
@@ -142,51 +201,51 @@ VideoDownload/
 | 依赖 | 版本 |
 |---|---|
 | JDK | 17 |
-| Gradle | 8.0（由 wrapper 自动下载） |
+| Gradle | 8.0(由 wrapper 自动下载) |
 | Android Gradle Plugin | 8.1.4 |
 | Kotlin | 1.9.24 |
 | compileSdk | 34 |
-| minSdk | 26（Android 8.0） |
-| targetSdk | 34（Android 14） |
+| minSdk | 26(Android 8.0) |
+| targetSdk | 34(Android 14) |
 
-主要第三方库：
-- OkHttp 4.12.0（网络请求）
-- Gson 2.11.0（JSON 解析）
-- Kotlinx Coroutines 1.8.1（协程）
+主要第三方库:
+- OkHttp 4.12.0(网络请求)
+- Gson 2.11.0(JSON 解析)
+- Kotlinx Coroutines 1.8.1(协程)
+- ZXing 3.5.3(二维码生成)
 - AndroidX / Material Components
 
 ## 编译方法
 
-> 克隆后需要先准备 Android SDK（含 platform android-34 和 build-tools 34.0.0），
+> 克隆后需要先准备 Android SDK(含 platform android-34 和 build-tools 34.0.0),
 > 并在工程根目录创建 `local.properties` 指向 SDK 路径。
 
 ### 1. 准备 SDK
 
-如果已装 Android Studio，SDK 通常在：
+如果已装 Android Studio,SDK 通常在:
 - Windows: `C:\Users\<用户名>\AppData\Local\Android\Sdk`
 - macOS: `~/Library/Android/sdk`
 - Linux: `~/Android/Sdk`
 
-通过 SDK Manager 安装：
-- SDK Platform 34（Android 14）
+通过 SDK Manager 安装:
+- SDK Platform 34(Android 14)
 - Android SDK Build-Tools 34.0.0
 - Android SDK Platform-Tools
 - Android SDK Command-line Tools
 
 ### 2. 配置 local.properties
 
-在工程根目录创建 `local.properties`，内容（路径换成你本机的）：
+在工程根目录创建 `local.properties`,内容(路径换成你本机的):
 
 ```properties
 sdk.dir=C\:\\Users\\你的用户名\\AppData\\Local\\Android\\Sdk
 ```
 
-> `local.properties` 已在 `.gitignore` 中，不会提交。
+> `local.properties` 已在 `.gitignore` 中,不会提交。
 
 ### 3. 接受 SDK License
 
 ```bash
-# 用命令行工具接受所有 license
 yes | sdkmanager --licenses
 ```
 
@@ -200,7 +259,7 @@ gradlew.bat assembleDebug
 ./gradlew assembleDebug
 ```
 
-产物路径：`app/build/outputs/apk/debug/app-debug.apk`
+产物路径:`app/build/outputs/apk/debug/app-debug.apk`
 
 ## 安装到手机
 
@@ -208,56 +267,79 @@ gradlew.bat assembleDebug
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
 
-或把 APK 文件传到手机，点击安装（需在系统设置允许“未知来源应用”安装）。
+或把 APK 文件传到手机,点击安装(需在系统设置允许"未知来源应用"安装)。
 
 ## 使用方法
 
+### 视频下载
+
 1. 在抖音 / 快手 / 小红书 / B站 App 里点视频右下角"分享" → "复制链接"
-2. 打开本应用，点"粘贴剪贴板"（或手动粘贴到输入框）
-3. 点"解析并下载"
-4. 日志区会显示标题 / 作者 / 平台 / 视频直链 / 下载进度
-5. 下载完成后到相册的 `Movies/VideoDownloader/` 目录查看
+2. 打开本应用,点击"视频下载"工具卡片
+3. 点"粘贴剪贴板"(或手动粘贴到输入框)
+4. 点"解析并下载"
+5. 日志区会显示标题 / 作者 / 平台 / 视频直链 / 下载进度
+6. 下载完成后到相册的 `Movies/VideoDownloader/` 目录查看
 
-> B站下载 1080P+ 画质需先点"B站登录"完成登录；未登录仅 480P。
+> B站下载 1080P+ 画质需先点"B站登录"完成登录;未登录仅 480P。
 
-### 示例输入
+#### 示例输入
 
-抖音：
+抖音:
 ```
-1.02 复制打开抖音，看看【我就是老盖的作品】这是私房照吗？ # 摄影师老盖 # 人像摄影  https://v.douyin.com/D68hRKDKps8/  XMJ:/ :7pm 01/25 o@d.aN
-```
-
-小红书：
-```
-黑 是真黑 但 不得不说，这个颜值导播可以的！ http://xhslink.com/o/7H6YzcRALw8 复制后直接打开【小红书】，笔记即刻可见。
+1.02 复制打开抖音,看看【我就是老盖的作品】这是私房照吗? # 摄影师老盖 # 人像摄影  https://v.douyin.com/D68hRKDKps8/  XMJ:/ :7pm 01/25 o@d.aN
 ```
 
-B站：
+小红书:
 ```
-【【全面评测】你想知道的 Steam Machine 的一切！体验+性能+拆机！-哔哩哔哩】 https://b23.tv/6t989Gh
+黑 是真黑 但 不得不说,这个颜值导播可以的! http://xhslink.com/o/7H6YzcRALw8 复制后直接打开【小红书】,笔记即刻可见。
 ```
+
+B站:
+```
+【【全面评测】你想知道的 Steam Machine 的一切!体验+性能+拆机!-哔哩哔哩】 https://b23.tv/6t989Gh
+```
+
+### 二维码生成
+
+1. 打开本应用,点击"二维码生成"工具卡片
+2. 在输入框输入文本或链接(可点"粘贴"按钮)
+3. 在下方样式区选择前景色、背景色、点阵样式、容错等级、边距
+4. 二维码会实时显示在预览区(改样式自动刷新)
+5. 可选:点"从相册选择"添加中心 Logo(自动切 H 容错)
+6. 点"保存到相册",PNG 文件保存到 `Pictures/QrCode/`
 
 ## 权限说明
 
 | 权限 | 用途 |
 |---|---|
-| `INTERNET` | 访问短链、解析接口、下载视频 |
-| `WRITE_EXTERNAL_STORAGE`（≤Android 9） | 旧版本写入相册 |
-| `READ_MEDIA_VIDEO`（Android 13+） | 媒体细粒度权限 |
+| `INTERNET` | 视频下载:访问短链、解析接口、下载视频 |
+| `WRITE_EXTERNAL_STORAGE`(≤Android 9) | 旧版本写入相册 |
+| `READ_MEDIA_VIDEO`(Android 13+) | 视频媒体细粒度权限 |
+| `READ_MEDIA_IMAGES`(Android 13+) | 二维码:从相册选 Logo |
 
-Android 10/11/12 通过 MediaStore 写入，无需存储权限；
-Android 13+ 仅申请 `READ_MEDIA_VIDEO`。
+Android 10/11/12 通过 MediaStore 写入,无需存储权限;
+Android 13+ 申请细粒度媒体权限。
 
 ## 已知限制
 
-- 各平台官方接口会不定期变更。本应用为每个平台都准备了多级兜底解析策略，
+### 视频下载
+- 各平台官方接口会不定期变更。本应用为每个平台都准备了多级兜底解析策略,
   但仍可能因官方接口彻底改版而失效。失效时优先更新 `VideoParser.kt` 中
   对应平台的接口地址或正则。
-- 解析出的"无水印"地址在服务端就已是原始视频流，本应用不做本地去水印处理。
-- 直播流、图集类作品（纯图片）暂不支持。
-- 小红书的 `xsec_token` 有时效性，分享文本需尽快使用。
-- B站未登录仅 480P；登录后清晰度取决于账号等级，大会员才能拿 4K/HDR。
-- B站 DASH 流需下载视频+音频两条 m4s 再本地合成，耗时与体积约为单流的两倍。
-- B站直链偶尔会返回非 443 端口（如 `:8082`），部分手机网络会拦截高端口，
+- 解析出的"无水印"地址在服务端就已是原始视频流,本应用不做本地去水印处理。
+- 直播流、图集类作品(纯图片)暂不支持。
+- 小红书的 `xsec_token` 有时效性,分享文本需尽快使用。
+- B站未登录仅 480P;登录后清晰度取决于账号等级,大会员才能拿 4K/HDR。
+- B站 DASH 流需下载视频+音频两条 m4s 再本地合成,耗时与体积约为单流的两倍。
+- B站直链偶尔会返回非 443 端口(如 `:8082`),部分手机网络会拦截高端口,
   表现为"视频流下载失败"。切换 Wi-Fi / 移动数据通常可解决。
-- **仅供学习交流使用**，请遵守各平台协议与当地法律，下载内容版权归原作者所有。
+- 微信视频号因链接封闭、视频流加密鉴权,**技术上无法支持**。
+
+### 二维码生成
+- 内容过长(超过 ZXing 编码上限,通常 2000+ 字符)会生成失败。
+- 圆点样式在低分辨率屏幕上可能比方块样式略显模糊。
+- 透明背景保存为 PNG 时透明区域在相册缩略图中显示为黑色。
+
+## 仅供学习交流
+
+请遵守各平台协议与当地法律,下载内容版权归原作者所有。本应用不用于商业用途,不对任何因使用本应用产生的纠纷负责。

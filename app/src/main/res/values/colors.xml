@@ -4,4 +4,5 @@
     <color name="white">#FFFFFFFF</color>
     <color name="douyin_red">#FE2C55</color>
     <color name="bg_light">#FFFAFAFA</color>
+    <color name="tool_qrcode_bg">#3F51B5</color>
 </resources>

@@ -1,11 +1,52 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">视频下载器</string>
-    <string name="subtitle_hint">支持抖音 / 快手 / 小红书 / B站分享链接，自动提取视频直链下载</string>
+    <string name="app_name">工具百宝箱</string>
+
+    <!-- 工具列表主页 -->
+    <string name="subtitle_hint">轻量实用工具合集，点击卡片进入对应工具</string>
+    <string name="tool_video_downloader_title">视频下载</string>
+    <string name="tool_video_downloader_desc">抖音 / 快手 / 小红书 / B站 视频下载</string>
+    <string name="tool_qrcode_title">二维码生成</string>
+    <string name="tool_qrcode_desc">输入文本/链接，自定义颜色与样式生成二维码</string>
+
+    <!-- 视频下载工具 -->
     <string name="label_input">粘贴分享文本（包含链接即可，会自动提取）</string>
     <string name="hint_input">粘贴抖音 / 快手 / 小红书 / B站分享文本，例如：\n1.02 复制打开抖音… https://v.douyin.com/xxxxx/\n或：… http://xhslink.com/o/xxxxx 复制后打开小红书\n或：【…】 https://b23.tv/xxxxx</string>
     <string name="btn_paste">粘贴剪贴板</string>
     <string name="btn_clear">清空</string>
     <string name="btn_download">解析并下载</string>
     <string name="log_initial">等待操作…\n</string>
+
+    <!-- 二维码工具 -->
+    <string name="qr_input_label">输入文本或链接</string>
+    <string name="qr_input_hint">例如：https://github.com 或任意文本</string>
+    <string name="qr_btn_generate">生成二维码</string>
+    <string name="qr_btn_save">保存到相册</string>
+    <string name="qr_btn_paste">粘贴</string>
+    <string name="qr_section_style">样式设置</string>
+    <string name="qr_fore_color">前景色</string>
+    <string name="qr_back_color">背景色</string>
+    <string name="qr_dot_style">点阵样式</string>
+    <string name="qr_dot_square">方块</string>
+    <string name="qr_dot_round">圆点</string>
+    <string name="qr_margin">边距</string>
+    <string name="qr_logo">中心 Logo</string>
+    <string name="qr_logo_pick">从相册选择</string>
+    <string name="qr_logo_clear">清除</string>
+    <string name="qr_error_correction">容错等级</string>
+    <string name="qr_ec_l">L · 7%</string>
+    <string name="qr_ec_m">M · 15%</string>
+    <string name="qr_ec_q">Q · 25%</string>
+    <string name="qr_ec_h">H · 30%</string>
+    <string name="qr_preview_hint">二维码预览（点击可放大）</string>
+    <string name="qr_save_success">已保存到相册：Pictures/QrCode/</string>
+    <string name="qr_save_fail">保存失败</string>
+    <string name="qr_empty_input">请先输入文本</string>
+    <string name="qr_color_black">黑色</string>
+    <string name="qr_color_white">白色</string>
+    <string name="qr_color_red">红色</string>
+    <string name="qr_color_blue">蓝色</string>
+    <string name="qr_color_green">绿色</string>
+    <string name="qr_color_purple">紫色</string>
+    <string name="qr_color_custom">自定义…</string>
 </resources>
