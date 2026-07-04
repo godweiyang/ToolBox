@@ -105,7 +105,9 @@ class AnimatedGifEncoder {
         }
         writeGraphicCtrlExt()
         writeImageDesc()
-        writePalette()
+        // 仅非首帧写局部调色板;首帧用 LSD 后的全局调色板,writeImageDesc 已声明无 LCT
+        // 若首帧也写,解码器会把这 768 字节当成 LZW 数据,导致整个流错位损坏
+        if (!firstFrame) writePalette()
         writePixels()
         firstFrame = false
         return true
@@ -219,8 +221,9 @@ class AnimatedGifEncoder {
     }
 
     private fun writePixels() {
-        // GIF LZW: 初始 code size = colorDepth + 1, 但最小为 2
-        val initCodeSize = (colorDepth + 1).coerceAtLeast(2)
+        // GIF LZW minimum code size = colorDepth (8 for 256 colors), 最小为 2
+        // 实际 code 位宽从 initCodeSize + 1 开始
+        val initCodeSize = colorDepth.coerceAtLeast(2)
         val encoder = LZWEncoder(indexedPixels, initCodeSize)
         encoder.encode(out!!)
     }
@@ -461,13 +464,17 @@ internal class NeuQuant(
 /**
  * LZW 编码器：GIF 用的 LZW 变长长度压缩。
  *
- * GIF LZW 规范：
- *  - 先输出 1 字节 "LZW minimum code size"（= initCodeSize）
- *  - 然后是一系列 sub-block：1 字节长度 N + N 字节数据，最后以 0 字节结束
- *  - clear code = 1 << initCodeSize, eof code = clear + 1
+ * 严格按 GIF89a 规范：
+ *  - LZW minimum code size = initCodeSize（颜色位深，256色时为 8）
+ *  - clear code = 1 << initCodeSize
+ *  - end-of-information code = clear + 1
  *  - 第一个可用字典 code = clear + 2
- *  - code 位宽从 initCodeSize+1 开始，字典满到 2^n 时升到 n+1 位，最高 12 位
- *  - 字典满（4096）时输出 clear code 并重置
+ *  - 初始 code 位宽 = initCodeSize + 1
+ *  - 字典插入新词后，当下一个待输出 code >= 2^curCodeSize 时升位宽（最高 12 位）
+ *  - 字典满（code 4095）时输出 clear code 并重置
+ *
+ * 输出格式：一系列 sub-block，每个 sub-block = 1 字节长度 N（1-255）+ N 字节数据，
+ * 最后以 0 字节结束整个 image data。
  */
 internal class LZWEncoder(
     private val pixels: ByteArray,
@@ -475,31 +482,33 @@ internal class LZWEncoder(
 ) {
     private val clearCode = 1 shl initCodeSize
     private val eofCode = clearCode + 1
-    private var dictSize = eofCode + 1
+    private val firstFreeCode = eofCode + 1   // 第一个可用字典 code = clear + 2
+    private var dictSize = firstFreeCode
     private var curCodeSize = initCodeSize + 1
-    private val maxCode = 4096
+    private val maxCode = 4096  // 12 位最大值 + 1
 
-    // LZW 字典：用哈希表存 (prefix << 8 | suffix) -> code
+    // LZW 字典：哈希表存 (prefixCode, suffixByte) -> dictCode
+    // key = (prefixCode << 8) | suffixByte
     private val hashSize = 5003
     private val hashKey = IntArray(hashSize) { -1 }
     private val hashCode = IntArray(hashSize)
 
-    // 位缓冲（低位先存）
+    // 位缓冲（低位先存，LSB first）
     private var bitBuf = 0
     private var bitCount = 0
 
-    // sub-block 缓冲：先攒到 byte 数组，满了 255 写出
+    // sub-block 缓冲
     private val blockBuf = ByteArray(255)
     private var blockLen = 0
 
     fun encode(out: OutputStream) {
-        // 1. 写 LZW minimum code size
+        // 1. 写 LZW minimum code size 字节
         out.write(initCodeSize)
 
-        // 2. 初始化
+        // 2. 初始化字典
         resetDict()
 
-        // 3. 写 clear code
+        // 3. 输出 clear code
         writeCode(out, clearCode)
 
         if (pixels.isEmpty()) {
@@ -510,6 +519,7 @@ internal class LZWEncoder(
             return
         }
 
+        // 4. LZW 主循环
         var w = pixels[0].toInt() and 0xff
         var idx = 1
         while (idx < pixels.size) {
@@ -518,22 +528,29 @@ internal class LZWEncoder(
 
             val newKey = (w shl 8) or k
             val hashIdx = hashLookup(newKey)
-            val existing = if (hashKey[hashIdx] == newKey) hashCode[hashIdx] else -1
 
-            if (existing >= 0) {
-                w = existing
+            if (hashKey[hashIdx] == newKey) {
+                // (w, k) 在字典里，扩展 w
+                w = hashCode[hashIdx]
             } else {
+                // (w, k) 不在字典里
+                // 先输出当前 w
                 writeCode(out, w)
+
+                // 检查是否需要升位宽：下一个要分配的 dict code 是 dictSize
+                // 如果 dictSize >= 2^curCodeSize，需要先升位宽（在新词插入前）
+                // 但标准做法是：插入新词后，如果 dictSize == 2^curCodeSize 且 curCodeSize < 12，升位宽
                 if (dictSize < maxCode) {
                     hashKey[hashIdx] = newKey
                     hashCode[hashIdx] = dictSize
                     dictSize++
-                    // 当 dictSize 超过当前位宽能表示的最大值时，升位宽
+                    // 插入后检查：如果新分配的 code 用完了当前位宽，升位宽
+                    // 注意：dictSize 此时是"下一个待分配"的 code，所以判断 dictSize > 2^curCodeSize
                     if (dictSize > (1 shl curCodeSize) && curCodeSize < 12) {
                         curCodeSize++
                     }
                 } else {
-                    // 字典满，输出 clear 并重置
+                    // 字典满了，输出 clear code 并重置
                     writeCode(out, clearCode)
                     resetDict()
                 }
@@ -541,7 +558,7 @@ internal class LZWEncoder(
             }
         }
 
-        // 4. 收尾
+        // 5. 收尾：输出最后的 w 和 eof
         writeCode(out, w)
         writeCode(out, eofCode)
         flushBits(out)
@@ -550,12 +567,12 @@ internal class LZWEncoder(
     }
 
     private fun resetDict() {
-        dictSize = eofCode + 1
+        dictSize = firstFreeCode
         curCodeSize = initCodeSize + 1
         for (i in hashKey.indices) hashKey[i] = -1
     }
 
-    /** 线性探测哈希查找槽位 */
+    /** 线性探测哈希查找槽位（返回 key 已存在的位置，或第一个空槽） */
     private fun hashLookup(key: Int): Int {
         var h = (key * 264) % hashSize
         if (h < 0) h += hashSize
@@ -565,7 +582,7 @@ internal class LZWEncoder(
         return h
     }
 
-    /** 写一个 code 到位缓冲，每凑够字节就推入 sub-block */
+    /** 写一个 code 到位缓冲，每攒够字节就推入 sub-block */
     private fun writeCode(out: OutputStream, code: Int) {
         bitBuf = bitBuf or (code shl bitCount)
         bitCount += curCodeSize

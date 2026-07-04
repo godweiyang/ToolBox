@@ -1,10 +1,11 @@
 package com.example.videodownloader
 
-import android.content.Intent
 import android.graphics.Rect
 import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.view.View
 import android.widget.SeekBar
 import android.widget.Toast
@@ -12,22 +13,15 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import com.example.videodownloader.databinding.ActivityVideoToGifBinding
-import com.google.android.material.slider.RangeSlider
 import kotlinx.coroutines.launch
 
 /**
  * 视频转 GIF 工具。
  *
- * 用户操作流程：
- * 1. 点击"选择视频"从相册导入本地视频
- * 2. 用 RangeSlider 选时间段（双 thumb，最小间隔 500ms）
- * 3. 用 4 个 SeekBar（左/上/右/下）按百分比选裁剪区域
- * 4. 用 3 个 SeekBar 调 fps / 输出宽度 / GIF 画质
- * 5. 点击"生成 GIF"，协程异步转换，进度条实时更新
- * 6. 完成后 Toast 提示，GIF 已保存到 Pictures/GifOutput/
- *
- * 裁剪区域语义：左/上 0-50% 表示从左/上边缘裁掉多少，右/下 0-50% 表示从右/下边缘裁掉多少。
- * 例如 左=10, 右=10 表示左右各裁掉 10%，保留中间 80%。
+ * UI 改进版：
+ *  - 视频预览 + CropOverlayView 叠加，直接在预览图上拖拽裁剪框（带三分线 + 8 手柄）
+ *  - 双 SeekBar 选时间段，拖动时实时 seek 视频到对应帧预览
+ *  - 输出选项（fps / 宽度 / 画质）保持 SeekBar
  */
 class VideoToGifActivity : AppCompatActivity() {
 
@@ -37,7 +31,10 @@ class VideoToGifActivity : AppCompatActivity() {
     private var videoWidth: Int = 0
     private var videoHeight: Int = 0
 
-    // 视频选择器
+    // seek 节流，避免频繁 seekTo 卡顿
+    private val seekHandler = Handler(Looper.getMainLooper())
+    private var pendingSeek: Long? = null
+
     private val pickVideoLauncher = registerForActivityResult(
         ActivityResultContracts.GetContent()
     ) { uri ->
@@ -66,79 +63,96 @@ class VideoToGifActivity : AppCompatActivity() {
             videoDurationMs = 0L
             videoWidth = 0
             videoHeight = 0
-            binding.videoPreview.visibility = View.GONE
             binding.videoPreview.setVideoURI(null)
+            binding.videoPreview.visibility = View.GONE
+            binding.cropOverlay.visibility = View.GONE
             binding.tvVideoInfo.text = getString(R.string.vgf_input_label)
-            binding.rsTime.valueFrom = 0f
-            binding.rsTime.valueTo = 10000f
-            binding.tvTimeRange.text = "0s - 0s"
+            binding.tvTimeRange.text = "0.0s - 0.0s"
+            binding.tvFrameTime.text = "0.0s"
+            binding.sbStart.progress = 0
+            binding.sbEnd.progress = 300
         }
 
         binding.btnGenerate.setOnClickListener {
             doGenerate()
         }
 
-        // 时间段 RangeSlider：手动约束最小间隔 500ms
-        binding.rsTime.addOnChangeListener(RangeSlider.OnChangeListener { slider, _, _ ->
-            val values = slider.values
-            if (values.size >= 2) {
-                val startMs = values[0]
-                val endMs = values[1]
-                // 最小间隔 500ms，违反时修正
-                if (endMs - startMs < 500f) {
-                    // 不强制修正，让用户继续拖（Material 默认会阻止越界）
+        // 时间段 SeekBar：拖动时实时预览，且约束 start < end - minGap
+        val minGapPromille = 30  // 最小间隔 3%（千分之 30）
+        val startListener = object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
+                if (binding.sbEnd.progress - progress < minGapPromille) {
+                    binding.sbStart.progress = binding.sbEnd.progress - minGapPromille
+                    return
                 }
-                binding.tvTimeRange.text = "${startMs / 1000.0}s - ${endMs / 1000.0}s"
+                updateTimeLabel()
+                previewSeek(getStartTimeMs())
             }
-        })
-
-        // 4 个裁剪 SeekBar
-        val cropListener = object : SeekBar.OnSeekBarChangeListener {
-            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {}
             override fun onStartTrackingTouch(seekBar: SeekBar?) {}
             override fun onStopTrackingTouch(seekBar: SeekBar?) {}
         }
-        binding.sbLeft.setOnSeekBarChangeListener(cropListener)
-        binding.sbTop.setOnSeekBarChangeListener(cropListener)
-        binding.sbRight.setOnSeekBarChangeListener(cropListener)
-        binding.sbBottom.setOnSeekBarChangeListener(cropListener)
+        val endListener = object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
+                if (progress - binding.sbStart.progress < minGapPromille) {
+                    binding.sbEnd.progress = binding.sbStart.progress + minGapPromille
+                    return
+                }
+                updateTimeLabel()
+                previewSeek(getEndTimeMs())
+            }
+            override fun onStartTrackingTouch(seekBar: SeekBar?) {}
+            override fun onStopTrackingTouch(seekBar: SeekBar?) {}
+        }
+        binding.sbStart.setOnSeekBarChangeListener(startListener)
+        binding.sbEnd.setOnSeekBarChangeListener(endListener)
 
         // 输出选项 SeekBar
-        binding.sbFps.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+        val optListener = object : SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
                 refreshOptionLabels()
             }
             override fun onStartTrackingTouch(seekBar: SeekBar?) {}
             override fun onStopTrackingTouch(seekBar: SeekBar?) {}
-        })
-        binding.sbWidth.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
-            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
-                refreshOptionLabels()
-            }
-            override fun onStartTrackingTouch(seekBar: SeekBar?) {}
-            override fun onStopTrackingTouch(seekBar: SeekBar?) {}
-        })
-        binding.sbQuality.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
-            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
-                refreshOptionLabels()
-            }
-            override fun onStartTrackingTouch(seekBar: SeekBar?) {}
-            override fun onStopTrackingTouch(seekBar: SeekBar?) {}
-        })
+        }
+        binding.sbFps.setOnSeekBarChangeListener(optListener)
+        binding.sbWidth.setOnSeekBarChangeListener(optListener)
+        binding.sbQuality.setOnSeekBarChangeListener(optListener)
     }
 
-    /** 刷新 fps / 宽度 / 画质 的 label */
     private fun refreshOptionLabels() {
         binding.tvFps.text = getString(R.string.vgf_fps, getFps())
         binding.tvWidth.text = getString(R.string.vgf_width, getOutputWidth())
         binding.tvQuality.text = getString(R.string.vgf_quality, getQuality())
     }
 
-    private fun getFps(): Int = (binding.sbFps.progress).coerceAtLeast(5)
-    private fun getOutputWidth(): Int = (binding.sbWidth.progress).coerceAtLeast(120)
+    private fun getFps(): Int = binding.sbFps.progress.coerceAtLeast(5)
+    private fun getOutputWidth(): Int = binding.sbWidth.progress.coerceAtLeast(120)
     private fun getQuality(): Int = binding.sbQuality.progress + 1  // 1-30
 
-    /** 加载视频元信息，更新 UI */
+    /** 起始时间 ms = (sbStart / 1000) * duration */
+    private fun getStartTimeMs(): Long = videoDurationMs * binding.sbStart.progress / 1000L
+    private fun getEndTimeMs(): Long = videoDurationMs * binding.sbEnd.progress / 1000L
+
+    private fun updateTimeLabel() {
+        val s = getStartTimeMs() / 1000.0
+        val e = getEndTimeMs() / 1000.0
+        binding.tvTimeRange.text = "%.1fs - %.1fs".format(s, e)
+    }
+
+    /** 节流 seek 视频到指定时间，避免频繁 seekTo 卡顿 */
+    private fun previewSeek(timeMs: Long) {
+        pendingSeek = timeMs
+        seekHandler.removeCallbacksAndMessages(null)
+        seekHandler.postDelayed({
+            pendingSeek?.let { ts ->
+                try {
+                    binding.videoPreview.seekTo(ts.toInt())
+                    binding.tvFrameTime.text = "%.1fs".format(ts / 1000.0)
+                } catch (_: Exception) {}
+            }
+        }, 60)
+    }
+
     private fun loadVideoInfo(uri: Uri) {
         var retriever: MediaMetadataRetriever? = null
         try {
@@ -151,21 +165,23 @@ class VideoToGifActivity : AppCompatActivity() {
             videoWidth = wStr?.toIntOrNull() ?: 0
             videoHeight = hStr?.toIntOrNull() ?: 0
 
-            // 显示视频信息和预览
             val durationSec = videoDurationMs / 1000.0
             binding.tvVideoInfo.text = getString(R.string.vgf_video_info, "${videoWidth}x${videoHeight}", "%.1fs".format(durationSec))
             binding.videoPreview.visibility = View.VISIBLE
             binding.videoPreview.setVideoURI(uri)
-            binding.videoPreview.seekTo(100)  // 显示第一帧附近
+            binding.videoPreview.seekTo(100)
 
-            // 更新 RangeSlider 范围
-            val maxMs = videoDurationMs.toFloat()
-            binding.rsTime.valueFrom = 0f
-            binding.rsTime.valueTo = maxMs
-            // 默认选前 3 秒或全长
-            val defaultEnd = (3000f).coerceAtMost(maxMs)
-            binding.rsTime.values = listOf(0f, defaultEnd)
-            binding.tvTimeRange.text = "0.0s - ${defaultEnd / 1000.0}s"
+            // 设置裁剪 overlay 的宽高比
+            if (videoWidth > 0 && videoHeight > 0) {
+                binding.cropOverlay.setVideoAspectRatio(videoWidth, videoHeight)
+                binding.cropOverlay.visibility = View.VISIBLE
+            }
+
+            // 默认选前 3 秒或前 30%
+            val defaultEndPromille = ((3000f / videoDurationMs.coerceAtLeast(1)) * 1000).toInt().coerceIn(100, 1000)
+            binding.sbStart.progress = 0
+            binding.sbEnd.progress = defaultEndPromille
+            updateTimeLabel()
         } catch (e: Exception) {
             Toast.makeText(this, "视频加载失败: ${e.message}", Toast.LENGTH_SHORT).show()
         } finally {
@@ -173,22 +189,15 @@ class VideoToGifActivity : AppCompatActivity() {
         }
     }
 
-    /** 计算裁剪区域（视频帧实际像素坐标） */
+    /** 从 CropOverlayView 拿归一化裁剪区域，转成视频像素坐标 */
     private fun computeCropRect(): Rect? {
         if (videoWidth <= 0 || videoHeight <= 0) return null
-        val leftPct = binding.sbLeft.progress
-        val topPct = binding.sbTop.progress
-        val rightPct = binding.sbRight.progress  // 从右边裁掉多少
-        val bottomPct = binding.sbBottom.progress
-
-        // 防御：保证 left + right < 100，top + bottom < 100
-        if (leftPct + rightPct >= 100 || topPct + bottomPct >= 100) return null
-
-        val x = (videoWidth * leftPct / 100f).toInt()
-        val y = (videoHeight * topPct / 100f).toInt()
-        val w = videoWidth - x - (videoWidth * rightPct / 100f).toInt()
-        val h = videoHeight - y - (videoHeight * bottomPct / 100f).toInt()
-        if (w <= 0 || h <= 0) return null
+        val norm = binding.cropOverlay.getCropRect()
+        if (norm.width() <= 0 || norm.height() <= 0) return null
+        val x = (videoWidth * norm.left).toInt().coerceIn(0, videoWidth - 1)
+        val y = (videoHeight * norm.top).toInt().coerceIn(0, videoHeight - 1)
+        val w = (videoWidth * norm.width()).toInt().coerceAtLeast(1).coerceAtMost(videoWidth - x)
+        val h = (videoHeight * norm.height()).toInt().coerceAtLeast(1).coerceAtMost(videoHeight - y)
         return Rect(x, y, x + w, y + h)
     }
 
@@ -203,19 +212,13 @@ class VideoToGifActivity : AppCompatActivity() {
             return
         }
 
-        val values = binding.rsTime.values
-        if (values.size < 2) {
-            Toast.makeText(this, "请选择时间段", Toast.LENGTH_SHORT).show()
-            return
-        }
-        val startMs = values[0].toLong()
-        val endMs = values[1].toLong()
+        val startMs = getStartTimeMs()
+        val endMs = getEndTimeMs()
         val fps = getFps()
         val outputWidth = getOutputWidth()
         val quality = getQuality()
         val cropRect = computeCropRect()
 
-        // UI 切换到生成中状态
         binding.btnGenerate.isEnabled = false
         binding.progressBar.visibility = View.VISIBLE
         binding.tvProgress.visibility = View.VISIBLE
@@ -237,7 +240,6 @@ class VideoToGifActivity : AppCompatActivity() {
                 binding.tvProgress.text = getString(R.string.vgf_progress, pct)
             }
 
-            // 恢复 UI
             binding.btnGenerate.isEnabled = true
             binding.progressBar.visibility = View.GONE
             binding.tvProgress.visibility = View.GONE
