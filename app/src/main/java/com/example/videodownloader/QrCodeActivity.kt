@@ -229,9 +229,9 @@ class QrCodeActivity : AppCompatActivity() {
         }
     }
 
-    /** 输入框有内容时自动重新生成 */
+    /** 输入框有内容时自动重新生成（无论之前是否生成过） */
     private fun regenerateIfHasInput() {
-        if (binding.etQrInput.text.isNotBlank() && currentQrBitmap != null) {
+        if (binding.etQrInput.text.isNotBlank()) {
             generate()
         }
     }

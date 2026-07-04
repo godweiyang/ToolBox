@@ -67,7 +67,8 @@ object QrCodeGenerator {
             val matrixHeight = bitMatrix.height
 
             // 计算每个模块的像素大小，确保整数倍，避免边缘锯齿
-            val moduleSize = sizePx / matrixWidth
+            // 至少为 1px，防止低分辨率下 moduleSize=0 导致圆点画不出来
+            val moduleSize = (sizePx / matrixWidth).coerceAtLeast(1)
             val renderSize = moduleSize * matrixWidth
 
             val bitmap = Bitmap.createBitmap(renderSize, renderSize, Bitmap.Config.ARGB_8888)
@@ -87,8 +88,8 @@ object QrCodeGenerator {
             }
 
             if (roundDot) {
-                // 圆点样式：每个模块画一个圆
-                val radius = moduleSize / 2f * 0.9f
+                // 圆点样式：每个模块画一个圆，半径取模块边长的一半，稍大一点视觉更连贯
+                val radius = moduleSize / 2f * 0.95f
                 for (x in 0 until matrixWidth) {
                     for (y in 0 until matrixHeight) {
                         if (bitMatrix.get(x, y)) {
