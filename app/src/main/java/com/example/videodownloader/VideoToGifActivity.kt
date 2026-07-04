@@ -86,10 +86,16 @@ class VideoToGifActivity : AppCompatActivity() {
                     return
                 }
                 updateTimeLabel()
-                previewSeek(getStartTimeMs())
+                if (fromUser) previewSeek(getStartTimeMs())
             }
-            override fun onStartTrackingTouch(seekBar: SeekBar?) {}
-            override fun onStopTrackingTouch(seekBar: SeekBar?) {}
+            override fun onStartTrackingTouch(seekBar: SeekBar?) {
+                // 拖动开始:暂停播放(如果在播放),避免与 seek 冲突
+                if (binding.videoPreview.isPlaying) binding.videoPreview.pause()
+            }
+            override fun onStopTrackingTouch(seekBar: SeekBar?) {
+                // 松手:取消节流,立即精确 seek 到最终位置
+                commitSeek(getStartTimeMs())
+            }
         }
         val endListener = object : SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
@@ -98,10 +104,14 @@ class VideoToGifActivity : AppCompatActivity() {
                     return
                 }
                 updateTimeLabel()
-                previewSeek(getEndTimeMs())
+                if (fromUser) previewSeek(getEndTimeMs())
             }
-            override fun onStartTrackingTouch(seekBar: SeekBar?) {}
-            override fun onStopTrackingTouch(seekBar: SeekBar?) {}
+            override fun onStartTrackingTouch(seekBar: SeekBar?) {
+                if (binding.videoPreview.isPlaying) binding.videoPreview.pause()
+            }
+            override fun onStopTrackingTouch(seekBar: SeekBar?) {
+                commitSeek(getEndTimeMs())
+            }
         }
         binding.sbStart.setOnSeekBarChangeListener(startListener)
         binding.sbEnd.setOnSeekBarChangeListener(endListener)
@@ -139,18 +149,24 @@ class VideoToGifActivity : AppCompatActivity() {
         binding.tvTimeRange.text = "%.1fs - %.1fs".format(s, e)
     }
 
-    /** 节流 seek 视频到指定时间，避免频繁 seekTo 卡顿 */
+    /** 节流 seek:拖动过程中每 200ms 最多发一次 seek,避免 seekTo 请求积压导致卡顿 */
     private fun previewSeek(timeMs: Long) {
         pendingSeek = timeMs
+        binding.tvFrameTime.text = "%.1fs".format(timeMs / 1000.0)
         seekHandler.removeCallbacksAndMessages(null)
         seekHandler.postDelayed({
             pendingSeek?.let { ts ->
-                try {
-                    binding.videoPreview.seekTo(ts.toInt())
-                    binding.tvFrameTime.text = "%.1fs".format(ts / 1000.0)
-                } catch (_: Exception) {}
+                try { binding.videoPreview.seekTo(ts.toInt()) } catch (_: Exception) {}
             }
-        }, 60)
+        }, 200)
+    }
+
+    /** 松手时精确 seek:取消所有节流,立即 seek 到最终位置 */
+    private fun commitSeek(timeMs: Long) {
+        seekHandler.removeCallbacksAndMessages(null)
+        pendingSeek = null
+        binding.tvFrameTime.text = "%.1fs".format(timeMs / 1000.0)
+        try { binding.videoPreview.seekTo(timeMs.toInt()) } catch (_: Exception) {}
     }
 
     private fun loadVideoInfo(uri: Uri) {
