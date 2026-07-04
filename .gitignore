@@ -1,0 +1,35 @@
+# Gradle
+.gradle/
+build/
+
+# Android 编译产物
+app/build/
+*.apk
+*.aab
+*.ap_
+*.dex
+
+# 本地 SDK 路径（机器相关，不提交）
+local.properties
+
+# 随仓库附带的大体积 SDK / 工具包（不应进版本库）
+sdk/
+tools/
+
+# IntelliJ / Android Studio
+*.iml
+.idea/
+captures/
+.cxx/
+
+# Eclipse / 其他
+.classpath
+.project
+.settings/
+
+# 操作系统
+.DS_Store
+Thumbs.db
+
+# 日志
+*.log

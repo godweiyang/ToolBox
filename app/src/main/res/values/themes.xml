@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.VideoDownloader" parent="Theme.MaterialComponents.Light.NoActionBar">
+        <item name="colorPrimary">#FE2C55</item>
+        <item name="colorPrimaryVariant">#C81E40</item>
+        <item name="colorOnPrimary">#FFFFFF</item>
+        <item name="colorSecondary">#25F4EE</item>
+        <item name="android:statusBarColor">#FE2C55</item>
+        <item name="android:windowBackground">@color/bg_light</item>
+    </style>
+</resources>
