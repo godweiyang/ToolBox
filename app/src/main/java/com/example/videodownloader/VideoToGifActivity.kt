@@ -1,5 +1,6 @@
 package com.example.videodownloader
 
+import android.graphics.Bitmap
 import android.graphics.Rect
 import android.media.MediaMetadataRetriever
 import android.net.Uri
@@ -13,7 +14,10 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import com.example.videodownloader.databinding.ActivityVideoToGifBinding
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * 视频转 GIF 工具。
@@ -34,6 +38,10 @@ class VideoToGifActivity : AppCompatActivity() {
     // seek 节流，避免频繁 seekTo 卡顿
     private val seekHandler = Handler(Looper.getMainLooper())
     private var pendingSeek: Long? = null
+
+    // 精确帧预览:复用 MediaMetadataRetriever,小拖动时抽精确帧覆盖 VideoView
+    private var frameRetriever: MediaMetadataRetriever? = null
+    private var preciseFrameJob: kotlinx.coroutines.Job? = null
 
     private val pickVideoLauncher = registerForActivityResult(
         ActivityResultContracts.GetContent()
@@ -149,27 +157,58 @@ class VideoToGifActivity : AppCompatActivity() {
         binding.tvTimeRange.text = "%.1fs - %.1fs".format(s, e)
     }
 
-    /** 节流 seek:拖动过程中每 200ms 最多发一次 seek,避免 seekTo 请求积压导致卡顿 */
+    /**
+     * 节流抽精确帧:拖动过程中每 200ms 最多抽一次,后台线程抽帧避免卡 UI。
+     * 用 MediaMetadataRetriever.getFrameAtTime(ts, OPTION_CLOSEST) 抽最接近 ts 的任意帧
+     * (不受关键帧限制,小拖动也能看到画面变化)。抽到的 Bitmap 显示在 ivPreciseFrame
+     * 上覆盖 VideoView。
+     */
     private fun previewSeek(timeMs: Long) {
         pendingSeek = timeMs
         binding.tvFrameTime.text = "%.1fs".format(timeMs / 1000.0)
         seekHandler.removeCallbacksAndMessages(null)
         seekHandler.postDelayed({
-            pendingSeek?.let { ts ->
-                try { binding.videoPreview.seekTo(ts.toInt()) } catch (_: Exception) {}
+            val ts = pendingSeek ?: return@postDelayed
+            val retriever = frameRetriever ?: return@postDelayed
+            // 取消上一次未完成的抽帧任务
+            preciseFrameJob?.cancel()
+            preciseFrameJob = lifecycleScope.launch {
+                val bmp: Bitmap? = withContext(Dispatchers.Default) {
+                    try {
+                        retriever.getFrameAtTime(
+                            ts * 1000L,  // getFrameAtTime 单位是微秒
+                            MediaMetadataRetriever.OPTION_CLOSEST
+                        )
+                    } catch (_: Exception) { null }
+                }
+                // 检查任务未被取消且时间戳仍是最新请求
+                if (isActive && pendingSeek == ts && bmp != null) {
+                    binding.ivPreciseFrame.setImageBitmap(bmp)
+                    binding.ivPreciseFrame.visibility = View.VISIBLE
+                }
             }
         }, 200)
     }
 
-    /** 松手时精确 seek:取消所有节流,立即 seek 到最终位置 */
+    /**
+     * 松手时精确 seek:取消抽帧任务,让 VideoView seek 到最终位置并显示。
+     * VideoView 显示后隐藏 ivPreciseFrame(避免双层画面)。
+     */
     private fun commitSeek(timeMs: Long) {
         seekHandler.removeCallbacksAndMessages(null)
+        preciseFrameJob?.cancel()
         pendingSeek = null
         binding.tvFrameTime.text = "%.1fs".format(timeMs / 1000.0)
+        // 先隐藏精确帧 ImageView,让 VideoView 接管显示
+        binding.ivPreciseFrame.visibility = View.GONE
+        binding.ivPreciseFrame.setImageDrawable(null)
         try { binding.videoPreview.seekTo(timeMs.toInt()) } catch (_: Exception) {}
     }
 
     private fun loadVideoInfo(uri: Uri) {
+        // 释放旧的 retriever
+        try { frameRetriever?.release() } catch (_: Exception) {}
+        frameRetriever = null
         var retriever: MediaMetadataRetriever? = null
         try {
             retriever = MediaMetadataRetriever()
@@ -180,6 +219,8 @@ class VideoToGifActivity : AppCompatActivity() {
             videoDurationMs = durStr?.toLongOrNull() ?: 0L
             videoWidth = wStr?.toIntOrNull() ?: 0
             videoHeight = hStr?.toIntOrNull() ?: 0
+            // 保存 retriever 供精确帧预览复用
+            frameRetriever = retriever
 
             val durationSec = videoDurationMs / 1000.0
             binding.tvVideoInfo.text = getString(R.string.vgf_video_info, "${videoWidth}x${videoHeight}", "%.1fs".format(durationSec))
@@ -200,9 +241,17 @@ class VideoToGifActivity : AppCompatActivity() {
             updateTimeLabel()
         } catch (e: Exception) {
             Toast.makeText(this, "视频加载失败: ${e.message}", Toast.LENGTH_SHORT).show()
-        } finally {
+            // 失败时释放
             try { retriever?.release() } catch (_: Exception) {}
+            frameRetriever = null
         }
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        preciseFrameJob?.cancel()
+        try { frameRetriever?.release() } catch (_: Exception) {}
+        frameRetriever = null
     }
 
     /** 从 CropOverlayView 拿归一化裁剪区域，转成视频像素坐标 */

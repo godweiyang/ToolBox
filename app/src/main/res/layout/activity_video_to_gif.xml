@@ -65,6 +65,16 @@
                 android:layout_height="match_parent"
                 android:layout_gravity="center" />
 
+            <!-- 精确帧预览:小拖动时显示 MediaMetadataRetriever 抽的精确帧,
+                 覆盖 VideoView(VideoView.seekTo 只到关键帧,小拖动画面不变) -->
+            <ImageView
+                android:id="@+id/ivPreciseFrame"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:layout_gravity="center"
+                android:scaleType="fitCenter"
+                android:visibility="gone" />
+
             <com.example.videodownloader.CropOverlayView
                 android:id="@+id/cropOverlay"
                 android:layout_width="match_parent"
