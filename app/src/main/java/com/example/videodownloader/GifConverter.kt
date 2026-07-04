@@ -92,9 +92,12 @@ object GifConverter {
             outputStream = openGifOutputStream(context, displayName) ?: throw IllegalStateException("无法创建输出文件")
 
             // 5. 编码 GIF
+            // ⚠ GIF89a Graphic Control Extension 的 delay 单位是 1/100 秒(centi-second),
+            // 不是毫秒!setDelay(71) 会被解读为 0.71 秒/帧 = 1.4 fps,导致 GIF 像慢放。
+            // intervalMs 是毫秒,需除以 10 转成 1/100 秒:71ms → 7(0.07s)→ ~14fps。
             val encoder = AnimatedGifEncoder()
             encoder.setSize(outW, outH)
-            encoder.setDelay(intervalMs.toInt())
+            encoder.setDelay((intervalMs / 10L).toInt().coerceAtLeast(2))
             encoder.setQuality(quality)
             encoder.setRepeat(0)  // 无限循环
             if (!encoder.start(outputStream)) {
