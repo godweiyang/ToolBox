@@ -102,13 +102,13 @@ object GifConverter {
             }
 
             // 6. 逐帧抽取
+            // 用 OPTION_CLOSEST(非 SYNC)取最接近指定时间的帧,不限关键帧。
+            // ⚠ 不能用 OPTION_CLOSEST_SYNC,它只返回 I帧,长 GOP 视频多个时间戳会返回同一帧 → GIF 不动。
             var lastReported = -1
             for (i in 0 until totalFrames) {
                 val frameMs = safeStart + i * intervalMs
                 val frameUs = frameMs * 1000L
                 var frame: Bitmap? = null
-                // 用 OPTION_CLOSEST(非 SYNC)取最接近指定时间的帧,不限关键帧。
-                // OPTION_CLOSEST_SYNC 只返回 I帧,长 GOP 视频多个时间戳会返回同一帧 → GIF 不动。
                 for (retry in 0 until 2) {
                     frame = retriever.getFrameAtTime(frameUs, MediaMetadataRetriever.OPTION_CLOSEST)
                     if (frame != null) break
@@ -118,36 +118,13 @@ object GifConverter {
                     continue
                 }
 
-                // 裁剪
-                val cropped: Bitmap = if (cropRect != null) {
-                    val cx = cropRect.left.coerceIn(0, frame.width - 1)
-                    val cy = cropRect.top.coerceIn(0, frame.height - 1)
-                    val cw = cropRect.width().coerceAtMost(frame.width - cx)
-                    val ch = cropRect.height().coerceAtMost(frame.height - cy)
-                    try {
-                        Bitmap.createBitmap(frame, cx, cy, cw, ch)
-                    } catch (e: Exception) {
-                        Log.w(TAG, "裁剪失败，用原图: ${e.message}")
-                        frame
-                    }
-                } else {
-                    frame
-                }
-
-                // 缩放
-                val scaled: Bitmap = if (cropped.width != outW || cropped.height != outH) {
-                    val s = Bitmap.createScaledBitmap(cropped, outW, outH, true)
-                    if (cropped !== frame) cropped.recycle()
-                    s
-                } else {
-                    cropped
-                }
-
+                val cropped = cropFrame(frame, cropRect)
+                val scaled = scaleFrame(cropped, frame, outW, outH)
                 encoder.addFrame(scaled)
                 if (scaled !== frame) scaled.recycle()
+                if (cropped !== frame) cropped.recycle()
                 frame.recycle()
 
-                // 进度
                 val pct = ((i + 1) * 100 / totalFrames).coerceIn(0, 100)
                 if (pct != lastReported) {
                     lastReported = pct
@@ -167,6 +144,30 @@ object GifConverter {
         } finally {
             try { retriever?.release() } catch (_: Exception) {}
             try { outputStream?.flush(); outputStream?.close() } catch (_: Exception) {}
+        }
+    }
+
+    /** 裁剪帧。cropRect 为 null 或裁剪失败时返回原 frame */
+    private fun cropFrame(frame: Bitmap, cropRect: android.graphics.Rect?): Bitmap {
+        if (cropRect == null) return frame
+        val cx = cropRect.left.coerceIn(0, frame.width - 1)
+        val cy = cropRect.top.coerceIn(0, frame.height - 1)
+        val cw = cropRect.width().coerceAtMost(frame.width - cx)
+        val ch = cropRect.height().coerceAtMost(frame.height - cy)
+        return try {
+            Bitmap.createBitmap(frame, cx, cy, cw, ch)
+        } catch (e: Exception) {
+            Log.w(TAG, "裁剪失败，用原图: ${e.message}")
+            frame
+        }
+    }
+
+    /** 缩放帧到目标尺寸。已是目标尺寸时返回原 frame */
+    private fun scaleFrame(cropped: Bitmap, origFrame: Bitmap, outW: Int, outH: Int): Bitmap {
+        return if (cropped.width != outW || cropped.height != outH) {
+            Bitmap.createScaledBitmap(cropped, outW, outH, true)
+        } else {
+            cropped
         }
     }
 

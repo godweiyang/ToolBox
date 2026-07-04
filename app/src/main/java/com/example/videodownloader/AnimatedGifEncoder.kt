@@ -123,31 +123,81 @@ class AnimatedGifEncoder {
     private fun analyzePixels() {
         val len = pixels.size
         indexedPixels = ByteArray(len)
-        // 用固定 6x6x6 RGB 调色板(216 色)+ 40 级灰度,替代 NeuQuant。
-        // NeuQuant 移植版有难以定位的 bug 导致调色板退化为灰度(黑白)。
-        // 固定调色板确定彩色,且量化 O(1) 每像素,无需遍历。
+        // RGB332 调色板:8R × 8G × 4B = 256 色。
+        // 绿通道多因人眼对绿色最敏感。
         if (colorTab.size != 256) colorTab = IntArray(256)
-        val levels = intArrayOf(0, 51, 102, 153, 204, 255)
         var idx = 0
-        for (ri in 0..5) for (gi in 0..5) for (bi in 0..5) {
-            colorTab[idx++] = (levels[ri] shl 16) or (levels[gi] shl 8) or levels[bi]
-        }
-        // 216-255 填灰度(40 级)
-        for (i in 216 until 256) {
-            val v = (i - 216) * 255 / 39
-            colorTab[i] = (v shl 16) or (v shl 8) or v
+        for (ri in 0..7) for (gi in 0..7) for (bi in 0..3) {
+            val r = if (ri == 7) 255 else ri * 36
+            val g = if (gi == 7) 255 else gi * 36
+            val b = if (bi == 3) 255 else bi * 85
+            colorTab[idx++] = (r shl 16) or (g shl 8) or b
         }
         usedEntry = BooleanArray(256) { true }
-        // 直接量化:每通道按 6 级归一,组合成调色板索引
-        for (i in 0 until len) {
-            val p = pixels[i]
-            val r = (p shr 16) and 0xff
-            val g = (p shr 8) and 0xff
-            val b = p and 0xff
-            val ri = ((r * 5 + 128) / 255).coerceIn(0, 5)
-            val gi = ((g * 5 + 128) / 255).coerceIn(0, 5)
-            val bi = ((b * 5 + 128) / 255).coerceIn(0, 5)
-            indexedPixels[i] = (ri * 36 + gi * 6 + bi).toByte()
+
+        // Floyd-Steinberg 抖动:把量化误差分散到相邻像素,消除色块感(油画感)。
+        // 误差分散方向(当前像素为 *):
+        //     *   7/16 →右
+        //  3/16↓  5/16↓  1/16↘
+        // 用整数运算(误差 ×16)避免浮点,精度足够。
+        val w = width
+        val h = height
+        val errR = IntArray(len)
+        val errG = IntArray(len)
+        val errB = IntArray(len)
+
+        for (y in 0 until h) {
+            for (x in 0 until w) {
+                val i = y * w + x
+                val p = pixels[i]
+                // pixels[i] 是 0xAARRGGBB;拆出 R/G/B,加累计误差
+                val r = ((p shr 16) and 0xff) + (errR[i] shr 4)
+                val g = ((p shr 8) and 0xff) + (errG[i] shr 4)
+                val b = (p and 0xff) + (errB[i] shr 4)
+
+                val cr = r.coerceIn(0, 255)
+                val cg = g.coerceIn(0, 255)
+                val cb = b.coerceIn(0, 255)
+                // 量化:R/G 高 3 位(8 级),B 高 2 位(4 级)
+                val ri = (cr shr 5) and 0x07
+                val gi = (cg shr 5) and 0x07
+                val bi = (cb shr 6) and 0x03
+                indexedPixels[i] = ((ri shl 5) or (gi shl 2) or bi).toByte()
+
+                // 量化后的实际颜色,算误差
+                val qr = if (ri == 7) 255 else ri * 36
+                val qg = if (gi == 7) 255 else gi * 36
+                val qb = if (bi == 3) 255 else bi * 85
+                val dr = (cr - qr) shl 4
+                val dg = (cg - qg) shl 4
+                val db = (cb - qb) shl 4
+
+                // 分散误差到相邻像素
+                if (x + 1 < w) {
+                    val ni = i + 1
+                    errR[ni] += dr * 7 / 16
+                    errG[ni] += dg * 7 / 16
+                    errB[ni] += db * 7 / 16
+                }
+                if (y + 1 < h) {
+                    if (x > 0) {
+                        val ni = i + w - 1
+                        errR[ni] += dr * 3 / 16
+                        errG[ni] += dg * 3 / 16
+                        errB[ni] += db * 3 / 16
+                    }
+                    val ni = i + w
+                    errR[ni] += dr * 5 / 16
+                    errG[ni] += dg * 5 / 16
+                    errB[ni] += db * 5 / 16
+                    if (x + 1 < w) {
+                        val ni2 = i + w + 1
+                        errR[ni2] += dr / 16
+                        errG[ni2] += dg / 16
+                        errB[ni2] += db / 16
+                    }
+                }
+            }
         }
         colorDepth = 8
         palSize = 7
