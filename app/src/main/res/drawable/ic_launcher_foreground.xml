@@ -1,27 +1,49 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- 自适应图标前景：108x108dp，中心 72x72dp 为可见区域。
-     这里画一个白色"下载箭头 + 播放三角"组合图标。 -->
+     画一个白色"工具箱 / 扭蛋机"轮廓：
+       顶部把手（小圆角矩形）
+       主体（带圆角的大矩形）
+       中间一条横向分隔条（工具箱的锁扣）
+       中央一个圆形锁孔
+     寓意：百宝箱容器，承载各种工具。 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!-- 下载箭头 -->
+
+    <!-- 顶部把手：宽 24，高 8，位于上方 -->
     <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M54,30 L54,62
-                           M54,62 L42,50
-                           M54,62 L66,50"
-        android:strokeColor="#FFFFFF"
-        android:strokeWidth="6"
-        android:strokeLineCap="round"
-        android:strokeLineJoin="round" />
-    <!-- 底部托盘 -->
+        android:pathData="M42,38
+                          Q42,34 46,34
+                          L62,34
+                          Q66,34 66,38
+                          L66,42
+                          L42,42
+                          Z"
+        android:fillColor="#FFFFFF" />
+
+    <!-- 主体：圆角矩形，从 x=30 到 x=78，y=44 到 y=76 -->
     <path
-        android:fillColor="#00000000"
-        android:strokeColor="#FFFFFF"
-        android:strokeWidth="6"
-        android:strokeLineCap="round"
-        android:strokeLineJoin="round"
-        android:pathData="M38,72 L70,72" />
+        android:pathData="M32,44
+                          L76,44
+                          Q80,44 80,48
+                          L80,72
+                          Q80,76 76,76
+                          L32,76
+                          Q28,76 28,72
+                          L28,48
+                          Q28,44 32,44
+                          Z"
+        android:fillColor="#FFFFFF" />
+
+    <!-- 中间横向分隔条（工具箱锁扣横条），用透明色镂空透出渐变背景 -->
+    <path
+        android:pathData="M28,56 L80,56 L80,62 L28,62 Z"
+        android:fillColor="#00000000" />
+
+    <!-- 中央锁孔：圆形，用透明色镂空 -->
+    <path
+        android:pathData="M54,59 m-3,0 a3,3 0 1,0 6,0 a3,3 0 1,0 -6,0"
+        android:fillColor="#00000000" />
 </vector>
