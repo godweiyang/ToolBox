@@ -124,9 +124,8 @@ class AnimatedGifEncoder {
         val len = pixels.size
         indexedPixels = ByteArray(len)
         val nq = NeuQuant(pixels, len, sample)
-        colorTab = nq.process()
+        colorTab = nq.process()  // IntArray(256),每项 0xRRGGBB
         usedEntry = BooleanArray(256)
-        // colorTab 里每个 int 装 RGB（0xffffff 以内），共 256 个
         for (i in 0 until colorTab.size) {
             colorTab[i] = colorTab[i] and 0xffffff
         }
@@ -146,8 +145,7 @@ class AnimatedGifEncoder {
         var minpos = 0
         var dmin = 256 * 256 * 256
         val len = colorTab.size
-        var i = 0
-        while (i < len) {
+        for (i in 0 until len) {
             val r = (colorTab[i] shr 16) and 0xff
             val g = (colorTab[i] shr 8) and 0xff
             val b = colorTab[i] and 0xff
@@ -155,11 +153,9 @@ class AnimatedGifEncoder {
             val dg = g - ((c shr 8) and 0xff)
             val db = b - (c and 0xff)
             val d = dr * dr + dg * dg + db * db
-            val idx = i / 3
-            if (usedEntry[idx] && d < dmin) {
-                dmin = d; minpos = idx
+            if (usedEntry[i] && d < dmin) {
+                dmin = d; minpos = i
             }
-            i += 3
         }
         if (transparent) usedEntry[transIndex] = true
         return minpos
@@ -209,18 +205,17 @@ class AnimatedGifEncoder {
     }
 
     private fun writePalette() {
-        // colorTab 来自 NeuQuant.mapPixels(): IntArray(256 * 3),
-        // 每个元素是单个通道值(0-255),按 R,G,B,R,G,B,... 排列。
-        // GIF 调色板 = 256 项 × 3 字节 = 768 字节,直接按字节写。
-        // ⚠ 不能把每个 int 当完整 RGB 写 3 字节,否则会写 2304 字节,
-        // 多出的 1536 字节把后续 LZW 数据全部错位,导致 GIF 一片空白/损坏。
+        // colorTab: IntArray(256),每项 packed 成 0xRRGGBB(对齐 Apache 原版)
+        // GIF 调色板 = 256 项 × 3 字节(R,G,B)= 768 字节
         val o = out ?: return
         for (i in colorTab.indices) {
-            o.write(colorTab[i] and 0xff)
+            o.write((colorTab[i] shr 16) and 0xff)  // R
+            o.write((colorTab[i] shr 8) and 0xff)   // G
+            o.write(colorTab[i] and 0xff)           // B
         }
-        // 补齐到 256 项 × 3 字节 = 768 字节(NeuQuant 已满 256 项,通常无需补)
-        val n = 3 * 256 - colorTab.size
-        for (i in 0 until n) o.write(0)
+        // 补齐到 256 项 × 3 字节 = 768 字节(NeuQuant 已满 256 项,通常 n=0)
+        val n = 256 - colorTab.size
+        for (i in 0 until n * 3) o.write(0)
     }
 
     private fun writePixels() {
@@ -447,11 +442,14 @@ internal class NeuQuant(
     }
 
     private fun mapPixels(): IntArray {
-        val map = IntArray(netsize * 3)
+        // 返回 256 项调色板,每项 packed 成 0xRRGGBB(对齐 Apache 原版 AnimatedGifEncoder.colorTab)
+        // network[i][0]=B, [1]=G, [2]=R(见 altersingle/learn 的 b,g,r 参数顺序)
+        val map = IntArray(netsize)
         for (i in 0 until netsize) {
-            map[i * 3] = network[i][0]
-            map[i * 3 + 1] = network[i][1]
-            map[i * 3 + 2] = network[i][2]
+            val r = network[i][2]
+            val g = network[i][1]
+            val b = network[i][0]
+            map[i] = (r shl 16) or (g shl 8) or b
         }
         return map
     }
