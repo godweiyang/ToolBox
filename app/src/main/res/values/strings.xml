@@ -73,4 +73,49 @@
     <string name="vgf_success">GIF 已保存到相册：Pictures/GifOutput/</string>
     <string name="vgf_fail">GIF 生成失败</string>
     <string name="vgf_video_info">视频：%1$s，时长：%2$s</string>
+
+    <!-- 九宫格切图工具 -->
+    <string name="tool_ninegrid_title">九宫格切图</string>
+    <string name="tool_ninegrid_desc">把一张图切成 3×3，发朋友圈九宫格</string>
+    <string name="ng_input_label">点击下方按钮选择图片</string>
+    <string name="ng_btn_pick">选择图片</string>
+    <string name="ng_btn_clear">清空</string>
+    <string name="ng_btn_save_all">全部保存到相册</string>
+    <string name="ng_preview_hint">九宫格预览（已自动居中裁剪为正方形）</string>
+    <string name="ng_no_image">请先选择图片</string>
+    <string name="ng_success">9 张图片已保存到相册：Pictures/NineGrid/</string>
+    <string name="ng_fail">保存失败</string>
+
+    <!-- GIF 倒放工具 -->
+    <string name="tool_gifreverse_title">GIF 倒放</string>
+    <string name="tool_gifreverse_desc">把 GIF 反过来播，趣味效果</string>
+    <string name="gr_input_label">点击下方按钮选择 GIF</string>
+    <string name="gr_btn_pick">选择 GIF</string>
+    <string name="gr_btn_clear">清空</string>
+    <string name="gr_btn_generate">生成倒放 GIF</string>
+    <string name="gr_btn_save">保存到相册</string>
+    <string name="gr_section_options">输出选项</string>
+    <string name="gr_frames">抽取帧数：%1$d（越多越流畅）</string>
+    <string name="gr_no_gif">请先选择 GIF</string>
+    <string name="gr_progress">正在生成倒放 GIF…%1$d%%</string>
+    <string name="gr_success">GIF 已保存到相册：Pictures/GifOutput/</string>
+    <string name="gr_fail">GIF 倒放失败</string>
+    <string name="gr_original">原图预览</string>
+    <string name="gr_reversed">倒放预览</string>
+
+    <!-- 分贝仪工具 -->
+    <string name="tool_decibel_title">分贝仪</string>
+    <string name="tool_decibel_desc">用麦克风测量环境噪音分贝</string>
+    <string name="db_current">%1$.1f dB</string>
+    <string name="db_min">最小：%1$.1f</string>
+    <string name="db_max">最大：%1$.1f</string>
+    <string name="db_avg">平均：%1$.1f</string>
+    <string name="db_btn_start">开始测量</string>
+    <string name="db_btn_stop">停止测量</string>
+    <string name="db_hint">点击开始测量，需授权麦克风权限</string>
+    <string name="db_perm_denied">需要麦克风权限才能测量分贝</string>
+    <string name="db_level_quiet">安静</string>
+    <string name="db_level_normal">正常</string>
+    <string name="db_level_loud">较吵</string>
+    <string name="db_level_very_loud">很吵</string>
 </resources>

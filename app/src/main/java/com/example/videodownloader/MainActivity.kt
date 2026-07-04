@@ -64,6 +64,27 @@ class MainActivity : AppCompatActivity() {
             iconRes = android.R.drawable.ic_menu_gallery,
             bgColorRes = R.color.tool_qrcode_bg,
             launcher = { ctx -> Intent(ctx, VideoToGifActivity::class.java) }
+        ),
+        Tool(
+            title = getString(R.string.tool_ninegrid_title),
+            desc = getString(R.string.tool_ninegrid_desc),
+            iconRes = android.R.drawable.ic_menu_crop,
+            bgColorRes = R.color.tool_ninegrid_bg,
+            launcher = { ctx -> Intent(ctx, NineGridActivity::class.java) }
+        ),
+        Tool(
+            title = getString(R.string.tool_gifreverse_title),
+            desc = getString(R.string.tool_gifreverse_desc),
+            iconRes = android.R.drawable.ic_menu_rotate,
+            bgColorRes = R.color.tool_gifreverse_bg,
+            launcher = { ctx -> Intent(ctx, GifReverseActivity::class.java) }
+        ),
+        Tool(
+            title = getString(R.string.tool_decibel_title),
+            desc = getString(R.string.tool_decibel_desc),
+            iconRes = android.R.drawable.ic_btn_speak_now,
+            bgColorRes = R.color.tool_decibel_bg,
+            launcher = { ctx -> Intent(ctx, DecibelMeterActivity::class.java) }
         )
     )
 }
