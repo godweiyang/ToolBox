@@ -1,0 +1,233 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="16dp">
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/tool_video_to_gif_title"
+            android:textSize="22sp"
+            android:textStyle="bold"
+            android:gravity="center"
+            android:paddingBottom="16dp" />
+
+        <!-- 视频导入区 -->
+        <TextView
+            android:id="@+id/tvVideoInfo"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/vgf_input_label"
+            android:textStyle="bold"
+            android:paddingBottom="6dp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginTop="8dp">
+
+            <Button
+                android:id="@+id/btnPick"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="wrap_content"
+                android:text="@string/vgf_btn_pick" />
+
+            <Button
+                android:id="@+id/btnClear"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="wrap_content"
+                android:text="@string/vgf_btn_clear"
+                android:layout_marginStart="8dp" />
+        </LinearLayout>
+
+        <!-- 视频预览 -->
+        <VideoView
+            android:id="@+id/videoPreview"
+            android:layout_width="match_parent"
+            android:layout_height="220dp"
+            android:layout_marginTop="12dp"
+            android:visibility="gone" />
+
+        <!-- 时间段选取 -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/vgf_section_time"
+            android:textStyle="bold"
+            android:textSize="16sp"
+            android:layout_marginTop="20dp"
+            android:paddingBottom="4dp" />
+
+        <TextView
+            android:id="@+id/tvTimeRange"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="0s - 0s"
+            android:textColor="#666666"
+            android:textSize="13sp"
+            android:paddingBottom="4dp" />
+
+        <com.google.android.material.slider.RangeSlider
+            android:id="@+id/rsTime"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:valueFrom="0"
+            android:valueTo="10000" />
+
+        <!-- 裁剪区域 -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/vgf_section_crop"
+            android:textStyle="bold"
+            android:textSize="16sp"
+            android:layout_marginTop="20dp"
+            android:paddingBottom="4dp" />
+
+        <TextView
+            android:id="@+id/tvLeft"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/vgf_crop_left"
+            android:paddingTop="8dp" />
+
+        <SeekBar
+            android:id="@+id/sbLeft"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:max="50"
+            android:progress="0" />
+
+        <TextView
+            android:id="@+id/tvTop"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/vgf_crop_top"
+            android:paddingTop="8dp" />
+
+        <SeekBar
+            android:id="@+id/sbTop"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:max="50"
+            android:progress="0" />
+
+        <TextView
+            android:id="@+id/tvRight"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/vgf_crop_right"
+            android:paddingTop="8dp" />
+
+        <SeekBar
+            android:id="@+id/sbRight"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:max="50"
+            android:progress="50" />
+
+        <TextView
+            android:id="@+id/tvBottom"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/vgf_crop_bottom"
+            android:paddingTop="8dp" />
+
+        <SeekBar
+            android:id="@+id/sbBottom"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:max="50"
+            android:progress="50" />
+
+        <!-- 输出选项 -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/vgf_section_options"
+            android:textStyle="bold"
+            android:textSize="16sp"
+            android:layout_marginTop="20dp"
+            android:paddingBottom="4dp" />
+
+        <TextView
+            android:id="@+id/tvFps"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingTop="8dp" />
+
+        <SeekBar
+            android:id="@+id/sbFps"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:max="20"
+            android:progress="14" />
+
+        <TextView
+            android:id="@+id/tvWidth"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingTop="8dp" />
+
+        <SeekBar
+            android:id="@+id/sbWidth"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:max="720"
+            android:progress="480" />
+
+        <TextView
+            android:id="@+id/tvQuality"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingTop="8dp" />
+
+        <SeekBar
+            android:id="@+id/sbQuality"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:max="29"
+            android:progress="9" />
+
+        <!-- 生成按钮 + 进度 -->
+        <Button
+            android:id="@+id/btnGenerate"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:text="@string/vgf_btn_generate"
+            android:backgroundTint="#FE2C55"
+            android:textColor="#FFFFFF" />
+
+        <ProgressBar
+            android:id="@+id/progressBar"
+            style="?android:attr/progressBarStyleHorizontal"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:max="100"
+            android:progress="0"
+            android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/tvProgress"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:textSize="13sp"
+            android:visibility="gone"
+            android:paddingTop="4dp" />
+
+    </LinearLayout>
+</ScrollView>

@@ -47,6 +47,10 @@
         <activity
             android:name=".BiliLoginActivity"
             android:exported="false" />
+
+        <activity
+            android:name=".VideoToGifActivity"
+            android:exported="false" />
     </application>
 
 </manifest>

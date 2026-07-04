@@ -57,6 +57,13 @@ class MainActivity : AppCompatActivity() {
             iconRes = android.R.drawable.ic_menu_camera,
             bgColorRes = R.color.tool_qrcode_bg,
             launcher = { ctx -> Intent(ctx, QrCodeActivity::class.java) }
+        ),
+        Tool(
+            title = getString(R.string.tool_video_to_gif_title),
+            desc = getString(R.string.tool_video_to_gif_desc),
+            iconRes = android.R.drawable.ic_menu_gallery,
+            bgColorRes = R.color.tool_qrcode_bg,
+            launcher = { ctx -> Intent(ctx, VideoToGifActivity::class.java) }
         )
     )
 }

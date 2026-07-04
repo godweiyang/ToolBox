@@ -50,4 +50,27 @@
     <string name="qr_color_green">绿色</string>
     <string name="qr_color_purple">紫色</string>
     <string name="qr_color_custom">自定义…</string>
+
+    <!-- 视频转 GIF 工具 -->
+    <string name="tool_video_to_gif_title">视频转 GIF</string>
+    <string name="tool_video_to_gif_desc">导入本地视频，选取时间段和区域，生成 GIF 表情包</string>
+    <string name="vgf_input_label">点击下方按钮导入本地视频</string>
+    <string name="vgf_btn_pick">选择视频</string>
+    <string name="vgf_btn_clear">清空</string>
+    <string name="vgf_btn_generate">生成 GIF</string>
+    <string name="vgf_no_video">请先选择视频</string>
+    <string name="vgf_section_time">时间段选取</string>
+    <string name="vgf_section_crop">裁剪区域（百分比，0-100）</string>
+    <string name="vgf_section_options">输出选项</string>
+    <string name="vgf_crop_left">左</string>
+    <string name="vgf_crop_top">上</string>
+    <string name="vgf_crop_right">右</string>
+    <string name="vgf_crop_bottom">下</string>
+    <string name="vgf_fps">帧率：%1$d fps</string>
+    <string name="vgf_width">输出宽度：%1$d px</string>
+    <string name="vgf_quality">GIF 画质：%1$d（越小越好，1-30）</string>
+    <string name="vgf_progress">正在生成 GIF…%1$d%%</string>
+    <string name="vgf_success">GIF 已保存到相册：Pictures/GifOutput/</string>
+    <string name="vgf_fail">GIF 生成失败</string>
+    <string name="vgf_video_info">视频：%1$s，时长：%2$s</string>
 </resources>
