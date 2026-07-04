@@ -39,6 +39,8 @@ class CropOverlayView @JvmOverloads constructor(
     private val videoRect = RectF()
 
     private var videoAspect = 1f  // w/h
+    private var videoW = 0        // 视频实际像素宽
+    private var videoH = 0        // 视频实际像素高
     private var initialized = false
 
     // 拖拽状态
@@ -72,9 +74,23 @@ class CropOverlayView @JvmOverloads constructor(
         strokeWidth = 1f
         isAntiAlias = true
     }
+    // 尺寸标签画笔
+    private val labelBgPaint = Paint().apply {
+        color = Color.argb(200, 0, 0, 0)
+        style = Paint.Style.FILL
+        isAntiAlias = true
+    }
+    private val labelTextPaint = Paint().apply {
+        color = Color.WHITE
+        textSize = 28f
+        isAntiAlias = true
+        isFakeBoldText = true
+    }
 
-    /** 设置视频宽高比，用于计算 letterbox 显示区 */
+    /** 设置视频实际像素宽高,用于显示裁剪尺寸 */
     fun setVideoAspectRatio(w: Int, h: Int) {
+        videoW = w
+        videoH = h
         videoAspect = if (h > 0) w.toFloat() / h else 1f
         computeVideoRect()
         invalidate()
@@ -151,6 +167,36 @@ class CropOverlayView @JvmOverloads constructor(
 
         // 4. 8 个手柄
         drawHandles(canvas)
+
+        // 5. 尺寸标签:显示当前裁剪区域的视频像素尺寸(宽×高),拖动时实时更新
+        drawSizeLabel(canvas)
+    }
+
+    /** 在裁剪框左上角画尺寸标签,显示视频像素尺寸(如 720×1280) */
+    private fun drawSizeLabel(canvas: Canvas) {
+        if (videoW <= 0 || videoH <= 0 || videoRect.width() <= 0) return
+        // 归一化裁剪区域 × 视频实际像素 = 裁剪后的视频像素尺寸
+        val normW = cropRect.width() / videoRect.width()
+        val normH = cropRect.height() / videoRect.height()
+        val cropPxW = (videoW * normW).toInt().coerceAtLeast(1)
+        val cropPxH = (videoH * normH).toInt().coerceAtLeast(1)
+        val text = "${cropPxW}×${cropPxH}"
+
+        // 标签位置:裁剪框左上角外侧(若空间不够则内侧)
+        val pad = 8f
+        val textW = labelTextPaint.measureText(text)
+        val textH = labelTextPaint.textSize
+        val bgW = textW + pad * 2
+        val bgH = textH + pad * 2
+        // 优先放在裁剪框左上角外侧上方;若上方空间不足(贴边),放裁剪框内侧左上
+        var bgLeft = cropRect.left
+        var bgTop = cropRect.top - bgH - 4f
+        if (bgTop < 0) bgTop = cropRect.top + 4f
+        if (bgLeft + bgW > width) bgLeft = width - bgW
+        if (bgLeft < 0) bgLeft = 0f
+
+        canvas.drawRect(bgLeft, bgTop, bgLeft + bgW, bgTop + bgH, labelBgPaint)
+        canvas.drawText(text, bgLeft + pad, bgTop + textH, labelTextPaint)
     }
 
     private fun drawHandles(canvas: Canvas) {
