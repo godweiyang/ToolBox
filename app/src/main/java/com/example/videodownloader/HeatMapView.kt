@@ -162,6 +162,14 @@ class HeatMapView @JvmOverloads constructor(
         invalidate()
     }
 
+    /** 更新最后一个采样点的 RSSI（同位置多次采样时用，避免颜色叠加变深） */
+    fun updateLastSample(rssi: Int) {
+        if (samples.isEmpty()) return
+        val last = samples.last()
+        samples[samples.lastIndex] = Sample(last.x, last.y, rssi)
+        invalidate()
+    }
+
     /** 清空 */
     fun clear() {
         samples.clear()

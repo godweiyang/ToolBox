@@ -343,17 +343,19 @@ class HeatmapFragment : Fragment(), SensorEventListener {
     /** 累计的位移向量（采样间隔内积算） */
     private var accumDx = 0f
     private var accumDy = 0f
+    /** 当前速度（手机坐标系，m/s） */
+    private var velX = 0f
+    private var velY = 0f
     /** 上次加速度时间戳（ns） */
     private var lastAccelTimeNs = 0L
-    /** 上次线性加速度（去重力后） */
-    private var lastLinearAccelX = 0f
-    private var lastLinearAccelY = 0f
     /** 重力分量（低通滤波分离） */
     private var gravityX = 0f
     private var gravityY = 0f
     private var gravityZ = 0f
     /** 当前是否在走动（加速度幅值超阈值） */
     private var isMoving = false
+    /** 静止计数器：连续多少次检测到静止，用于 ZUPT */
+    private var staticCount = 0
 
     private val sampleRunnable = object : Runnable {
         override fun run() {
@@ -399,6 +401,9 @@ class HeatmapFragment : Fragment(), SensorEventListener {
             lastWorldY = 0f
             accumDx = 0f
             accumDy = 0f
+            velX = 0f
+            velY = 0f
+            staticCount = 0
             binding.tvSteps.text = ""
             binding.tvHeatmapEmpty.visibility = View.VISIBLE
         }
@@ -425,6 +430,9 @@ class HeatmapFragment : Fragment(), SensorEventListener {
         // 重置位移积分
         accumDx = 0f
         accumDy = 0f
+        velX = 0f
+        velY = 0f
+        staticCount = 0
         lastAccelTimeNs = 0L
         // 注册传感器：旋转矢量拿朝向，加速度计做位移检测
         sensorManager.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR)?.let {
@@ -458,21 +466,25 @@ class HeatmapFragment : Fragment(), SensorEventListener {
         }
 
         // 把累计位移从"手机坐标系"转到"世界坐标系"（按当前朝向旋转）
-        // accumDx/accumDy 是手机坐标系下的位移（x=东，y=北，单位：米）
-        // 用 currentYaw 旋转到世界坐标系
         val cosY = Math.cos(currentYaw.toDouble()).toFloat()
         val sinY = Math.sin(currentYaw.toDouble()).toFloat()
         val worldDx = accumDx * cosY - accumDy * sinY
         val worldDy = accumDx * sinY + accumDy * cosY
-
-        lastWorldX += worldDx
-        lastWorldY += worldDy
+        val moveDist = Math.sqrt((worldDx * worldDx + worldDy * worldDy).toDouble()).toFloat()
 
         // 重置累计位移
         accumDx = 0f
         accumDy = 0f
 
-        binding.heatMap.addSample(lastWorldX, lastWorldY, rssi)
+        // 移动距离 < 0.3m 视为在同一位置：更新最后一个采样点的 RSSI，不追加新点
+        // 这样在同一个点站着不动时，颜色不会越叠越深，而是反映最新的信号值
+        if (moveDist < 0.3f && binding.heatMap.getSampleCount() > 0) {
+            binding.heatMap.updateLastSample(rssi)
+        } else {
+            lastWorldX += worldDx
+            lastWorldY += worldDy
+            binding.heatMap.addSample(lastWorldX, lastWorldY, rssi)
+        }
         updateSampleCount()
     }
 
@@ -512,26 +524,33 @@ class HeatmapFragment : Fragment(), SensorEventListener {
 
                 // 检测是否在走动：水平方向加速度幅值
                 val horizMag = Math.sqrt((lx * lx + ly * ly).toDouble()).toFloat()
-                isMoving = horizMag > 1.0f  // >1 m/s² 认为在走动
+                isMoving = horizMag > 1.5f  // >1.5 m/s² 认为在走动
 
-                // 只在走动时积分位移，静止时不累加（避免漂移）
                 if (isMoving) {
-                    // 二重积分得位移：v += a*dt, s += v*dt
-                    // 简化版：直接 s += a * dt²（近似，对短时间间隔够用）
-                    // 更稳的做法是先积分出速度再积分位移，但需要去除初速度，这里用简化版
-                    accumDx += lx * dt * dt * 0.5f
-                    accumDy += ly * dt * dt * 0.5f
-                    // 限制单次累计位移上限，避免抖动导致大跳
-                    val accumMag = Math.sqrt((accumDx * accumDx + accumDy * accumDy).toDouble()).toFloat()
-                    val maxAccum = 1.5f  // 单周期最多 1.5 米
-                    if (accumMag > maxAccum) {
-                        val scale = maxAccum / accumMag
-                        accumDx *= scale
-                        accumDy *= scale
+                    staticCount = 0
+                    // 速度积分：v += a * dt
+                    velX += lx * dt
+                    velY += ly * dt
+                    // 位移积分：s += v * dt + 0.5 * a * dt²
+                    accumDx += velX * dt + lx * dt * dt * 0.5f
+                    accumDy += velY * dt + ly * dt * dt * 0.5f
+                } else {
+                    // ZUPT 零速更新：检测到静止时强制把速度清零，防止漂移
+                    staticCount++
+                    if (staticCount > 3) {  // 连续 3 次静止才清零，避免走动中的短暂停顿
+                        velX = 0f
+                        velY = 0f
                     }
                 }
-                lastLinearAccelX = lx
-                lastLinearAccelY = ly
+
+                // 限制单周期累计位移上限，避免抖动导致大跳
+                val accumMag = Math.sqrt((accumDx * accumDx + accumDy * accumDy).toDouble()).toFloat()
+                val maxAccum = 2.0f  // 单周期最多 2 米（1.5 秒走 2 米 = 1.3 m/s，正常步速）
+                if (accumMag > maxAccum) {
+                    val scale = maxAccum / accumMag
+                    accumDx *= scale
+                    accumDy *= scale
+                }
             }
         }
     }
