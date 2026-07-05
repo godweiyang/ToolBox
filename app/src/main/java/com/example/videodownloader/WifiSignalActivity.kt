@@ -315,12 +315,14 @@ class RealtimeFragment : Fragment() {
 /**
  * 热力图页：自动采集 WiFi 信号，每 1.5 秒一个采样点。
  *
- * 采样点位置基于加速度计 + 陀螺仪积分推算：
- * - 检测到手机走动时，按朝向积分位移，采样点跟着移动
- * - 手机静止时（加速度幅值稳定 ≈ 重力），采样点位置保持不变，只更新信号值
- * - 这样手机放在原地时点不会飘移
+ * 采样点位置用 PDR（行人航迹推算）：
+ * - TYPE_STEP_DETECTOR 系统级步频检测（准确，Android 4.4+）
+ * - TYPE_ROTATION_VECTOR 提供朝向
+ * - 每检测到一步，沿当前朝向推进固定步长 0.65 米
+ * - 静止时采样点位置不变，只更新信号值
  *
- * HeatMapView 会自动 fit 所有点到屏幕，用户可双指捏合缩放查看细节。
+ * 纯加速度计二次积分在室内定位不可行（噪声放大 + 重力分离不完美），
+ * 步频检测 + 固定步长是手机端唯一靠谱的相对轨迹方案。
  */
 class HeatmapFragment : Fragment(), SensorEventListener {
 
@@ -337,25 +339,17 @@ class HeatmapFragment : Fragment(), SensorEventListener {
     private var lastWorldX = 0f
     private var lastWorldY = 0f
 
-    // ===== 位移检测相关 =====
-    /** 当前朝向（弧度，0=北，顺时针） */
+    // ===== PDR 相关 =====
+    /** 当前朝向（弧度，0=北，逆时针为正） */
     private var currentYaw = 0f
-    /** 累计的位移向量（采样间隔内积算） */
-    private var accumDx = 0f
-    private var accumDy = 0f
-    /** 当前速度（手机坐标系，m/s） */
-    private var velX = 0f
-    private var velY = 0f
-    /** 上次加速度时间戳（ns） */
-    private var lastAccelTimeNs = 0L
-    /** 重力分量（低通滤波分离） */
-    private var gravityX = 0f
-    private var gravityY = 0f
-    private var gravityZ = 0f
-    /** 当前是否在走动（加速度幅值超阈值） */
-    private var isMoving = false
-    /** 静止计数器：连续多少次检测到静止，用于 ZUPT */
-    private var staticCount = 0
+    /** 本周期内检测到的步数 */
+    private var stepsInPeriod = 0
+    /** 总步数 */
+    private var totalSteps = 0
+    /** 单步长（米） */
+    private val stepLength = 0.65f
+    /** 是否有 STEP_DETECTOR 传感器 */
+    private var hasStepDetector = false
 
     private val sampleRunnable = object : Runnable {
         override fun run() {
@@ -370,6 +364,13 @@ class HeatmapFragment : Fragment(), SensorEventListener {
         ActivityResultContracts.RequestPermission()
     ) { granted ->
         if (granted) startSampling()
+    }
+
+    private val activityPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        // 无论是否授权都启动（无授权则回退到加速度计检测）
+        startSampling()
     }
 
     override fun onCreateView(
@@ -399,11 +400,8 @@ class HeatmapFragment : Fragment(), SensorEventListener {
             binding.heatMap.clear()
             lastWorldX = 0f
             lastWorldY = 0f
-            accumDx = 0f
-            accumDy = 0f
-            velX = 0f
-            velY = 0f
-            staticCount = 0
+            stepsInPeriod = 0
+            totalSteps = 0
             binding.tvSteps.text = ""
             binding.tvHeatmapEmpty.visibility = View.VISIBLE
         }
@@ -427,19 +425,44 @@ class HeatmapFragment : Fragment(), SensorEventListener {
         isSampling = true
         binding.btnToggleHeat.text = getString(R.string.wifi_btn_stop)
         binding.tvHeatmapEmpty.visibility = View.GONE
-        // 重置位移积分
-        accumDx = 0f
-        accumDy = 0f
-        velX = 0f
-        velY = 0f
-        staticCount = 0
-        lastAccelTimeNs = 0L
-        // 注册传感器：旋转矢量拿朝向，加速度计做位移检测
+        stepsInPeriod = 0
+        // 注册旋转矢量获取朝向
         sensorManager.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR)?.let {
             sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_UI)
         }
-        sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)?.let {
-            sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_GAME)
+        // 注册步频检测器（系统级，比手动加速度积分可靠）
+        // Android 10+ 需要 ACTIVITY_RECOGNITION 运行时权限
+        val stepDetector = sensorManager.getDefaultSensor(Sensor.TYPE_STEP_DETECTOR)
+        if (stepDetector != null && Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+            // Android 9 及以下不需要运行时权限
+            hasStepDetector = true
+            sensorManager.registerListener(this, stepDetector, SensorManager.SENSOR_DELAY_FASTEST)
+            android.util.Log.i("WifiHeatmap", "Using TYPE_STEP_DETECTOR (no permission needed)")
+        } else if (stepDetector != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val perm = Manifest.permission.ACTIVITY_RECOGNITION
+            if (ContextCompat.checkSelfPermission(requireContext(), perm) == PackageManager.PERMISSION_GRANTED) {
+                hasStepDetector = true
+                sensorManager.registerListener(this, stepDetector, SensorManager.SENSOR_DELAY_FASTEST)
+                android.util.Log.i("WifiHeatmap", "Using TYPE_STEP_DETECTOR (permission granted)")
+            } else {
+                // 先启动采样（用加速度计回退），再请求权限；授权后下次启动才用 STEP_DETECTOR
+                hasStepDetector = false
+                sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)?.let {
+                    sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_GAME)
+                }
+                try {
+                    activityPermissionLauncher.launch(perm)
+                } catch (e: Exception) {
+                    android.util.Log.e("WifiHeatmap", "launch activity permission failed", e)
+                }
+                android.util.Log.w("WifiHeatmap", "Requesting ACTIVITY_RECOGNITION, using accelerometer fallback for now")
+            }
+        } else {
+            hasStepDetector = false
+            android.util.Log.w("WifiHeatmap", "TYPE_STEP_DETECTOR not available, falling back to accelerometer")
+            sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)?.let {
+                sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_GAME)
+            }
         }
         // 立即采样一次，然后定时采样
         sampleOnce()
@@ -453,7 +476,7 @@ class HeatmapFragment : Fragment(), SensorEventListener {
         binding.btnToggleHeat.text = getString(R.string.wifi_btn_start)
     }
 
-    /** 采一个点：位置 = 上次位置 + 本周期累计位移（手机不动时累计位移≈0） */
+    /** 采一个点：本周期内有步数则沿朝向推进，否则同位置更新 */
     private fun sampleOnce() {
         val rssi = getCurrentRssi()
         if (rssi == Int.MIN_VALUE) {
@@ -465,91 +488,81 @@ class HeatmapFragment : Fragment(), SensorEventListener {
             return
         }
 
-        // 把累计位移从"手机坐标系"转到"世界坐标系"（按当前朝向旋转）
-        val cosY = Math.cos(currentYaw.toDouble()).toFloat()
-        val sinY = Math.sin(currentYaw.toDouble()).toFloat()
-        val worldDx = accumDx * cosY - accumDy * sinY
-        val worldDy = accumDx * sinY + accumDy * cosY
-        val moveDist = Math.sqrt((worldDx * worldDx + worldDy * worldDy).toDouble()).toFloat()
+        val steps = stepsInPeriod
+        stepsInPeriod = 0
 
-        // 重置累计位移
-        accumDx = 0f
-        accumDy = 0f
-
-        // 移动距离 < 0.3m 视为在同一位置：更新最后一个采样点的 RSSI，不追加新点
-        // 这样在同一个点站着不动时，颜色不会越叠越深，而是反映最新的信号值
-        if (moveDist < 0.3f && binding.heatMap.getSampleCount() > 0) {
-            binding.heatMap.updateLastSample(rssi)
-        } else {
-            lastWorldX += worldDx
-            lastWorldY += worldDy
+        if (steps > 0) {
+            // 走了 steps 步，沿当前朝向推进 steps * stepLength 米
+            // 注意 Android 朝向：0=北，逆时针为正；世界坐标 y 轴朝北，x 轴朝东
+            val dist = steps * stepLength
+            val dx = (Math.sin(currentYaw.toDouble()) * dist).toFloat()  // 东向分量
+            val dy = (Math.cos(currentYaw.toDouble()) * dist).toFloat()  // 北向分量
+            lastWorldX += dx
+            lastWorldY += dy
             binding.heatMap.addSample(lastWorldX, lastWorldY, rssi)
+        } else {
+            // 静止：同位置更新，不追加新点
+            if (binding.heatMap.getSampleCount() > 0) {
+                binding.heatMap.updateLastSample(rssi)
+            } else {
+                binding.heatMap.addSample(lastWorldX, lastWorldY, rssi)
+            }
         }
         updateSampleCount()
     }
 
     private fun updateSampleCount() {
         val count = binding.heatMap.getSampleCount()
-        binding.tvSteps.text = getString(R.string.wifi_heatmap_steps, count)
+        binding.tvSteps.text = getString(R.string.wifi_heatmap_steps, count) + "  共 $totalSteps 步"
     }
+
+    // ===== 加速度计回退步频检测 =====
+    /** 加速度幅值低通滤波后的信号 */
+    private val accelMagHistory = ArrayList<Float>(50)
+    private var lastStepTimeMs = 0L
+    /** 当前是否在步频峰值状态机中 */
+    private var inStepPeak = false
 
     override fun onSensorChanged(event: SensorEvent) {
         when (event.sensor.type) {
             Sensor.TYPE_ROTATION_VECTOR -> {
-                // 取 z 轴旋转分量作为朝向（弧度）
                 val r = FloatArray(9)
                 SensorManager.getRotationMatrixFromVector(r, event.values)
                 val orientation = FloatArray(3)
                 SensorManager.getOrientation(r, orientation)
-                currentYaw = orientation[0]  // azimut，0=北，逆时针为正
+                currentYaw = orientation[0]
+            }
+            Sensor.TYPE_STEP_DETECTOR -> {
+                // 系统级步频检测：每步触发一次
+                stepsInPeriod++
+                totalSteps++
             }
             Sensor.TYPE_ACCELEROMETER -> {
-                val now = event.timestamp
-                if (lastAccelTimeNs == 0L) {
-                    lastAccelTimeNs = now
-                    return
-                }
-                val dt = (now - lastAccelTimeNs) / 1e9f  // 秒
-                lastAccelTimeNs = now
-                if (dt <= 0f || dt > 0.5f) return  // 异常 dt 跳过
+                if (hasStepDetector) return  // 有系统步频检测就不用加速度计
+                // 回退方案：手动步频检测
+                val ax = event.values[0]
+                val ay = event.values[1]
+                val az = event.values[2]
+                val mag = Math.sqrt((ax * ax + ay * ay + az * az).toDouble()).toFloat()
+                // 减去重力（约 9.81）
+                val linear = mag - 9.81f
+                accelMagHistory.add(linear)
+                if (accelMagHistory.size > 50) accelMagHistory.removeAt(0)
+                if (accelMagHistory.size < 10) return
 
-                // 低通滤波分离重力
-                val alpha = 0.8f
-                gravityX = alpha * gravityX + (1 - alpha) * event.values[0]
-                gravityY = alpha * gravityY + (1 - alpha) * event.values[1]
-                gravityZ = alpha * gravityZ + (1 - alpha) * event.values[2]
-                // 线性加速度 = 原始 - 重力
-                val lx = event.values[0] - gravityX
-                val ly = event.values[1] - gravityY
+                // 滑动窗口均值作为动态阈值
+                val avg = accelMagHistory.average().toFloat()
+                val threshold = if (avg > 0.5f) avg * 1.5f else 1.0f
 
-                // 检测是否在走动：水平方向加速度幅值
-                val horizMag = Math.sqrt((lx * lx + ly * ly).toDouble()).toFloat()
-                isMoving = horizMag > 1.5f  // >1.5 m/s² 认为在走动
-
-                if (isMoving) {
-                    staticCount = 0
-                    // 速度积分：v += a * dt
-                    velX += lx * dt
-                    velY += ly * dt
-                    // 位移积分：s += v * dt + 0.5 * a * dt²
-                    accumDx += velX * dt + lx * dt * dt * 0.5f
-                    accumDy += velY * dt + ly * dt * dt * 0.5f
-                } else {
-                    // ZUPT 零速更新：检测到静止时强制把速度清零，防止漂移
-                    staticCount++
-                    if (staticCount > 3) {  // 连续 3 次静止才清零，避免走动中的短暂停顿
-                        velX = 0f
-                        velY = 0f
-                    }
-                }
-
-                // 限制单周期累计位移上限，避免抖动导致大跳
-                val accumMag = Math.sqrt((accumDx * accumDx + accumDy * accumDy).toDouble()).toFloat()
-                val maxAccum = 2.0f  // 单周期最多 2 米（1.5 秒走 2 米 = 1.3 m/s，正常步速）
-                if (accumMag > maxAccum) {
-                    val scale = maxAccum / accumMag
-                    accumDx *= scale
-                    accumDy *= scale
+                val now = System.currentTimeMillis()
+                // 状态机：幅值超阈值 → 等峰值 → 回落判定为一步
+                if (!inStepPeak && linear > threshold && now - lastStepTimeMs > 300) {
+                    inStepPeak = true
+                } else if (inStepPeak && linear < threshold * 0.5f) {
+                    inStepPeak = false
+                    lastStepTimeMs = now
+                    stepsInPeriod++
+                    totalSteps++
                 }
             }
         }

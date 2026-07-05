@@ -33,6 +33,9 @@
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
 
+    <!-- WiFi 信号探测器:步频检测（Android 10+ 需要 ACTIVITY_RECOGNITION） -->
+    <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
+
     <application
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
