@@ -118,6 +118,7 @@
     <string name="db_level_normal">正常</string>
     <string name="db_level_loud">较吵</string>
     <string name="db_level_very_loud">很吵</string>
+    <string name="db_chart_label">分贝实时曲线</string>
 
     <!-- 局域网文件互传工具 -->
     <string name="tool_fileshare_title">局域网文件互传</string>

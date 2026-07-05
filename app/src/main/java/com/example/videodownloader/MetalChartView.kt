@@ -9,13 +9,13 @@ import android.util.AttributeSet
 import android.view.View
 
 /**
- * 磁场强度实时波形图。
+ * 实时波形图（通用）：磁场、分贝、加速度等均可复用。
  *
  * 横轴：时间（最近的样本画在右边，更早的画在左边，自动滚动）
- * 纵轴：磁场强度 μT，自动按 [maxValue] 缩放到画布高度
+ * 纵轴：自动按 [maxValue] 缩放到画布高度
  *
  * 数据通过 [addPoint] 追加，超出 [MAX_POINTS] 时丢弃最旧的。
- * 阈值线横向标出，超过阈值的点用红色高亮。
+ * 可选阈值线：超过阈值的点用红色高亮（[showThreshold] = true 时启用）。
  */
 class MetalChartView @JvmOverloads constructor(
     context: Context,
@@ -31,14 +31,19 @@ class MetalChartView @JvmOverloads constructor(
     private val points = ArrayList<Float>(MAX_POINTS)
     private var maxValue = 100f
     private var threshold = 60f
+    /** 是否绘制阈值线 + 超阈值变红（分贝仪等不需要阈值时设为 false） */
+    private var showThreshold = true
+    /** 主色（默认磁场蓝），分贝仪可设为紫色 */
+    private var mainColor = 0xFF0288D1.toInt()
+    private var fillColor = 0x330288D1
 
     private val linePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = 0xFF0288D1.toInt()
+        color = mainColor
         style = Paint.Style.STROKE
         strokeWidth = 3f
     }
     private val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = 0x330288D1
+        color = fillColor
         style = Paint.Style.FILL
     }
     private val thresholdPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -57,6 +62,17 @@ class MetalChartView @JvmOverloads constructor(
         textSize = 24f
     }
 
+    /** 配置外观：主色 / 是否显示阈值线 / 初始纵轴上限 */
+    fun configure(color: Int, showThreshold: Boolean, initMax: Float = 100f) {
+        mainColor = color
+        fillColor = (color and 0x00FFFFFF) or 0x33000000.toInt()
+        this.showThreshold = showThreshold
+        maxValue = initMax
+        linePaint.color = mainColor
+        fillPaint.color = fillColor
+        invalidate()
+    }
+
     /** 追加一个采样点 */
     fun addPoint(value: Float) {
         points.add(value)
@@ -64,10 +80,8 @@ class MetalChartView @JvmOverloads constructor(
         // 自动放大纵轴上限
         if (value > maxValue) {
             maxValue = value * 1.2f
-            invalidate()
-        } else {
-            invalidate()
         }
+        invalidate()
     }
 
     /** 设置阈值（用于画阈值线） */
@@ -79,7 +93,6 @@ class MetalChartView @JvmOverloads constructor(
     /** 重置所有数据 */
     fun reset() {
         points.clear()
-        maxValue = 100f
         invalidate()
     }
 
@@ -96,7 +109,7 @@ class MetalChartView @JvmOverloads constructor(
         }
 
         // 2. 阈值线（按 maxValue 缩放）
-        if (threshold > 0 && threshold < maxValue) {
+        if (showThreshold && threshold > 0 && threshold < maxValue) {
             val ty = h - (threshold / maxValue) * h
             canvas.drawLine(0f, ty, w, ty, thresholdPaint)
             canvas.drawText("%.0f".format(threshold), 8f, ty - 4f, textPaint)
@@ -130,9 +143,9 @@ class MetalChartView @JvmOverloads constructor(
         fillPath.close()
 
         canvas.drawPath(fillPath, fillPaint)
-        // 超阈值部分用红色画
-        val overThreshold = points.maxOrNull()?.let { it > threshold } ?: false
-        linePaint.color = if (overThreshold) 0xFFF44336.toInt() else 0xFF0288D1.toInt()
+        // 超阈值部分用红色画（仅在 showThreshold 模式下）
+        val overThreshold = showThreshold && (points.maxOrNull()?.let { it > threshold } ?: false)
+        linePaint.color = if (overThreshold) 0xFFF44336.toInt() else mainColor
         canvas.drawPath(linePath, linePaint)
     }
 }

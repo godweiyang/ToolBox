@@ -71,6 +71,13 @@ class DecibelMeterActivity : AppCompatActivity() {
                 }
             }
         }
+
+        // 配置波形图：紫色主色（和分贝仪主题一致），不显示阈值线，纵轴 0-120 dB
+        binding.chartView.configure(
+            color = 0xFF5E35B1.toInt(),
+            showThreshold = false,
+            initMax = 120f
+        )
     }
 
     private fun startRecording() {
@@ -102,6 +109,7 @@ class DecibelMeterActivity : AppCompatActivity() {
         maxDb = Double.MIN_VALUE
         sumDb = 0.0
         countDb = 0
+        binding.chartView.reset()
 
         isRecording = true
         binding.btnToggle.text = getString(R.string.db_btn_stop)
@@ -175,6 +183,8 @@ class DecibelMeterActivity : AppCompatActivity() {
                 binding.tvAvg.text = getString(R.string.db_avg, sumDb / countDb)
             }
         }
+        // 波形图（按值缩放，超过 120 dB 自动放大纵轴）
+        binding.chartView.addPoint(db.toFloat())
     }
 
     override fun onDestroy() {
