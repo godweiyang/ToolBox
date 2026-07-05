@@ -132,37 +132,56 @@ class RealtimeFragment : Fragment() {
     private fun startDetection() {
         // Android 12+ 需要 ACCESS_FINE_LOCATION 才能读取 WiFi 信息
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            val perm = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q)
-                Manifest.permission.ACCESS_FINE_LOCATION
-            else Manifest.permission.ACCESS_FINE_LOCATION
+            val perm = Manifest.permission.ACCESS_FINE_LOCATION
             if (ContextCompat.checkSelfPermission(requireContext(), perm) != PackageManager.PERMISSION_GRANTED) {
-                locationPermissionLauncher.launch(perm)
+                try {
+                    locationPermissionLauncher.launch(perm)
+                } catch (e: Exception) {
+                    android.util.Log.e("WifiRealtime", "launch permission failed", e)
+                    android.widget.Toast.makeText(
+                        requireContext(),
+                        "无法请求权限: ${e.message}",
+                        android.widget.Toast.LENGTH_LONG
+                    ).show()
+                }
                 return
             }
         }
 
-        isDetecting = true
-        rssiHistory.clear()
-        minRssi = Int.MAX_VALUE
-        maxRssi = Int.MIN_VALUE
-        sumRssi = 0L
-        countRssi = 0
-        binding.chartRssi.reset()
-        binding.btnToggle.text = getString(R.string.wifi_btn_stop)
-        binding.tvHint.text = getString(R.string.wifi_walk_hint)
+        try {
+            isDetecting = true
+            rssiHistory.clear()
+            minRssi = Int.MAX_VALUE
+            maxRssi = Int.MIN_VALUE
+            sumRssi = 0L
+            countRssi = 0
+            binding.chartRssi.reset()
+            binding.btnToggle.text = getString(R.string.wifi_btn_stop)
+            binding.tvHint.text = getString(R.string.wifi_walk_hint)
 
-        // 注册 RSSI 变化广播
-        // Android 14+ 必须显式指定 RECEIVER_NOT_EXPORTED / RECEIVER_EXPORTED，否则抛 SecurityException
-        val filter = IntentFilter(WifiManager.RSSI_CHANGED_ACTION)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            requireContext().registerReceiver(rssiReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
-        } else {
-            requireContext().registerReceiver(rssiReceiver, filter)
+            // 注册 RSSI 变化广播
+            // Android 13+ 必须显式指定 RECEIVER_NOT_EXPORTED / RECEIVER_EXPORTED，否则抛 SecurityException
+            val filter = IntentFilter(WifiManager.RSSI_CHANGED_ACTION)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                requireContext().registerReceiver(rssiReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
+            } else {
+                requireContext().registerReceiver(rssiReceiver, filter)
+            }
+
+            // 立即更新一次，然后每秒轮询（广播有延迟，轮询保证最低频率）
+            updateWifiInfo()
+            handler.post(pollRunnable)
+        } catch (e: Exception) {
+            android.util.Log.e("WifiRealtime", "startDetection failed", e)
+            isDetecting = false
+            android.widget.Toast.makeText(
+                requireContext(),
+                "启动失败: ${e.javaClass.simpleName}: ${e.message}",
+                android.widget.Toast.LENGTH_LONG
+            ).show()
+            // 还原按钮状态
+            try { binding.btnToggle.text = getString(R.string.wifi_btn_start) } catch (_: Exception) {}
         }
-
-        // 立即更新一次，然后每秒轮询（广播有延迟，轮询保证最低频率）
-        updateWifiInfo()
-        handler.post(pollRunnable)
     }
 
     private fun stopDetection() {
