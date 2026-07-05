@@ -3,7 +3,7 @@
     <string name="app_name">工具百宝箱</string>
 
     <!-- 工具列表主页 -->
-    <string name="subtitle_hint">轻量实用工具合集，点击卡片进入对应工具</string>
+    <string name="subtitle_hint">轻量实用工具合集，点击进入 · 长按拖动排序</string>
     <string name="tool_video_downloader_title">视频下载</string>
     <string name="tool_video_downloader_desc">抖音 / 快手 / 小红书 / B站 视频下载</string>
     <string name="tool_qrcode_title">二维码生成</string>
