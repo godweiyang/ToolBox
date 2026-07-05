@@ -11,6 +11,7 @@ import android.view.GestureDetector
 import android.view.MotionEvent
 import android.view.ScaleGestureDetector
 import android.view.View
+import android.view.ViewParent
 import kotlin.math.max
 import kotlin.math.min
 
@@ -129,6 +130,28 @@ class HeatMapView @JvmOverloads constructor(
     override fun onTouchEvent(event: MotionEvent): Boolean {
         scaleDetector.onTouchEvent(event)
         gestureDetector.onTouchEvent(event)
+
+        // 双指缩放中，或已放大后的单指拖动，都要阻止父级（ViewPager2）拦截触摸事件
+        // 否则左右滑动会被 ViewPager2 当作切 Tab
+        val pointerCount = event.pointerCount
+        when (event.actionMasked) {
+            MotionEvent.ACTION_DOWN,
+            MotionEvent.ACTION_POINTER_DOWN -> {
+                if (pointerCount >= 2 || userScale > 1.01f) {
+                    parent?.requestDisallowInterceptTouchEvent(true)
+                }
+            }
+            MotionEvent.ACTION_MOVE -> {
+                if (pointerCount >= 2 || userScale > 1.01f) {
+                    parent?.requestDisallowInterceptTouchEvent(true)
+                }
+            }
+            MotionEvent.ACTION_UP,
+            MotionEvent.ACTION_POINTER_UP,
+            MotionEvent.ACTION_CANCEL -> {
+                parent?.requestDisallowInterceptTouchEvent(false)
+            }
+        }
         return true
     }
 
