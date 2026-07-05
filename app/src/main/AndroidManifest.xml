@@ -26,6 +26,9 @@
     <!-- 文件互传:WiFi 状态信息（获取局域网 IP） -->
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
 
+    <!-- 金属探测器:震动报警 -->
+    <uses-permission android:name="android.permission.VIBRATE" />
+
     <application
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
@@ -75,6 +78,10 @@
 
         <activity
             android:name=".FileShareActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".MetalDetectorActivity"
             android:exported="false" />
 
         <!-- 局域网文件互传 HTTP server，前台 Service 保活 -->

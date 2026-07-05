@@ -9,4 +9,8 @@
     <color name="tool_gifreverse_bg">#00897B</color>
     <color name="tool_decibel_bg">#5E35B1</color>
     <color name="tool_fileshare_bg">#0288D1</color>
+    <color name="tool_metal_bg">#37474F</color>
+    <color name="metal_normal">#4CAF50</color>
+    <color name="metal_warn">#FF9800</color>
+    <color name="metal_alert">#F44336</color>
 </resources>

@@ -137,4 +137,23 @@
     <string name="fs_same_wifi_hint">请确保手机和电脑在同一个 WiFi 网络</string>
     <string name="fs_channel_name">文件互传服务</string>
     <string name="fs_channel_desc">保持 HTTP server 运行，电脑可访问手机</string>
+
+    <!-- 金属探测器工具 -->
+    <string name="tool_metal_title">金属探测器</string>
+    <string name="tool_metal_desc">用磁力计探测附近的金属/磁铁，超阈值震动报警</string>
+    <string name="metal_current">%1$.1f μT</string>
+    <string name="metal_axis">X: %1$.1f    Y: %2$.1f    Z: %3$.1f μT</string>
+    <string name="metal_min">最小：%1$.1f</string>
+    <string name="metal_max">最大：%1$.1f</string>
+    <string name="metal_avg">平均：%1$.1f</string>
+    <string name="metal_btn_start">开始探测</string>
+    <string name="metal_btn_stop">停止探测</string>
+    <string name="metal_hint">点击开始探测，靠近金属/磁铁时数值会飙升</string>
+    <string name="metal_no_sensor">设备没有磁力计传感器，无法使用</string>
+    <string name="metal_threshold">报警阈值：%1$.0f μT</string>
+    <string name="metal_level_normal">环境磁场</string>
+    <string name="metal_level_detect">检测到金属！</string>
+    <string name="metal_level_strong">强烈磁场！</string>
+    <string name="metal_calibrating">校准中…请将手机远离金属</string>
+    <string name="metal_chart_label">磁场强度实时曲线</string>
 </resources>

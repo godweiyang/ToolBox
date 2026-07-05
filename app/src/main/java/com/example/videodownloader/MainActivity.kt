@@ -92,6 +92,13 @@ class MainActivity : AppCompatActivity() {
             iconRes = android.R.drawable.stat_sys_upload,
             bgColorRes = R.color.tool_fileshare_bg,
             launcher = { ctx -> Intent(ctx, FileShareActivity::class.java) }
+        ),
+        Tool(
+            title = getString(R.string.tool_metal_title),
+            desc = getString(R.string.tool_metal_desc),
+            iconRes = android.R.drawable.ic_menu_compass,
+            bgColorRes = R.color.tool_metal_bg,
+            launcher = { ctx -> Intent(ctx, MetalDetectorActivity::class.java) }
         )
     )
 }
