@@ -340,16 +340,29 @@ class HeatmapFragment : Fragment(), SensorEventListener {
     private var lastWorldY = 0f
 
     // ===== PDR 相关 =====
-    /** 当前朝向（弧度，0=北，逆时针为正） */
+    /** 当前朝向（弧度，0=北，逆时针为正），已低通滤波 */
     private var currentYaw = 0f
+    /** 原始朝向，用于低通滤波 */
+    private var rawYaw = 0f
+    /** 朝向低通滤波的复数分量（sin/cum, cos/cum），避免角度绕圈问题 */
+    private var yawSinSum = 0.0
+    private var yawCosSum = 0.0
+    private val yawWindow = ArrayDeque<Double>(10)  // 滑动窗口存最近 10 个朝向（弧度）
     /** 本周期内检测到的步数 */
     private var stepsInPeriod = 0
     /** 总步数 */
     private var totalSteps = 0
-    /** 单步长（米） */
-    private val stepLength = 0.65f
     /** 是否有 STEP_DETECTOR 传感器 */
     private var hasStepDetector = false
+
+    // ===== 自适应步长（Weinberg 算法） =====
+    /** 加速度幅值的最大值/最小值，用于估算步长 */
+    private var accelMax = Float.MIN_VALUE
+    private var accelMin = Float.MAX_VALUE
+    /** 上一次步长（米） */
+    private var lastStepLength = 0.65f
+    /** Weinberg 经验系数 */
+    private val weinbergK = 0.55f
 
     private val sampleRunnable = object : Runnable {
         override fun run() {
@@ -426,15 +439,20 @@ class HeatmapFragment : Fragment(), SensorEventListener {
         binding.btnToggleHeat.text = getString(R.string.wifi_btn_stop)
         binding.tvHeatmapEmpty.visibility = View.GONE
         stepsInPeriod = 0
+        accelMax = Float.MIN_VALUE
+        accelMin = Float.MAX_VALUE
         // 注册旋转矢量获取朝向
         sensorManager.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR)?.let {
             sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_UI)
+        }
+        // 始终注册加速度计：用于自适应步长估算（Weinberg 算法需要每步的加速度峰值）
+        sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)?.let {
+            sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_GAME)
         }
         // 注册步频检测器（系统级，比手动加速度积分可靠）
         // Android 10+ 需要 ACTIVITY_RECOGNITION 运行时权限
         val stepDetector = sensorManager.getDefaultSensor(Sensor.TYPE_STEP_DETECTOR)
         if (stepDetector != null && Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
-            // Android 9 及以下不需要运行时权限
             hasStepDetector = true
             sensorManager.registerListener(this, stepDetector, SensorManager.SENSOR_DELAY_FASTEST)
             android.util.Log.i("WifiHeatmap", "Using TYPE_STEP_DETECTOR (no permission needed)")
@@ -445,11 +463,7 @@ class HeatmapFragment : Fragment(), SensorEventListener {
                 sensorManager.registerListener(this, stepDetector, SensorManager.SENSOR_DELAY_FASTEST)
                 android.util.Log.i("WifiHeatmap", "Using TYPE_STEP_DETECTOR (permission granted)")
             } else {
-                // 先启动采样（用加速度计回退），再请求权限；授权后下次启动才用 STEP_DETECTOR
                 hasStepDetector = false
-                sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)?.let {
-                    sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_GAME)
-                }
                 try {
                     activityPermissionLauncher.launch(perm)
                 } catch (e: Exception) {
@@ -460,9 +474,6 @@ class HeatmapFragment : Fragment(), SensorEventListener {
         } else {
             hasStepDetector = false
             android.util.Log.w("WifiHeatmap", "TYPE_STEP_DETECTOR not available, falling back to accelerometer")
-            sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)?.let {
-                sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_GAME)
-            }
         }
         // 立即采样一次，然后定时采样
         sampleOnce()
@@ -492,9 +503,10 @@ class HeatmapFragment : Fragment(), SensorEventListener {
         stepsInPeriod = 0
 
         if (steps > 0) {
-            // 走了 steps 步，沿当前朝向推进 steps * stepLength 米
-            // 注意 Android 朝向：0=北，逆时针为正；世界坐标 y 轴朝北，x 轴朝东
-            val dist = steps * stepLength
+            // 走了 steps 步，用上一次估算的步长（每步触发时已通过 Weinberg 更新 lastStepLength）
+            // 注意：用 currentYaw（已低通滤波）作为整段位移的朝向
+            // Android 朝向：0=北，逆时针为正；世界坐标 y 轴朝北，x 轴朝东
+            val dist = steps * lastStepLength
             val dx = (Math.sin(currentYaw.toDouble()) * dist).toFloat()  // 东向分量
             val dy = (Math.cos(currentYaw.toDouble()) * dist).toFloat()  // 北向分量
             lastWorldX += dx
@@ -517,10 +529,8 @@ class HeatmapFragment : Fragment(), SensorEventListener {
     }
 
     // ===== 加速度计回退步频检测 =====
-    /** 加速度幅值低通滤波后的信号 */
     private val accelMagHistory = ArrayList<Float>(50)
     private var lastStepTimeMs = 0L
-    /** 当前是否在步频峰值状态机中 */
     private var inStepPeak = false
 
     override fun onSensorChanged(event: SensorEvent) {
@@ -530,42 +540,70 @@ class HeatmapFragment : Fragment(), SensorEventListener {
                 SensorManager.getRotationMatrixFromVector(r, event.values)
                 val orientation = FloatArray(3)
                 SensorManager.getOrientation(r, orientation)
-                currentYaw = orientation[0]
+                rawYaw = orientation[0]
+                // 用复数平均法做低通滤波（避免 359°↔1° 跳变）
+                yawWindow.add(rawYaw.toDouble())
+                if (yawWindow.size > 10) yawWindow.removeFirst()
+                var s = 0.0
+                var c = 0.0
+                for (y in yawWindow) {
+                    s += Math.sin(y)
+                    c += Math.cos(y)
+                }
+                currentYaw = Math.atan2(s, c).toFloat()
             }
             Sensor.TYPE_STEP_DETECTOR -> {
                 // 系统级步频检测：每步触发一次
-                stepsInPeriod++
-                totalSteps++
+                onStepDetected()
             }
             Sensor.TYPE_ACCELEROMETER -> {
-                if (hasStepDetector) return  // 有系统步频检测就不用加速度计
-                // 回退方案：手动步频检测
+                // 始终更新加速度 max/min（用于 Weinberg 自适应步长）
                 val ax = event.values[0]
                 val ay = event.values[1]
                 val az = event.values[2]
                 val mag = Math.sqrt((ax * ax + ay * ay + az * az).toDouble()).toFloat()
-                // 减去重力（约 9.81）
+                if (mag > accelMax) accelMax = mag
+                if (mag < accelMin) accelMin = mag
+
+                // 无系统步频检测时，用加速度计做手动步频检测
+                if (hasStepDetector) return
+
                 val linear = mag - 9.81f
                 accelMagHistory.add(linear)
                 if (accelMagHistory.size > 50) accelMagHistory.removeAt(0)
                 if (accelMagHistory.size < 10) return
 
-                // 滑动窗口均值作为动态阈值
                 val avg = accelMagHistory.average().toFloat()
                 val threshold = if (avg > 0.5f) avg * 1.5f else 1.0f
 
                 val now = System.currentTimeMillis()
-                // 状态机：幅值超阈值 → 等峰值 → 回落判定为一步
                 if (!inStepPeak && linear > threshold && now - lastStepTimeMs > 300) {
                     inStepPeak = true
                 } else if (inStepPeak && linear < threshold * 0.5f) {
                     inStepPeak = false
                     lastStepTimeMs = now
-                    stepsInPeriod++
-                    totalSteps++
+                    onStepDetected()
                 }
             }
         }
+    }
+
+    /** 每检测到一步时调用：用 Weinberg 算法估算步长，并累加步数 */
+    private fun onStepDetected() {
+        // Weinberg: stepLength = K * sqrt(accelMax - accelMin)
+        // accelMax/accelMin 是这一步周期内的加速度幅值极值
+        val diff = accelMax - accelMin
+        if (diff > 0.1f) {  // 避免噪声导致极小值
+            val estimated = weinbergK * Math.sqrt(diff.toDouble()).toFloat()
+            // 限制步长在合理范围 0.3 ~ 1.2 米
+            lastStepLength = estimated.coerceIn(0.3f, 1.2f)
+        }
+        // 重置极值，为下一步做准备
+        accelMax = Float.MIN_VALUE
+        accelMin = Float.MAX_VALUE
+
+        stepsInPeriod++
+        totalSteps++
     }
 
     override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
