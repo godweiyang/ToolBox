@@ -219,8 +219,10 @@ class FileShareServer(
         val uploadedTempPath = files["file"] ?: return newFixedLengthResponse(
             Response.Status.BAD_REQUEST, MIME_PLAINTEXT, "no file"
         )
-        // NanoHTTPD 把原始文件名放进 session.parameters["filename"]
+        // 优先从前端显式传递的 filename 字段拿原始文件名（含后缀）
+        // NanoHTTPD 不会自动解析 multipart 的 filename 字段，必须前端额外带
         val originalName = session.parameters["filename"]?.firstOrNull()
+            ?: extractFilenameFromKey(files.keys, "file")
             ?: "uploaded_${System.currentTimeMillis()}"
         val tempFile = File(uploadedTempPath)
         val saved = saveToDownloads(tempFile, originalName)
@@ -234,6 +236,21 @@ class FileShareServer(
         } else {
             newFixedLengthResponse(Response.Status.INTERNAL_ERROR, MIME_PLAINTEXT, "save failed")
         }
+    }
+
+    /**
+     * 兜底：从 NanoHTTPD files map 的 key 里提取原始文件名。
+     * NanoHTTPD 在某些版本会把 key 格式化为 "fieldName;filename=xxx.png"。
+     * 找不到返回 null。
+     */
+    private fun extractFilenameFromKey(keys: Set<String>, fieldName: String): String? {
+        for (k in keys) {
+            if (k.startsWith(fieldName) && k.contains("filename=", ignoreCase = true)) {
+                val idx = k.indexOf("filename=", ignoreCase = true)
+                return k.substring(idx + "filename=".length).trim().trim('"').ifBlank { null }
+            }
+        }
+        return null
     }
 
     /** 把上传的文件写入 Download/ToolBoxShare/ */
@@ -460,6 +477,8 @@ function uploadFiles(files) {
 function uploadOne(file) {
   const fd = new FormData();
   fd.append('file', file, file.name);
+  // 显式带上原始文件名，NanoHTTPD 不会自动解析 multipart filename 字段
+  fd.append('filename', file.name);
   const item = document.createElement('div');
   item.className = 'upload-item';
   item.textContent = '⏳ ' + file.name + ' (' + formatSize(file.size) + ')';
