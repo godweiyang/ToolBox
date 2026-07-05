@@ -152,8 +152,13 @@ class RealtimeFragment : Fragment() {
         binding.tvHint.text = getString(R.string.wifi_walk_hint)
 
         // 注册 RSSI 变化广播
+        // Android 14+ 必须显式指定 RECEIVER_NOT_EXPORTED / RECEIVER_EXPORTED，否则抛 SecurityException
         val filter = IntentFilter(WifiManager.RSSI_CHANGED_ACTION)
-        requireContext().registerReceiver(rssiReceiver, filter)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            requireContext().registerReceiver(rssiReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
+        } else {
+            requireContext().registerReceiver(rssiReceiver, filter)
+        }
 
         // 立即更新一次，然后每秒轮询（广播有延迟，轮询保证最低频率）
         updateWifiInfo()
