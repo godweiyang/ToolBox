@@ -4,8 +4,11 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.Service
+import android.content.ContentUris
 import android.content.ContentValues
 import android.content.Intent
+import android.content.pm.ServiceInfo
+import android.net.Uri
 import android.os.Build
 import android.os.Environment
 import android.os.IBinder
@@ -59,7 +62,16 @@ class FileShareService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        startForeground(NOTIF_ID, buildNotification("服务运行中"))
+        val notification = buildNotification("服务运行中")
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            startForeground(
+                NOTIF_ID,
+                notification,
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
+            )
+        } else {
+            startForeground(NOTIF_ID, notification)
+        }
         try {
             if (serverInstance == null) {
                 serverInstance = FileShareServer(PORT, this)
@@ -193,16 +205,30 @@ class FileShareServer(
         val target = files.find { it.id == id } ?: return newFixedLengthResponse(
             Response.Status.NOT_FOUND, MIME_PLAINTEXT, "file not found"
         )
-        val file = File(target.path)
-        if (!file.exists()) return newFixedLengthResponse(
+        val input = openSharedFileInput(target) ?: return newFixedLengthResponse(
             Response.Status.NOT_FOUND, MIME_PLAINTEXT, "file missing"
         )
-        val fis = file.inputStream()
         val mime = guessMime(target.name)
-        val resp = newChunkedResponse(Response.Status.OK, mime, fis)
-        resp.addHeader("Content-Disposition", "attachment; filename=\"${target.name}\"")
-        resp.addHeader("Content-Length", file.length().toString())
+        val resp = newChunkedResponse(Response.Status.OK, mime, input)
+        resp.addHeader("Content-Disposition", "attachment; filename=\"${target.name.replace("\"", "_")}\"")
+        if (target.size > 0) {
+            resp.addHeader("Content-Length", target.size.toString())
+        }
         return resp
+    }
+
+    private fun openSharedFileInput(target: SharedFile): java.io.InputStream? {
+        return try {
+            if (target.path.startsWith("content://")) {
+                service.contentResolver.openInputStream(Uri.parse(target.path))
+            } else {
+                val file = File(target.path)
+                if (file.exists()) file.inputStream() else null
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "open shared file failed: ${target.name}", e)
+            null
+        }
     }
 
     /** POST /upload → 接收 multipart 文件 */
@@ -221,9 +247,9 @@ class FileShareServer(
         )
         // 优先从前端显式传递的 filename 字段拿原始文件名（含后缀）
         // NanoHTTPD 不会自动解析 multipart 的 filename 字段，必须前端额外带
-        val originalName = session.parameters["filename"]?.firstOrNull()
+        val originalName = sanitizeDisplayName(session.parameters["filename"]?.firstOrNull()
             ?: extractFilenameFromKey(files.keys, "file")
-            ?: "uploaded_${System.currentTimeMillis()}"
+            ?: "uploaded_${System.currentTimeMillis()}")
         val tempFile = File(uploadedTempPath)
         val saved = saveToDownloads(tempFile, originalName)
         return if (saved != null) {
@@ -236,6 +262,15 @@ class FileShareServer(
         } else {
             newFixedLengthResponse(Response.Status.INTERNAL_ERROR, MIME_PLAINTEXT, "save failed")
         }
+    }
+
+    private fun sanitizeDisplayName(name: String): String {
+        val baseName = name
+            .substringAfterLast('/')
+            .substringAfterLast('\\')
+            .replace(Regex("[\\r\\n]"), "_")
+            .trim()
+        return baseName.ifBlank { "uploaded_${System.currentTimeMillis()}" }
     }
 
     /**
@@ -320,13 +355,22 @@ class FileShareServer(
             } else {
                 MediaStore.Files.getContentUri("external")
             }
-            val proj = arrayOf(
-                MediaStore.Downloads._ID,
-                MediaStore.Downloads.DISPLAY_NAME,
-                MediaStore.Downloads.SIZE,
-                MediaStore.Downloads.DATE_ADDED,
-                MediaStore.Downloads.DATA
-            )
+            val proj = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                arrayOf(
+                    MediaStore.Downloads._ID,
+                    MediaStore.Downloads.DISPLAY_NAME,
+                    MediaStore.Downloads.SIZE,
+                    MediaStore.Downloads.DATE_ADDED
+                )
+            } else {
+                arrayOf(
+                    MediaStore.Downloads._ID,
+                    MediaStore.Downloads.DISPLAY_NAME,
+                    MediaStore.Downloads.SIZE,
+                    MediaStore.Downloads.DATE_ADDED,
+                    MediaStore.Downloads.DATA
+                )
+            }
             val sel = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 "${MediaStore.Downloads.RELATIVE_PATH} LIKE ?"
             } else {
@@ -345,7 +389,13 @@ class FileShareServer(
                     val id = if (idIdx >= 0) c.getLong(idIdx) else 0L
                     val size = if (sizeIdx >= 0) c.getLong(sizeIdx) else 0L
                     val time = if (timeIdx >= 0) c.getLong(timeIdx) * 1000 else 0L
-                    val path = if (dataIdx >= 0) c.getString(dataIdx) ?: "" else ""
+                    val path = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                        ContentUris.withAppendedId(collection, id).toString()
+                    } else if (dataIdx >= 0) {
+                        c.getString(dataIdx) ?: ""
+                    } else {
+                        ""
+                    }
                     result.add(SharedFile(id, name, size, time, path))
                 }
             }
@@ -533,13 +583,27 @@ function refreshList() {
     d.files.forEach(f => {
       const li = document.createElement('li');
       li.className = 'file-item';
-      li.innerHTML = '<span class="file-icon">' + iconFor(f.name) + '</span>' +
-                     '<span class="file-name">' + f.name + '<br><span class="time">' + formatTime(f.time) + '</span></span>' +
-                     '<span class="file-size">' + formatSize(f.size) + '</span>';
+      const icon = document.createElement('span');
+      icon.className = 'file-icon';
+      icon.textContent = iconFor(f.name);
+      const name = document.createElement('span');
+      name.className = 'file-name';
+      name.appendChild(document.createTextNode(f.name));
+      name.appendChild(document.createElement('br'));
+      const time = document.createElement('span');
+      time.className = 'time';
+      time.textContent = formatTime(f.time);
+      name.appendChild(time);
+      const size = document.createElement('span');
+      size.className = 'file-size';
+      size.textContent = formatSize(f.size);
       const btn = document.createElement('button');
       btn.className = 'btn-dl';
       btn.textContent = '下载';
       btn.onclick = () => { window.location.href = '/file?id=' + f.id; };
+      li.appendChild(icon);
+      li.appendChild(name);
+      li.appendChild(size);
       li.appendChild(btn);
       listEl.appendChild(li);
     });

@@ -251,7 +251,7 @@ class RealtimeFragment : Fragment() {
         }
 
         // 估算距离（基于信号衰减模型，仅粗略）
-        val distance = estimateDistance(rssi, freq)
+        val distance = estimateDistance(rssi)
         binding.tvDistance.text = getString(R.string.wifi_distance, distance)
 
         // 信号等级 + 颜色
@@ -280,12 +280,10 @@ class RealtimeFragment : Fragment() {
 
     /**
      * 基于 RSSI 估算距离（米）。
-     * 自由空间路径损耗：FSPL(dB) = 20log10(d) + 20log10(f) - 27.55
-     * 其中 d 单位米，f 单位 MHz
      * 反推：d = 10^((RSSI - A) / (10*n))，A 是 1m 处的信号强度，n 是路径损耗指数
      * 室内 n 通常取 2.5-3.5，A 通常取 -40 ~ -50 dBm@1m
      */
-    private fun estimateDistance(rssi: Int, freqMHz: Int): Double {
+    private fun estimateDistance(rssi: Int): Double {
         val A = -45  // 1m 处的信号强度（经验值）
         val n = 3.0  // 室内路径损耗指数
         val distance = Math.pow(10.0, (A - rssi) / (10.0 * n))
@@ -382,8 +380,9 @@ class HeatmapFragment : Fragment(), SensorEventListener {
     private val activityPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
-        // 无论是否授权都启动（无授权则回退到加速度计检测）
-        startSampling()
+        if (granted && isSampling) {
+            registerStepDetector()
+        }
     }
 
     override fun onCreateView(
@@ -453,15 +452,11 @@ class HeatmapFragment : Fragment(), SensorEventListener {
         // Android 10+ 需要 ACTIVITY_RECOGNITION 运行时权限
         val stepDetector = sensorManager.getDefaultSensor(Sensor.TYPE_STEP_DETECTOR)
         if (stepDetector != null && Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
-            hasStepDetector = true
-            sensorManager.registerListener(this, stepDetector, SensorManager.SENSOR_DELAY_FASTEST)
-            android.util.Log.i("WifiHeatmap", "Using TYPE_STEP_DETECTOR (no permission needed)")
+            registerStepDetector()
         } else if (stepDetector != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             val perm = Manifest.permission.ACTIVITY_RECOGNITION
             if (ContextCompat.checkSelfPermission(requireContext(), perm) == PackageManager.PERMISSION_GRANTED) {
-                hasStepDetector = true
-                sensorManager.registerListener(this, stepDetector, SensorManager.SENSOR_DELAY_FASTEST)
-                android.util.Log.i("WifiHeatmap", "Using TYPE_STEP_DETECTOR (permission granted)")
+                registerStepDetector()
             } else {
                 hasStepDetector = false
                 try {
@@ -480,10 +475,19 @@ class HeatmapFragment : Fragment(), SensorEventListener {
         handler.post(sampleRunnable)
     }
 
+    private fun registerStepDetector() {
+        if (hasStepDetector) return
+        val stepDetector = sensorManager.getDefaultSensor(Sensor.TYPE_STEP_DETECTOR) ?: return
+        hasStepDetector = true
+        sensorManager.registerListener(this, stepDetector, SensorManager.SENSOR_DELAY_FASTEST)
+        android.util.Log.i("WifiHeatmap", "Using TYPE_STEP_DETECTOR")
+    }
+
     private fun stopSampling() {
         isSampling = false
         handler.removeCallbacks(sampleRunnable)
         sensorManager.unregisterListener(this)
+        hasStepDetector = false
         binding.btnToggleHeat.text = getString(R.string.wifi_btn_start)
     }
 

@@ -1,9 +1,12 @@
 package com.example.videodownloader
 
+import android.Manifest
+import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.Rect
 import android.media.MediaMetadataRetriever
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -12,6 +15,7 @@ import android.widget.SeekBar
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import com.example.videodownloader.databinding.ActivityVideoToGifBinding
 import kotlinx.coroutines.Dispatchers
@@ -42,6 +46,12 @@ class VideoToGifActivity : AppCompatActivity() {
     // 精确帧预览:复用 MediaMetadataRetriever,小拖动时抽精确帧覆盖 VideoView
     private var frameRetriever: MediaMetadataRetriever? = null
     private var preciseFrameJob: kotlinx.coroutines.Job? = null
+
+    private val writePermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) doGenerate() else Toast.makeText(this, R.string.vgf_fail, Toast.LENGTH_SHORT).show()
+    }
 
     private val pickVideoLauncher = registerForActivityResult(
         ActivityResultContracts.GetContent()
@@ -276,6 +286,7 @@ class VideoToGifActivity : AppCompatActivity() {
             Toast.makeText(this, "视频时长无效", Toast.LENGTH_SHORT).show()
             return
         }
+        if (!ensureLegacyWritePermission()) return
 
         val startMs = getStartTimeMs()
         val endMs = getEndTimeMs()
@@ -315,5 +326,15 @@ class VideoToGifActivity : AppCompatActivity() {
                 Toast.makeText(this@VideoToGifActivity, R.string.vgf_fail, Toast.LENGTH_LONG).show()
             }
         }
+    }
+
+    private fun ensureLegacyWritePermission(): Boolean {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) return true
+        val permission = Manifest.permission.WRITE_EXTERNAL_STORAGE
+        if (ContextCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_GRANTED) {
+            return true
+        }
+        writePermissionLauncher.launch(permission)
+        return false
     }
 }

@@ -61,7 +61,6 @@ class AnimatedGifEncoder {
     }
 
     fun start(os: OutputStream): Boolean {
-        if (os == null) return false
         closeStream = false
         out = os
         var ok = false
@@ -91,7 +90,7 @@ class AnimatedGifEncoder {
     }
 
     fun addFrame(bm: Bitmap): Boolean {
-        if (!started || bm == null) return false
+        if (!started) return false
         image = bm
         if (!sizeSet) {
             width = bm.width; height = bm.height

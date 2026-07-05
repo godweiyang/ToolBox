@@ -4,9 +4,11 @@ import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
+import android.os.Build
 import android.os.Bundle
 import android.os.VibrationEffect
 import android.os.Vibrator
+import android.os.VibratorManager
 import android.widget.SeekBar
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
@@ -52,7 +54,12 @@ class MetalDetectorActivity : AppCompatActivity(), SensorEventListener {
 
         sensorManager = getSystemService(SENSOR_SERVICE) as SensorManager
         magnetometer = sensorManager?.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD)
-        vibrator = getSystemService(VIBRATOR_SERVICE) as? Vibrator
+        vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            getSystemService(VibratorManager::class.java).defaultVibrator
+        } else {
+            @Suppress("DEPRECATION")
+            getSystemService(VIBRATOR_SERVICE) as? Vibrator
+        }
 
         if (magnetometer == null) {
             Toast.makeText(this, getString(R.string.metal_no_sensor), Toast.LENGTH_LONG).show()
@@ -173,7 +180,7 @@ class MetalDetectorActivity : AppCompatActivity(), SensorEventListener {
     /** 触发报警：震动 + 可视反馈 */
     private fun triggerAlarm(strong: Boolean) {
         val pattern = if (strong) longArrayOf(0, 400, 100, 400) else longArrayOf(0, 200)
-        val amplitudes = if (strong) intArrayOf(255, 0, 255, 0) else intArrayOf(255)
+        val amplitudes = if (strong) intArrayOf(0, 255, 0, 255) else intArrayOf(0, 255)
         try {
             if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
                 vibrator?.vibrate(VibrationEffect.createWaveform(pattern, amplitudes, -1))

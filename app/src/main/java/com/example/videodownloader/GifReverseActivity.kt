@@ -1,6 +1,10 @@
+@file:Suppress("DEPRECATION")
+
 package com.example.videodownloader
 
+import android.Manifest
 import android.content.ContentValues
+import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
@@ -13,6 +17,7 @@ import android.widget.SeekBar
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import com.example.videodownloader.databinding.ActivityGifReverseBinding
 import kotlinx.coroutines.Dispatchers
@@ -41,6 +46,12 @@ class GifReverseActivity : AppCompatActivity() {
     private var gifBytes: ByteArray? = null
     /** 倒放后的 GIF 字节 */
     private var reversedBytes: ByteArray? = null
+
+    private val writePermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) saveReversed() else toast(getString(R.string.gr_fail))
+    }
 
     private val pickGifLauncher = registerForActivityResult(
         ActivityResultContracts.GetContent()
@@ -226,6 +237,7 @@ class GifReverseActivity : AppCompatActivity() {
 
     private fun saveReversed() {
         val bytes = reversedBytes ?: return
+        if (!ensureLegacyWritePermission()) return
         val name = "gifreverse_${System.currentTimeMillis()}.gif"
         val cv = ContentValues().apply {
             put(MediaStore.Images.Media.DISPLAY_NAME, name)
@@ -260,6 +272,16 @@ class GifReverseActivity : AppCompatActivity() {
         } finally {
             try { os?.close() } catch (_: Exception) {}
         }
+    }
+
+    private fun ensureLegacyWritePermission(): Boolean {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) return true
+        val permission = Manifest.permission.WRITE_EXTERNAL_STORAGE
+        if (ContextCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_GRANTED) {
+            return true
+        }
+        writePermissionLauncher.launch(permission)
+        return false
     }
 
     private fun readBytes(uri: Uri): ByteArray? {

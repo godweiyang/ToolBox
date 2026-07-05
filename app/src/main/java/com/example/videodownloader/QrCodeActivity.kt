@@ -1,8 +1,10 @@
 package com.example.videodownloader
 
+import android.Manifest
 import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
@@ -17,6 +19,7 @@ import android.view.View
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 import com.example.videodownloader.databinding.ActivityQrcodeBinding
 import com.google.zxing.qrcode.decoder.ErrorCorrectionLevel
 import java.io.OutputStream
@@ -47,6 +50,16 @@ class QrCodeActivity : AppCompatActivity() {
     private var logoBitmap: Bitmap? = null
     /** 当前生成的二维码 Bitmap，用于保存 */
     private var currentQrBitmap: Bitmap? = null
+
+    private val writePermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) {
+            currentQrBitmap?.let { saveToGallery(it) }
+        } else {
+            toast(getString(R.string.qr_save_fail))
+        }
+    }
 
     /** 预设颜色列表（前景色用深色，背景色用浅色） */
     private val foreColorPresets = listOf(
@@ -105,8 +118,8 @@ class QrCodeActivity : AppCompatActivity() {
             binding.llBackColors.addView(swatch)
         }
         // 默认选中黑/白
-        (binding.llForeColors.getChildAt(0) as? View)?.isSelected = true
-        (binding.llBackColors.getChildAt(0) as? View)?.isSelected = true
+        binding.llForeColors.getChildAt(0).isSelected = true
+        binding.llBackColors.getChildAt(0).isSelected = true
     }
 
     /** 创建一个圆形色块 */
@@ -196,7 +209,9 @@ class QrCodeActivity : AppCompatActivity() {
         }
 
         binding.btnSave.setOnClickListener {
-            currentQrBitmap?.let { saveToGallery(it) }
+            currentQrBitmap?.let { bitmap ->
+                if (ensureLegacyWritePermission()) saveToGallery(bitmap)
+            }
         }
     }
 
@@ -276,8 +291,11 @@ class QrCodeActivity : AppCompatActivity() {
                 contentValues.put(MediaStore.Images.Media.IS_PENDING, 0)
                 resolver.update(uri, contentValues, null, null)
             }
-            // 通知相册刷新
-            sendBroadcast(Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE, uri))
+            // 旧版系统需要显式通知媒体库刷新；Q+ 由 MediaStore pending 状态处理。
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+                @Suppress("DEPRECATION")
+                sendBroadcast(Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE, uri))
+            }
             toast(getString(R.string.qr_save_success))
         } catch (e: Exception) {
             toast(getString(R.string.qr_save_fail))
@@ -301,6 +319,16 @@ class QrCodeActivity : AppCompatActivity() {
         val clip = cm.primaryClip ?: return null
         if (clip.itemCount == 0) return null
         return clip.getItemAt(0).coerceToText(this).toString()
+    }
+
+    private fun ensureLegacyWritePermission(): Boolean {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) return true
+        val permission = Manifest.permission.WRITE_EXTERNAL_STORAGE
+        if (ContextCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_GRANTED) {
+            return true
+        }
+        writePermissionLauncher.launch(permission)
+        return false
     }
 
     private fun dp(value: Int): Int {

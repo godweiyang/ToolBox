@@ -1,6 +1,8 @@
 package com.example.videodownloader
 
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.Color
 import android.os.Build
@@ -11,7 +13,9 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.example.videodownloader.databinding.ActivityFileShareBinding
@@ -37,6 +41,12 @@ class FileShareActivity : AppCompatActivity() {
     private val receivedFiles = ArrayList<FileShareServer.SharedFile>()
     private lateinit var adapter: ReceivedFileAdapter
 
+    private val writePermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) startService() else toast(getString(R.string.fs_perm_denied))
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityFileShareBinding.inflate(layoutInflater)
@@ -55,7 +65,7 @@ class FileShareActivity : AppCompatActivity() {
         }
 
         // 注册接收文件回调
-        FileShareService.onFileReceived = { name, size ->
+        FileShareService.onFileReceived = { name, _ ->
             handler.post {
                 refreshReceivedList()
                 toast("已接收:$name")
@@ -77,6 +87,7 @@ class FileShareActivity : AppCompatActivity() {
     }
 
     private fun startService() {
+        if (!ensureLegacyWritePermission()) return
         val intent = Intent(this, FileShareService::class.java)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             startForegroundService(intent)
@@ -165,6 +176,16 @@ class FileShareActivity : AppCompatActivity() {
 
     private fun toast(msg: String) {
         android.widget.Toast.makeText(this, msg, android.widget.Toast.LENGTH_SHORT).show()
+    }
+
+    private fun ensureLegacyWritePermission(): Boolean {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) return true
+        val permission = Manifest.permission.WRITE_EXTERNAL_STORAGE
+        if (ContextCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_GRANTED) {
+            return true
+        }
+        writePermissionLauncher.launch(permission)
+        return false
     }
 
     /** 接收文件列表适配器 */

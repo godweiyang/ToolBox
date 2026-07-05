@@ -7,6 +7,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
+import android.os.Looper
 import android.text.method.ScrollingMovementMethod
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
@@ -26,7 +27,7 @@ class VideoDownloaderActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityVideoDownloaderBinding
 
-    /** Android 13+ 用细粒度媒体权限；旧版本用 WRITE_EXTERNAL_STORAGE */
+    /** Android 10+ 通过 MediaStore 写入无需存储权限；旧版本用 WRITE_EXTERNAL_STORAGE */
     private val permissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { result ->
@@ -131,9 +132,7 @@ class VideoDownloaderActivity : AppCompatActivity() {
     }
 
     private fun requiredPermissions(): List<String> {
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            listOf(Manifest.permission.READ_MEDIA_VIDEO)
-        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             emptyList()
         } else {
             listOf(Manifest.permission.WRITE_EXTERNAL_STORAGE)
@@ -177,7 +176,7 @@ class VideoDownloaderActivity : AppCompatActivity() {
                     audioUrl = video.audioUrl,
                     displayName = video.title
                 ) { percent ->
-                    runOnUiThread {
+                    runOnUiIfAlive {
                         binding.progressBar.progress = percent
                         val stage = when {
                             percent < 40 -> "下载视频流"
@@ -196,13 +195,14 @@ class VideoDownloaderActivity : AppCompatActivity() {
                     videoUrl = video.videoUrl,
                     displayName = video.title
                 ) { percent ->
-                    runOnUiThread {
+                    runOnUiIfAlive {
                         binding.progressBar.progress = percent
                         binding.tvProgress.text = "下载中 $percent%"
                     }
                 }
             }
 
+            if (!isActivityAlive()) return@launch
             when (result) {
                 is DownloadManager.Result.Success -> {
                     DownloadManager.notifyGallery(applicationContext, result.uri)
@@ -218,6 +218,19 @@ class VideoDownloaderActivity : AppCompatActivity() {
                 }
             }
             setUiBusy(false)
+        }
+    }
+
+    private fun isActivityAlive(): Boolean = !isFinishing && !isDestroyed
+
+    private fun runOnUiIfAlive(action: () -> Unit) {
+        if (!isActivityAlive()) return
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            action()
+        } else {
+            runOnUiThread {
+                if (isActivityAlive()) action()
+            }
         }
     }
 

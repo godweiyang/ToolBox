@@ -259,8 +259,6 @@ class CropOverlayView @JvmOverloads constructor(
         val top = cropRect.top
         val right = cropRect.right
         val bottom = cropRect.bottom
-        val cx = (left + right) / 2
-        val cy = (top + bottom) / 2
         val hs = handleSizePx
 
         // 4 角优先

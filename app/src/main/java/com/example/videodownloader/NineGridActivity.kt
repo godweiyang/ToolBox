@@ -1,6 +1,8 @@
 package com.example.videodownloader
 
+import android.Manifest
 import android.content.ContentValues
+import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.Color
 import android.net.Uri
@@ -14,6 +16,7 @@ import android.widget.ImageView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 import com.example.videodownloader.databinding.ActivityNineGridBinding
 import java.io.OutputStream
 
@@ -31,6 +34,12 @@ class NineGridActivity : AppCompatActivity() {
     private lateinit var binding: ActivityNineGridBinding
     /** 切好的 9 张图，null 表示无 */
     private val pieces = ArrayList<Bitmap>(9)
+
+    private val writePermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) saveAll() else toast(getString(R.string.ng_fail))
+    }
 
     private val pickImageLauncher = registerForActivityResult(
         ActivityResultContracts.GetContent()
@@ -85,7 +94,6 @@ class NineGridActivity : AppCompatActivity() {
         // 居中裁正方形（尺寸过大时降采样避免 OOM）
         val maxSize = 1080
         val square: Bitmap = if (size > maxSize) {
-            val scale = maxSize.toFloat() / size
             Bitmap.createBitmap(src, x, y, size, size).let {
                 val scaled = Bitmap.createScaledBitmap(it, maxSize, maxSize, true)
                 if (scaled !== it) it.recycle()
@@ -135,6 +143,7 @@ class NineGridActivity : AppCompatActivity() {
             toast(getString(R.string.ng_no_image))
             return
         }
+        if (!ensureLegacyWritePermission()) return
         val ts = System.currentTimeMillis()
         var okCount = 0
         for (i in pieces.indices) {
@@ -186,6 +195,16 @@ class NineGridActivity : AppCompatActivity() {
     private fun readBitmapFromUri(uri: Uri): Bitmap? {
         val input = contentResolver.openInputStream(uri) ?: return null
         return input.use { android.graphics.BitmapFactory.decodeStream(it) }
+    }
+
+    private fun ensureLegacyWritePermission(): Boolean {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) return true
+        val permission = Manifest.permission.WRITE_EXTERNAL_STORAGE
+        if (ContextCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_GRANTED) {
+            return true
+        }
+        writePermissionLauncher.launch(permission)
+        return false
     }
 
     private fun dp(v: Int): Int =

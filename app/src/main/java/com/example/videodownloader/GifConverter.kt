@@ -53,6 +53,7 @@ object GifConverter {
     ): Uri? = withContext(Dispatchers.Default) {
         var retriever: MediaMetadataRetriever? = null
         var outputStream: OutputStream? = null
+        var output: GifOutput? = null
         try {
             retriever = MediaMetadataRetriever()
             retriever.setDataSource(context, videoUri)
@@ -89,7 +90,8 @@ object GifConverter {
 
             // 4. 准备输出流
             val displayName = "gif_${System.currentTimeMillis()}.gif"
-            outputStream = openGifOutputStream(context, displayName) ?: throw IllegalStateException("无法创建输出文件")
+            output = openGifOutput(context, displayName) ?: throw IllegalStateException("无法创建输出文件")
+            outputStream = output.stream
 
             // 5. 编码 GIF
             // ⚠ GIF89a Graphic Control Extension 的 delay 单位是 1/100 秒(centi-second),
@@ -122,9 +124,9 @@ object GifConverter {
                 }
 
                 val cropped = cropFrame(frame, cropRect)
-                val scaled = scaleFrame(cropped, frame, outW, outH)
+                val scaled = scaleFrame(cropped, outW, outH)
                 encoder.addFrame(scaled)
-                if (scaled !== frame) scaled.recycle()
+                if (scaled !== cropped && scaled !== frame) scaled.recycle()
                 if (cropped !== frame) cropped.recycle()
                 frame.recycle()
 
@@ -139,10 +141,12 @@ object GifConverter {
             withContext(Dispatchers.Main) { onProgress(100) }
             Log.i(TAG, "GIF 生成完成")
 
-            // 返回 Uri：如果是 MediaStore，需要构造；如果是私有目录文件，需要 file->uri
-            return@withContext getGifUri(context, displayName, outputStream)
+            outputStream.flush()
+            markGifReady(context, output.uri)
+            return@withContext output.uri
         } catch (e: Exception) {
             Log.e(TAG, "GIF 转换失败", e)
+            output?.let { discardGifOutput(context, it.uri) }
             null
         } finally {
             try { retriever?.release() } catch (_: Exception) {}
@@ -166,7 +170,7 @@ object GifConverter {
     }
 
     /** 缩放帧到目标尺寸。已是目标尺寸时返回原 frame */
-    private fun scaleFrame(cropped: Bitmap, origFrame: Bitmap, outW: Int, outH: Int): Bitmap {
+    private fun scaleFrame(cropped: Bitmap, outW: Int, outH: Int): Bitmap {
         return if (cropped.width != outW || cropped.height != outH) {
             Bitmap.createScaledBitmap(cropped, outW, outH, true)
         } else {
@@ -174,8 +178,10 @@ object GifConverter {
         }
     }
 
-    /** 打开 GIF 输出流：优先 MediaStore(Pictures/GifOutput/)，否则 app 私有目录 */
-    private fun openGifOutputStream(context: Context, displayName: String): OutputStream? {
+    private data class GifOutput(val uri: Uri, val stream: OutputStream)
+
+    /** 打开 GIF 输出：保留 insert 返回的 Uri，避免生成后按文件名反查出错 */
+    private fun openGifOutput(context: Context, displayName: String): GifOutput? {
         return try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 // API 29+ 用 MediaStore，无需权限
@@ -184,49 +190,42 @@ object GifConverter {
                     put(MediaStore.MediaColumns.DISPLAY_NAME, displayName)
                     put(MediaStore.MediaColumns.MIME_TYPE, "image/gif")
                     put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_PICTURES + "/GifOutput")
+                    put(MediaStore.Images.Media.IS_PENDING, 1)
                 }
                 val uri = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
-                uri?.let { resolver.openOutputStream(it) }
+                val stream = uri?.let { resolver.openOutputStream(it) }
+                if (uri != null && stream != null) GifOutput(uri, stream) else null
             } else {
                 // API < 29 直接写公有目录
                 val dir = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES), "GifOutput")
                 if (!dir.exists()) dir.mkdirs()
                 val file = File(dir, displayName)
-                FileOutputStream(file)
+                GifOutput(Uri.fromFile(file), FileOutputStream(file))
             }
         } catch (e: Exception) {
-            Log.e(TAG, "openGifOutputStream 失败", e)
+            Log.e(TAG, "openGifOutput 失败", e)
             null
         }
     }
 
-    /** 拿到生成文件的 Uri（用于返回给调用方） */
-    private fun getGifUri(context: Context, displayName: String, os: OutputStream): Uri? {
-        return try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                // MediaStore 模式：查询刚插入的记录
-                val resolver = context.contentResolver
-                val cursor = resolver.query(
-                    MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
-                    arrayOf(MediaStore.MediaColumns._ID),
-                    "${MediaStore.MediaColumns.DISPLAY_NAME}=?",
-                    arrayOf(displayName),
-                    null
-                )
-                cursor?.use {
-                    if (it.moveToFirst()) {
-                        val id = it.getLong(0)
-                        return Uri.withAppendedPath(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, id.toString())
-                    }
-                }
-                null
-            } else {
-                val dir = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES), "GifOutput")
-                Uri.fromFile(File(dir, displayName))
+    private fun markGifReady(context: Context, uri: Uri) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return
+        try {
+            val values = ContentValues().apply {
+                put(MediaStore.Images.Media.IS_PENDING, 0)
             }
+            context.contentResolver.update(uri, values, null, null)
         } catch (e: Exception) {
-            Log.w(TAG, "getGifUri 失败: ${e.message}")
-            null
+            Log.w(TAG, "markGifReady 失败: ${e.message}")
+        }
+    }
+
+    private fun discardGifOutput(context: Context, uri: Uri) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return
+        try {
+            context.contentResolver.delete(uri, null, null)
+        } catch (e: Exception) {
+            Log.w(TAG, "discardGifOutput 失败: ${e.message}")
         }
     }
 }
