@@ -306,38 +306,7 @@ class HeatMapView @JvmOverloads constructor(
             canvas.drawCircle(cx, cy, radius, cloudPaint)
         }
         cloudPaint.shader = null
-
-        // 2. 画采样点标记（仅当缩放足够大时显示文字，避免缩小时文字挤一起）
-        val showLabels = totalScale > 1.5f
-        for (s in samples) {
-            val cx = worldToScreenX(s.x)
-            val cy = worldToScreenY(s.y)
-            if (cx < -50f || cx > width + 50f || cy < -50f || cy > height + 50f) continue
-
-            // 中心小圆点
-            val dotR = (8f * userScale.coerceIn(0.5f, 2f)).coerceAtLeast(4f)
-            dotPaint.style = Paint.Style.FILL
-            dotPaint.color = rssiToColor(s.rssi)
-            canvas.drawCircle(cx, cy, dotR, dotPaint)
-            // 白色描边
-            dotPaint.style = Paint.Style.STROKE
-            dotPaint.color = Color.WHITE
-            dotPaint.strokeWidth = 2f
-            canvas.drawCircle(cx, cy, dotR, dotPaint)
-
-            if (showLabels) {
-                val label = "${rssiToLevel(s.rssi)} ${s.rssi}"
-                val textWidth = textPaint.measureText(label)
-                val textHeight = textPaint.textSize
-                val bgLeft = cx - textWidth / 2 - 8f
-                val bgTop = cy - cloudRadiusScreen * 0.5f - textHeight / 2 - 4f
-                val bgRight = cx + textWidth / 2 + 8f
-                val bgBottom = cy - cloudRadiusScreen * 0.5f + textHeight / 2 + 4f
-                textBgPaint.color = rssiToColor(s.rssi) or 0xFF000000.toInt()
-                canvas.drawRoundRect(bgLeft, bgTop, bgRight, bgBottom, 8f, 8f, textBgPaint)
-                canvas.drawText(label, cx, cy - cloudRadiusScreen * 0.5f + textHeight / 3f, textPaint)
-            }
-        }
+        // 不再画中心标记和文字标签，只保留色块
     }
 
     private fun drawGrid(canvas: Canvas) {

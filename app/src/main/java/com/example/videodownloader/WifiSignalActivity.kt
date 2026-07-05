@@ -11,6 +11,10 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.hardware.Sensor
+import android.hardware.SensorEvent
+import android.hardware.SensorEventListener
+import android.hardware.SensorManager
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -48,6 +52,9 @@ class WifiSignalActivity : AppCompatActivity() {
         setContentView(binding.root)
 
         // ViewPager2 + TabLayout 双页面
+        // 禁用 ViewPager2 的左右滑动手势，只允许点击 Tab 标签切换
+        // 这样热力图页的单指/双指拖动不会被 ViewPager2 拦截
+        binding.viewPager.isUserInputEnabled = false
         binding.viewPager.adapter = WifiPagerAdapter(this)
         TabLayoutMediator(binding.tabLayout, binding.viewPager) { tab, position ->
             tab.text = if (position == 0) getString(R.string.wifi_tab_realtime)
@@ -308,15 +315,20 @@ class RealtimeFragment : Fragment() {
 /**
  * 热力图页：自动采集 WiFi 信号，每 1.5 秒一个采样点。
  *
- * 采样点位置在世界坐标系下累加（每次基于上次位置 + 随机抖动），
+ * 采样点位置基于加速度计 + 陀螺仪积分推算：
+ * - 检测到手机走动时，按朝向积分位移，采样点跟着移动
+ * - 手机静止时（加速度幅值稳定 ≈ 重力），采样点位置保持不变，只更新信号值
+ * - 这样手机放在原地时点不会飘移
+ *
  * HeatMapView 会自动 fit 所有点到屏幕，用户可双指捏合缩放查看细节。
  */
-class HeatmapFragment : Fragment() {
+class HeatmapFragment : Fragment(), SensorEventListener {
 
     private var _binding: PageWifiHeatmapBinding? = null
     private val binding get() = _binding!!
 
     private lateinit var wifiManager: WifiManager
+    private lateinit var sensorManager: SensorManager
     private val handler = Handler(Looper.getMainLooper())
 
     private var isSampling = false
@@ -324,6 +336,24 @@ class HeatmapFragment : Fragment() {
     /** 上次采样点的世界坐标（首次从 0,0 开始） */
     private var lastWorldX = 0f
     private var lastWorldY = 0f
+
+    // ===== 位移检测相关 =====
+    /** 当前朝向（弧度，0=北，顺时针） */
+    private var currentYaw = 0f
+    /** 累计的位移向量（采样间隔内积算） */
+    private var accumDx = 0f
+    private var accumDy = 0f
+    /** 上次加速度时间戳（ns） */
+    private var lastAccelTimeNs = 0L
+    /** 上次线性加速度（去重力后） */
+    private var lastLinearAccelX = 0f
+    private var lastLinearAccelY = 0f
+    /** 重力分量（低通滤波分离） */
+    private var gravityX = 0f
+    private var gravityY = 0f
+    private var gravityZ = 0f
+    /** 当前是否在走动（加速度幅值超阈值） */
+    private var isMoving = false
 
     private val sampleRunnable = object : Runnable {
         override fun run() {
@@ -352,6 +382,7 @@ class HeatmapFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         wifiManager = requireContext().applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
+        sensorManager = requireContext().getSystemService(Context.SENSOR_SERVICE) as SensorManager
 
         binding.btnToggleHeat.setOnClickListener {
             if (isSampling) stopSampling() else startSampling()
@@ -366,6 +397,8 @@ class HeatmapFragment : Fragment() {
             binding.heatMap.clear()
             lastWorldX = 0f
             lastWorldY = 0f
+            accumDx = 0f
+            accumDy = 0f
             binding.tvSteps.text = ""
             binding.tvHeatmapEmpty.visibility = View.VISIBLE
         }
@@ -389,6 +422,17 @@ class HeatmapFragment : Fragment() {
         isSampling = true
         binding.btnToggleHeat.text = getString(R.string.wifi_btn_stop)
         binding.tvHeatmapEmpty.visibility = View.GONE
+        // 重置位移积分
+        accumDx = 0f
+        accumDy = 0f
+        lastAccelTimeNs = 0L
+        // 注册传感器：旋转矢量拿朝向，加速度计做位移检测
+        sensorManager.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR)?.let {
+            sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_UI)
+        }
+        sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)?.let {
+            sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_GAME)
+        }
         // 立即采样一次，然后定时采样
         sampleOnce()
         handler.post(sampleRunnable)
@@ -397,10 +441,11 @@ class HeatmapFragment : Fragment() {
     private fun stopSampling() {
         isSampling = false
         handler.removeCallbacks(sampleRunnable)
+        sensorManager.unregisterListener(this)
         binding.btnToggleHeat.text = getString(R.string.wifi_btn_start)
     }
 
-    /** 采一个点：在上次位置附近随机抖动 0.3~0.5 米 */
+    /** 采一个点：位置 = 上次位置 + 本周期累计位移（手机不动时累计位移≈0） */
     private fun sampleOnce() {
         val rssi = getCurrentRssi()
         if (rssi == Int.MIN_VALUE) {
@@ -412,11 +457,20 @@ class HeatmapFragment : Fragment() {
             return
         }
 
-        // 随机抖动：每次走 0.3~0.6 米随机方向
-        val angle = (Math.random() * Math.PI * 2).toFloat()
-        val dist = (0.3 + Math.random() * 0.3).toFloat()  // 0.3~0.6 米
-        lastWorldX += (Math.cos(angle.toDouble()) * dist).toFloat()
-        lastWorldY += (Math.sin(angle.toDouble()) * dist).toFloat()
+        // 把累计位移从"手机坐标系"转到"世界坐标系"（按当前朝向旋转）
+        // accumDx/accumDy 是手机坐标系下的位移（x=东，y=北，单位：米）
+        // 用 currentYaw 旋转到世界坐标系
+        val cosY = Math.cos(currentYaw.toDouble()).toFloat()
+        val sinY = Math.sin(currentYaw.toDouble()).toFloat()
+        val worldDx = accumDx * cosY - accumDy * sinY
+        val worldDy = accumDx * sinY + accumDy * cosY
+
+        lastWorldX += worldDx
+        lastWorldY += worldDy
+
+        // 重置累计位移
+        accumDx = 0f
+        accumDy = 0f
 
         binding.heatMap.addSample(lastWorldX, lastWorldY, rssi)
         updateSampleCount()
@@ -426,6 +480,63 @@ class HeatmapFragment : Fragment() {
         val count = binding.heatMap.getSampleCount()
         binding.tvSteps.text = getString(R.string.wifi_heatmap_steps, count)
     }
+
+    override fun onSensorChanged(event: SensorEvent) {
+        when (event.sensor.type) {
+            Sensor.TYPE_ROTATION_VECTOR -> {
+                // 取 z 轴旋转分量作为朝向（弧度）
+                val r = FloatArray(9)
+                SensorManager.getRotationMatrixFromVector(r, event.values)
+                val orientation = FloatArray(3)
+                SensorManager.getOrientation(r, orientation)
+                currentYaw = orientation[0]  // azimut，0=北，逆时针为正
+            }
+            Sensor.TYPE_ACCELEROMETER -> {
+                val now = event.timestamp
+                if (lastAccelTimeNs == 0L) {
+                    lastAccelTimeNs = now
+                    return
+                }
+                val dt = (now - lastAccelTimeNs) / 1e9f  // 秒
+                lastAccelTimeNs = now
+                if (dt <= 0f || dt > 0.5f) return  // 异常 dt 跳过
+
+                // 低通滤波分离重力
+                val alpha = 0.8f
+                gravityX = alpha * gravityX + (1 - alpha) * event.values[0]
+                gravityY = alpha * gravityY + (1 - alpha) * event.values[1]
+                gravityZ = alpha * gravityZ + (1 - alpha) * event.values[2]
+                // 线性加速度 = 原始 - 重力
+                val lx = event.values[0] - gravityX
+                val ly = event.values[1] - gravityY
+
+                // 检测是否在走动：水平方向加速度幅值
+                val horizMag = Math.sqrt((lx * lx + ly * ly).toDouble()).toFloat()
+                isMoving = horizMag > 1.0f  // >1 m/s² 认为在走动
+
+                // 只在走动时积分位移，静止时不累加（避免漂移）
+                if (isMoving) {
+                    // 二重积分得位移：v += a*dt, s += v*dt
+                    // 简化版：直接 s += a * dt²（近似，对短时间间隔够用）
+                    // 更稳的做法是先积分出速度再积分位移，但需要去除初速度，这里用简化版
+                    accumDx += lx * dt * dt * 0.5f
+                    accumDy += ly * dt * dt * 0.5f
+                    // 限制单次累计位移上限，避免抖动导致大跳
+                    val accumMag = Math.sqrt((accumDx * accumDx + accumDy * accumDy).toDouble()).toFloat()
+                    val maxAccum = 1.5f  // 单周期最多 1.5 米
+                    if (accumMag > maxAccum) {
+                        val scale = maxAccum / accumMag
+                        accumDx *= scale
+                        accumDy *= scale
+                    }
+                }
+                lastLinearAccelX = lx
+                lastLinearAccelY = ly
+            }
+        }
+    }
+
+    override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
 
     private fun getCurrentRssi(): Int {
         return try {
