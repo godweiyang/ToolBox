@@ -69,8 +69,8 @@ class HeatMapView @JvmOverloads constructor(
         color = 0x15000000
     }
 
-    /** 云块半径（像素），约对应 1.5m 范围 */
-    private val cloudRadius = 180f
+    /** 云块半径（像素） */
+    private val cloudRadius = 120f
 
     /** 添加一个采样点并重绘 */
     fun addSample(x: Float, y: Float, rssi: Int) {
