@@ -4,26 +4,31 @@ import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
-import android.graphics.PorterDuff
-import android.graphics.PorterDuffXfermode
 import android.graphics.RadialGradient
 import android.graphics.Shader
 import android.util.AttributeSet
+import android.view.GestureDetector
+import android.view.MotionEvent
+import android.view.ScaleGestureDetector
 import android.view.View
+import kotlin.math.max
+import kotlin.math.min
 
 /**
- * WiFi 信号热力图（点状云风格）。
+ * WiFi 信号热力图（点状云风格，支持双指缩放和拖动）。
  *
- * 数据模型：用户在不同位置手动标记的采样点 (x, y, rssi)。
- * - x, y 是视图坐标系下的像素位置（用户点击位置）
+ * 数据模型：用户走动时自动采集的采样点 (x, y, rssi)。
+ * - x, y 是"世界坐标"（自动采集时以起点为 0，每次采样点位置基于上次位置 + 随机抖动）
  * - rssi 用于着色：-50 dBm 以上绿色（信号强），-90 dBm 以下红色（信号弱）
  *
  * 渲染策略：
- * 1. 每个采样点画一个大的径向渐变色块（从中心颜色渐变到透明）
- * 2. 多个色块自然叠加形成"信号云"效果，类似天气预报热力图
- * 3. 中心画小圆点+信号等级文字，标注采样位置
+ * 1. 自动 fit 所有点到视图（保持长宽比），用户可通过双指缩放放大查看
+ * 2. 每个采样点画径向渐变色块，多个色块叠加形成"信号云"
+ * 3. 中心画小圆点+信号等级文字
  *
- * 不再依赖 PDR 步行推算，避免原地晃动误判。
+ * 手势：
+ * - 双指捏合缩放（0.3x ~ 8x）
+ * - 单指拖动平移（缩放后查看不同区域）
  */
 class HeatMapView @JvmOverloads constructor(
     context: Context,
@@ -31,24 +36,35 @@ class HeatMapView @JvmOverloads constructor(
     defStyle: Int = 0
 ) : View(context, attrs, defStyle) {
 
-    /** 单个采样点：视图坐标 + 信号强度 */
+    /** 单个采样点：世界坐标 + 信号强度 */
     data class Sample(
-        val x: Float,   // 视图像素 x
-        val y: Float,   // 视图像素 y
+        val x: Float,   // 世界坐标 x
+        val y: Float,   // 世界坐标 y
         val rssi: Int   // dBm
     )
 
     private val samples = mutableListOf<Sample>()
 
+    // ===== 视图变换 =====
+    /** 自动 fit 的基础缩放（让所有点正好填满视图） */
+    private var baseScale = 1f
+    /** 用户捏合的额外缩放倍数 */
+    private var userScale = 1f
+    /** 总缩放 = baseScale * userScale */
+    private val totalScale: Float get() = baseScale * userScale
+    /** 世界坐标 -> 视图坐标的偏移 */
+    private var offsetX = 0f
+    private var offsetY = 0f
+    /** 自动 fit 计算出的中心偏移（用于重置） */
+    private var autoOffsetX = 0f
+    private var autoOffsetY = 0f
+
     private val cloudPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.FILL
-        // 用 SRC_OVER 叠加，半透明色块自然融合
-        alpha = 200
     }
 
     private val dotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.FILL
-        color = 0xFF333333.toInt()
     }
 
     private val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -60,7 +76,6 @@ class HeatMapView @JvmOverloads constructor(
 
     private val textBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.FILL
-        color = 0xCC333333.toInt()
     }
 
     private val gridPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -69,18 +84,73 @@ class HeatMapView @JvmOverloads constructor(
         color = 0x15000000
     }
 
-    /** 云块半径（像素） */
-    private val cloudRadius = 120f
+    /** 云块半径（世界坐标单位，约对应 0.5m） */
+    private val cloudRadiusWorld = 0.5f
+
+    // ===== 手势检测 =====
+    private val scaleDetector = ScaleGestureDetector(context, object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
+        override fun onScale(detector: ScaleGestureDetector): Boolean {
+            val factor = detector.scaleFactor
+            userScale = (userScale * factor).coerceIn(0.3f, 8f)
+            // 以捏合中心为缩放支点
+            val focusWorldX = screenToWorldX(detector.focusX)
+            val focusWorldY = screenToWorldY(detector.focusY)
+            computeTransform()
+            // 调整 offset 使 focus 点保持在原屏幕位置
+            val newFocusScreenX = worldToScreenX(focusWorldX)
+            val newFocusScreenY = worldToScreenY(focusWorldY)
+            offsetX += detector.focusX - newFocusScreenX
+            offsetY += detector.focusY - newFocusScreenY
+            invalidate()
+            return true
+        }
+    })
+
+    private val gestureDetector = GestureDetector(context, object : GestureDetector.SimpleOnGestureListener() {
+        override fun onScroll(
+            e1: MotionEvent?,
+            e2: MotionEvent,
+            distanceX: Float,
+            distanceY: Float
+        ): Boolean {
+            // 单指拖动平移（仅当用户已放大时才有意义）
+            offsetX -= distanceX
+            offsetY -= distanceY
+            invalidate()
+            return true
+        }
+    })
+
+    init {
+        // 让父 View 不要拦截触摸事件，确保手势能传到本 View
+        // （在 Fragment 里 setOnTouchListener 会拦截，这里改用 onTouchEvent）
+    }
+
+    override fun onTouchEvent(event: MotionEvent): Boolean {
+        scaleDetector.onTouchEvent(event)
+        gestureDetector.onTouchEvent(event)
+        return true
+    }
 
     /** 添加一个采样点并重绘 */
     fun addSample(x: Float, y: Float, rssi: Int) {
         samples.add(Sample(x, y, rssi))
+        computeTransform()
         invalidate()
     }
 
     /** 清空 */
     fun clear() {
         samples.clear()
+        userScale = 1f
+        computeTransform()
+        invalidate()
+    }
+
+    /** 重置视图（恢复到自动 fit 状态） */
+    fun resetView() {
+        userScale = 1f
+        computeTransform()
         invalidate()
     }
 
@@ -88,11 +158,61 @@ class HeatMapView @JvmOverloads constructor(
 
     fun getSampleCount() = samples.size
 
-    /** 根据 RSSI 返回颜色：-50 以上绿，-90 以下红，中间渐变 */
+    /** 计算自动 fit 的缩放和偏移（基于所有采样点） */
+    private fun computeTransform() {
+        if (samples.isEmpty() || width == 0 || height == 0) {
+            baseScale = 1f
+            offsetX = width / 2f
+            offsetY = height / 2f
+            autoOffsetX = offsetX
+            autoOffsetY = offsetY
+            return
+        }
+
+        var minX = Float.MAX_VALUE
+        var minY = Float.MAX_VALUE
+        var maxX = Float.MIN_VALUE
+        var maxY = Float.MIN_VALUE
+        for (s in samples) {
+            if (s.x < minX) minX = s.x
+            if (s.y < minY) minY = s.y
+            if (s.x > maxX) maxX = s.x
+            if (s.y > maxY) maxY = s.y
+        }
+
+        // 至少给 1 单位范围，避免单点时除零
+        val worldW = max(maxX - minX, 1f)
+        val worldH = max(maxY - minY, 1f)
+
+        val padding = 80f
+        val availW = width - padding * 2
+        val availH = height - padding * 2
+        if (availW <= 0 || availH <= 0) return
+
+        // 保持长宽比，按较小的缩放
+        baseScale = min(availW / worldW, availH / worldH)
+
+        // 把世界中心映射到视图中心
+        val worldCenterX = (minX + maxX) / 2f
+        val worldCenterY = (minY + maxY) / 2f
+        autoOffsetX = width / 2f - worldCenterX * totalScale
+        autoOffsetY = height / 2f - worldCenterY * totalScale
+        // 用户未拖动时，offset 跟随 autoOffset
+        // 仅在 userScale == 1f 时重置 offset（避免覆盖用户的拖动）
+        if (userScale == 1f) {
+            offsetX = autoOffsetX
+            offsetY = autoOffsetY
+        }
+    }
+
+    private fun worldToScreenX(x: Float) = offsetX + x * totalScale
+    private fun worldToScreenY(y: Float) = offsetY + y * totalScale
+    private fun screenToWorldX(x: Float) = (x - offsetX) / totalScale
+    private fun screenToWorldY(y: Float) = (y - offsetY) / totalScale
+
+    /** 根据 RSSI 返回颜色 */
     private fun rssiToColor(rssi: Int): Int {
-        // 归一化到 0..1，0=最弱(-90)，1=最强(-30)
         val t = ((rssi + 90) / 60f).coerceIn(0f, 1f)
-        // 红(0xE53935) → 黄(0xFDD835) → 绿(0x43A047)
         return when {
             t < 0.5f -> {
                 val k = t * 2f
@@ -118,7 +238,6 @@ class HeatMapView @JvmOverloads constructor(
         return Color.argb(255, r, g, b)
     }
 
-    /** 根据 RSSI 返回等级文字 */
     private fun rssiToLevel(rssi: Int): String = when {
         rssi >= -55 -> "极佳"
         rssi >= -65 -> "良好"
@@ -127,69 +246,106 @@ class HeatMapView @JvmOverloads constructor(
         else -> "很差"
     }
 
+    override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
+        super.onSizeChanged(w, h, oldw, oldh)
+        computeTransform()
+    }
+
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
         if (width == 0 || height == 0) return
 
-        // 画浅色网格作为背景参考
         drawGrid(canvas)
 
         if (samples.isEmpty()) return
 
-        // 1. 画点状云：每个采样点一个径向渐变色块
+        val cloudRadiusScreen = cloudRadiusWorld * totalScale
+
+        // 1. 画点状云
         for (s in samples) {
+            val cx = worldToScreenX(s.x)
+            val cy = worldToScreenY(s.y)
+            // 跳过视图外的点（性能优化）
+            if (cx < -cloudRadiusScreen || cx > width + cloudRadiusScreen ||
+                cy < -cloudRadiusScreen || cy > height + cloudRadiusScreen
+            ) continue
+
             val color = rssiToColor(s.rssi)
-            // 径向渐变：中心实色 → 边缘透明
+            val radius = cloudRadiusScreen.coerceAtLeast(20f)  // 缩太小也至少 20px
             val shader = RadialGradient(
-                s.x, s.y, cloudRadius,
+                cx, cy, radius,
                 intArrayOf(color, color and 0x00FFFFFF),
                 floatArrayOf(0.3f, 1f),
                 Shader.TileMode.CLAMP
             )
             cloudPaint.shader = shader
             cloudPaint.alpha = 180
-            canvas.drawCircle(s.x, s.y, cloudRadius, cloudPaint)
+            canvas.drawCircle(cx, cy, radius, cloudPaint)
         }
         cloudPaint.shader = null
 
-        // 2. 画每个采样点的标记（小圆点 + 等级标签）
+        // 2. 画采样点标记（仅当缩放足够大时显示文字，避免缩小时文字挤一起）
+        val showLabels = totalScale > 1.5f
         for (s in samples) {
+            val cx = worldToScreenX(s.x)
+            val cy = worldToScreenY(s.y)
+            if (cx < -50f || cx > width + 50f || cy < -50f || cy > height + 50f) continue
+
             // 中心小圆点
+            val dotR = (8f * userScale.coerceIn(0.5f, 2f)).coerceAtLeast(4f)
+            dotPaint.style = Paint.Style.FILL
             dotPaint.color = rssiToColor(s.rssi)
-            canvas.drawCircle(s.x, s.y, 10f, dotPaint)
+            canvas.drawCircle(cx, cy, dotR, dotPaint)
             // 白色描边
             dotPaint.style = Paint.Style.STROKE
             dotPaint.color = Color.WHITE
             dotPaint.strokeWidth = 2f
-            canvas.drawCircle(s.x, s.y, 10f, dotPaint)
-            dotPaint.style = Paint.Style.FILL
+            canvas.drawCircle(cx, cy, dotR, dotPaint)
 
-            // 等级文字标签（带背景）
-            val label = "${rssiToLevel(s.rssi)} ${s.rssi}"
-            val textWidth = textPaint.measureText(label)
-            val textHeight = textPaint.textSize
-            val bgLeft = s.x - textWidth / 2 - 8f
-            val bgTop = s.y - cloudRadius * 0.3f - textHeight / 2 - 4f
-            val bgRight = s.x + textWidth / 2 + 8f
-            val bgBottom = s.y - cloudRadius * 0.3f + textHeight / 2 + 4f
-            // 圆角背景
-            textBgPaint.color = rssiToColor(s.rssi) or 0xFF000000.toInt()
-            canvas.drawRoundRect(bgLeft, bgTop, bgRight, bgBottom, 8f, 8f, textBgPaint)
-            canvas.drawText(label, s.x, s.y - cloudRadius * 0.3f + textHeight / 3f, textPaint)
+            if (showLabels) {
+                val label = "${rssiToLevel(s.rssi)} ${s.rssi}"
+                val textWidth = textPaint.measureText(label)
+                val textHeight = textPaint.textSize
+                val bgLeft = cx - textWidth / 2 - 8f
+                val bgTop = cy - cloudRadiusScreen * 0.5f - textHeight / 2 - 4f
+                val bgRight = cx + textWidth / 2 + 8f
+                val bgBottom = cy - cloudRadiusScreen * 0.5f + textHeight / 2 + 4f
+                textBgPaint.color = rssiToColor(s.rssi) or 0xFF000000.toInt()
+                canvas.drawRoundRect(bgLeft, bgTop, bgRight, bgBottom, 8f, 8f, textBgPaint)
+                canvas.drawText(label, cx, cy - cloudRadiusScreen * 0.5f + textHeight / 3f, textPaint)
+            }
         }
     }
 
     private fun drawGrid(canvas: Canvas) {
-        val step = 60f  // 每 60px 一条
-        var x = step
-        while (x < width) {
-            canvas.drawLine(x, 0f, x, height.toFloat(), gridPaint)
-            x += step
+        // 在世界坐标系下每 1 单位画一条网格线
+        if (totalScale <= 0f) return
+        val stepWorld = 1f
+        val stepPx = stepWorld * totalScale
+        if (stepPx < 20f) return  // 太密就不画
+
+        // 找到视图范围对应的世界坐标范围
+        val worldLeft = screenToWorldX(0f)
+        val worldRight = screenToWorldX(width.toFloat())
+        val worldTop = screenToWorldY(0f)
+        val worldBottom = screenToWorldY(height.toFloat())
+
+        val startX = Math.floor(worldLeft.toDouble()).toInt()
+        val endX = Math.ceil(worldRight.toDouble()).toInt()
+        val startY = Math.floor(worldTop.toDouble()).toInt()
+        val endY = Math.ceil(worldBottom.toDouble()).toInt()
+
+        var x = startX.toFloat()
+        while (x <= endX) {
+            val sx = worldToScreenX(x)
+            canvas.drawLine(sx, 0f, sx, height.toFloat(), gridPaint)
+            x += stepWorld
         }
-        var y = step
-        while (y < height) {
-            canvas.drawLine(0f, y, width.toFloat(), y, gridPaint)
-            y += step
+        var y = startY.toFloat()
+        while (y <= endY) {
+            val sy = worldToScreenY(y)
+            canvas.drawLine(0f, sy, width.toFloat(), sy, gridPaint)
+            y += stepWorld
         }
     }
 }

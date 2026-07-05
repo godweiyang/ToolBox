@@ -306,11 +306,10 @@ class RealtimeFragment : Fragment() {
 }
 
 /**
- * 热力图页：用户走动到不同位置后，点击地图标记当前所在位置的信号强度。
+ * 热力图页：自动采集 WiFi 信号，每 1.5 秒一个采样点。
  *
- * 两种采样模式：
- * - 手动模式（默认）：走到一个位置后点击地图任意位置，在该点标记当前 RSSI
- * - 自动模式：每 1.5 秒自动采集一个点，位置在上次点击位置附近随机抖动
+ * 采样点位置在世界坐标系下累加（每次基于上次位置 + 随机抖动），
+ * HeatMapView 会自动 fit 所有点到屏幕，用户可双指捏合缩放查看细节。
  */
 class HeatmapFragment : Fragment() {
 
@@ -320,20 +319,17 @@ class HeatmapFragment : Fragment() {
     private lateinit var wifiManager: WifiManager
     private val handler = Handler(Looper.getMainLooper())
 
-    /** 当前模式：true=自动采样，false=手动点击 */
-    private var isAutoMode = false
-    private var isAutoSampling = false
+    private var isSampling = false
 
-    /** 自动模式下，下一次采样的中心位置（默认地图中心） */
-    private var lastSampleX = -1f
-    private var lastSampleY = -1f
+    /** 上次采样点的世界坐标（首次从 0,0 开始） */
+    private var lastWorldX = 0f
+    private var lastWorldY = 0f
 
-    /** 自动采样任务 */
-    private val autoSampleRunnable = object : Runnable {
+    private val sampleRunnable = object : Runnable {
         override fun run() {
-            if (isAutoSampling) {
-                sampleAtLastPosition()
-                handler.postDelayed(this, 1500)  // 每 1.5 秒采一次
+            if (isSampling) {
+                sampleOnce()
+                handler.postDelayed(this, 1500)
             }
         }
     }
@@ -341,7 +337,7 @@ class HeatmapFragment : Fragment() {
     private val locationPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
-        if (granted) startAutoSampling()
+        if (granted) startSampling()
     }
 
     override fun onCreateView(
@@ -357,62 +353,19 @@ class HeatmapFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
         wifiManager = requireContext().applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
 
-        // 默认手动模式
-        updateModeUI()
-
-        // 点击地图：在点击位置标记一个采样点（手动模式）
-        binding.heatMap.setOnTouchListener { v, ev ->
-            if (!isAutoMode && ev.action == android.view.MotionEvent.ACTION_UP) {
-                val rssi = getCurrentRssi()
-                if (rssi != Int.MIN_VALUE) {
-                    binding.heatMap.addSample(ev.x, ev.y, rssi)
-                    // 记录位置，自动模式时从此处附近继续
-                    lastSampleX = ev.x
-                    lastSampleY = ev.y
-                    binding.tvHeatmapEmpty.visibility = View.GONE
-                    updateSampleCount()
-                } else {
-                    android.widget.Toast.makeText(
-                        requireContext(),
-                        getString(R.string.wifi_no_connection),
-                        android.widget.Toast.LENGTH_SHORT
-                    ).show()
-                }
-            }
-            v.performClick()
-            false
-        }
-
-        // 切换手动/自动模式
-        binding.btnMode.setOnClickListener {
-            isAutoMode = !isAutoMode
-            if (isAutoMode) {
-                // 切到自动模式，自动开始采样
-                startAutoSampling()
-            } else {
-                // 切到手动模式，停止自动采样
-                stopAutoSampling()
-            }
-            updateModeUI()
-        }
-
-        // 开始/停止自动采样（仅自动模式有效）
         binding.btnToggleHeat.setOnClickListener {
-            if (isAutoMode) {
-                if (isAutoSampling) stopAutoSampling() else startAutoSampling()
-            } else {
-                android.widget.Toast.makeText(
-                    requireContext(),
-                    "请先切换到自动模式",
-                    android.widget.Toast.LENGTH_SHORT
-                ).show()
-            }
+            if (isSampling) stopSampling() else startSampling()
+        }
+
+        binding.btnResetView.setOnClickListener {
+            binding.heatMap.resetView()
         }
 
         binding.btnClear.setOnClickListener {
+            stopSampling()
             binding.heatMap.clear()
-            lastSampleX = -1f
-            lastSampleY = -1f
+            lastWorldX = 0f
+            lastWorldY = 0f
             binding.tvSteps.text = ""
             binding.tvHeatmapEmpty.visibility = View.VISIBLE
         }
@@ -420,26 +373,7 @@ class HeatmapFragment : Fragment() {
         binding.tvHeatmapEmpty.visibility = View.VISIBLE
     }
 
-    /** 更新模式相关的 UI */
-    private fun updateModeUI() {
-        binding.btnMode.text = if (isAutoMode) {
-            getString(R.string.wifi_heatmap_mode_auto)
-        } else {
-            getString(R.string.wifi_heatmap_mode_manual)
-        }
-        // 自动模式下，「开始/停止」按钮可用；手动模式下隐藏文字提示
-        binding.btnToggleHeat.visibility = if (isAutoMode) View.VISIBLE else View.GONE
-        binding.tvWalkHint.text = if (isAutoMode) {
-            getString(R.string.wifi_heatmap_auto_hint)
-        } else {
-            getString(R.string.wifi_heatmap_manual_hint)
-        }
-        binding.tvWalkHint.visibility = View.VISIBLE
-    }
-
-    /** 开启自动采样：每 1.5 秒采一个点 */
-    private fun startAutoSampling() {
-        // Android 12+ 需要 ACCESS_FINE_LOCATION 才能读取 WiFi 信息
+    private fun startSampling() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             val perm = Manifest.permission.ACCESS_FINE_LOCATION
             if (ContextCompat.checkSelfPermission(requireContext(), perm) != PackageManager.PERMISSION_GRANTED) {
@@ -452,43 +386,45 @@ class HeatmapFragment : Fragment() {
             }
         }
 
-        isAutoSampling = true
+        isSampling = true
         binding.btnToggleHeat.text = getString(R.string.wifi_btn_stop)
         binding.tvHeatmapEmpty.visibility = View.GONE
-        // 立即采样一次
-        sampleAtLastPosition()
-        handler.post(autoSampleRunnable)
+        // 立即采样一次，然后定时采样
+        sampleOnce()
+        handler.post(sampleRunnable)
     }
 
-    private fun stopAutoSampling() {
-        isAutoSampling = false
-        handler.removeCallbacks(autoSampleRunnable)
-        if (isAutoMode) {
-            binding.btnToggleHeat.text = getString(R.string.wifi_btn_start)
-        }
+    private fun stopSampling() {
+        isSampling = false
+        handler.removeCallbacks(sampleRunnable)
+        binding.btnToggleHeat.text = getString(R.string.wifi_btn_start)
     }
 
-    /** 在上次采样位置附近采样一个点（首次采样用地图中心） */
-    private fun sampleAtLastPosition() {
+    /** 采一个点：在上次位置附近随机抖动 0.3~0.5 米 */
+    private fun sampleOnce() {
         val rssi = getCurrentRssi()
-        if (rssi == Int.MIN_VALUE) return
+        if (rssi == Int.MIN_VALUE) {
+            android.widget.Toast.makeText(
+                requireContext(),
+                getString(R.string.wifi_no_connection),
+                android.widget.Toast.LENGTH_SHORT
+            ).show()
+            return
+        }
 
-        val cx = if (lastSampleX < 0) binding.heatMap.width / 2f else lastSampleX
-        val cy = if (lastSampleY < 0) binding.heatMap.height / 2f else lastSampleY
-        // 在上次位置附近 80px 范围内随机抖动
-        val jitterX = (Math.random() - 0.5).toFloat() * 80f
-        val jitterY = (Math.random() - 0.5).toFloat() * 80f
-        val newX = cx + jitterX
-        val newY = cy + jitterY
-        binding.heatMap.addSample(newX, newY, rssi)
-        lastSampleX = newX
-        lastSampleY = newY
+        // 随机抖动：每次走 0.3~0.6 米随机方向
+        val angle = (Math.random() * Math.PI * 2).toFloat()
+        val dist = (0.3 + Math.random() * 0.3).toFloat()  // 0.3~0.6 米
+        lastWorldX += (Math.cos(angle.toDouble()) * dist).toFloat()
+        lastWorldY += (Math.sin(angle.toDouble()) * dist).toFloat()
+
+        binding.heatMap.addSample(lastWorldX, lastWorldY, rssi)
         updateSampleCount()
     }
 
     private fun updateSampleCount() {
         val count = binding.heatMap.getSampleCount()
-        binding.tvSteps.text = "已采集 $count 个采样点"
+        binding.tvSteps.text = getString(R.string.wifi_heatmap_steps, count)
     }
 
     private fun getCurrentRssi(): Int {
@@ -507,7 +443,7 @@ class HeatmapFragment : Fragment() {
 
     override fun onDestroyView() {
         super.onDestroyView()
-        stopAutoSampling()
+        stopSampling()
         _binding = null
     }
 }

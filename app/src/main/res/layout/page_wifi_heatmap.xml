@@ -45,7 +45,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:gravity="center"
-        android:text="@string/wifi_heatmap_manual_hint"
+        android:text="@string/wifi_heatmap_auto_hint"
         android:textSize="12sp"
         android:textColor="#999999"
         android:paddingBottom="8dp" />
@@ -56,21 +56,21 @@
         android:orientation="horizontal">
 
         <Button
-            android:id="@+id/btnMode"
-            android:layout_width="0dp"
-            android:layout_weight="1"
-            android:layout_height="wrap_content"
-            android:text="@string/wifi_heatmap_mode_manual" />
-
-        <Button
             android:id="@+id/btnToggleHeat"
             android:layout_width="0dp"
             android:layout_weight="1"
             android:layout_height="wrap_content"
             android:text="@string/wifi_btn_start"
-            android:layout_marginStart="8dp"
             android:backgroundTint="@color/tool_wifi_bg"
             android:textColor="@android:color/white" />
+
+        <Button
+            android:id="@+id/btnResetView"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:text="@string/wifi_heatmap_reset_view"
+            android:layout_marginStart="8dp" />
 
         <Button
             android:id="@+id/btnClear"

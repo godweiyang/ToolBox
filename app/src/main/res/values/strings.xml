@@ -179,14 +179,12 @@
     <string name="wifi_no_connection">未连接 WiFi</string>
     <string name="wifi_perm_denied">需要位置权限才能读取 WiFi 信息</string>
     <string name="wifi_chart_label">信号强度实时曲线 (dBm)</string>
-    <string name="wifi_heatmap_label">走到不同位置点击地图标记信号，红色=弱 绿色=强</string>
-    <string name="wifi_heatmap_empty">走到一个位置后点击地图标记信号强度，或切换到自动模式自动采集</string>
+    <string name="wifi_heatmap_label">自动采集信号热力图，双指捏合缩放查看，红色=弱 绿色=强</string>
+    <string name="wifi_heatmap_empty">点击「开始探测」后拿着手机在家里走动，信号会自动采集</string>
     <string name="wifi_heatmap_steps">已采集 %1$d 个采样点</string>
     <string name="wifi_heatmap_clear">清空</string>
-    <string name="wifi_heatmap_mode_manual">手动模式</string>
-    <string name="wifi_heatmap_mode_auto">自动模式</string>
-    <string name="wifi_heatmap_manual_hint">点击地图任意位置标记当前位置的信号</string>
-    <string name="wifi_heatmap_auto_hint">自动采样中，每 1.5 秒采集一个点</string>
+    <string name="wifi_heatmap_reset_view">重置视图</string>
+    <string name="wifi_heatmap_auto_hint">自动采样中，每 1.5 秒采集一个点。双指捏合可缩放地图</string>
     <string name="wifi_step_count">步数: %1$d</string>
     <string name="wifi_walk_hint">请保持手机屏幕朝上水平握持，正常走路</string>
     <string name="wifi_min">最小：%1$d dBm</string>
