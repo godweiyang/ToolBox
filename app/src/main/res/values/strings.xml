@@ -165,7 +165,7 @@
     <string name="wifi_tab_heatmap">信号热力图</string>
     <string name="wifi_current_rssi">%1$d dBm</string>
     <string name="wifi_ssid">SSID: %1$s</string>
-    <string name="wifi_freq">%1$s %.1f GHz</string>
+    <string name="wifi_freq">%1$s %2$.1f GHz</string>
     <string name="wifi_link_speed">连接速率: %1$d Mbps</string>
     <string name="wifi_distance">估算距离: %1$.1f m</string>
     <string name="wifi_level_excellent">信号极佳</string>
