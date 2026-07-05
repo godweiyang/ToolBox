@@ -305,19 +305,40 @@ class RealtimeFragment : Fragment() {
     }
 }
 
-/** 热力图页：拿着手机走动时绘制信号轨迹 */
+/**
+ * 热力图页：用户走动到不同位置后，点击地图标记当前所在位置的信号强度。
+ *
+ * 不再使用 PDR 步行推算（原地晃动会误判步数，精度差）。
+ * 改为"手动标记采样"模式：用户走到一个位置 → 点击地图 → 在该点画一个信号云色块。
+ * 多个采样点叠加形成点状云热力图。
+ */
 class HeatmapFragment : Fragment() {
 
     private var _binding: PageWifiHeatmapBinding? = null
     private val binding get() = _binding!!
 
     private lateinit var wifiManager: WifiManager
-    private lateinit var pdrTracker: PdrTracker
     private val handler = Handler(Looper.getMainLooper())
 
-    private var isTracking = false
-    private var lastSampleTime = 0L
-    private var totalDistance = 0f
+    /** 自动采样模式：开启后每秒在地图中心采一个点 */
+    private var isAutoSampling = false
+    private var autoSampleCount = 0
+
+    /** 自动采样任务 */
+    private val autoSampleRunnable = object : Runnable {
+        override fun run() {
+            if (isAutoSampling) {
+                sampleAtCenter()
+                handler.postDelayed(this, 1500)  // 每 1.5 秒采一次
+            }
+        }
+    }
+
+    private val locationPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) startAutoSampling()
+    }
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -332,31 +353,34 @@ class HeatmapFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
         wifiManager = requireContext().applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
 
-        pdrTracker = PdrTracker(stepLength = 0.7f) { x, y, stepCount ->
-            // 每走一步，记录当前位置的 RSSI
-            val now = System.currentTimeMillis()
-            if (now - lastSampleTime > 800) {  // 800ms 采样一次，避免过密
-                lastSampleTime = now
+        // 点击地图：在点击位置标记一个采样点（当前位置的 RSSI）
+        binding.heatMap.setOnTouchListener { v, ev ->
+            if (ev.action == android.view.MotionEvent.ACTION_UP) {
                 val rssi = getCurrentRssi()
                 if (rssi != Int.MIN_VALUE) {
-                    binding.heatMap.addSample(x, y, rssi)
+                    binding.heatMap.addSample(ev.x, ev.y, rssi)
+                    binding.tvHeatmapEmpty.visibility = View.GONE
+                    updateSampleCount()
+                } else {
+                    android.widget.Toast.makeText(
+                        requireContext(),
+                        getString(R.string.wifi_no_connection),
+                        android.widget.Toast.LENGTH_SHORT
+                    ).show()
                 }
             }
-
-            totalDistance = stepCount * 0.7f
-            binding.tvSteps.text = getString(
-                R.string.wifi_heatmap_steps, stepCount, totalDistance
-            )
+            v.performClick()
+            false
         }
 
+        // 开始/停止自动采样（每秒在地图中心采一个点）
         binding.btnToggleHeat.setOnClickListener {
-            if (isTracking) stopTracking() else startTracking()
+            if (isAutoSampling) stopAutoSampling() else startAutoSampling()
         }
 
         binding.btnClear.setOnClickListener {
-            pdrTracker.reset()
             binding.heatMap.clear()
-            totalDistance = 0f
+            autoSampleCount = 0
             binding.tvSteps.text = ""
             binding.tvHeatmapEmpty.visibility = View.VISIBLE
         }
@@ -364,37 +388,53 @@ class HeatmapFragment : Fragment() {
         binding.tvHeatmapEmpty.visibility = View.VISIBLE
     }
 
-    private fun startTracking() {
-        if (ContextCompat.checkSelfPermission(
-                requireContext(),
-                Manifest.permission.ACCESS_FINE_LOCATION
-            ) != PackageManager.PERMISSION_GRANTED
-        ) {
-            requestPermissions(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION), 1001)
-            return
+    /** 开启自动采样：每 1.5 秒在地图中心采一个点 */
+    private fun startAutoSampling() {
+        // Android 12+ 需要 ACCESS_FINE_LOCATION 才能读取 WiFi 信息
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            val perm = Manifest.permission.ACCESS_FINE_LOCATION
+            if (ContextCompat.checkSelfPermission(requireContext(), perm) != PackageManager.PERMISSION_GRANTED) {
+                try {
+                    locationPermissionLauncher.launch(perm)
+                } catch (e: Exception) {
+                    android.util.Log.e("WifiHeatmap", "launch permission failed", e)
+                }
+                return
+            }
         }
 
-        isTracking = true
-        pdrTracker.reset()
-        binding.heatMap.clear()
-        binding.tvHeatmapEmpty.visibility = View.GONE
+        isAutoSampling = true
         binding.btnToggleHeat.text = getString(R.string.wifi_btn_stop)
-        totalDistance = 0f
-
-        val sm = requireContext().getSystemService(Context.SENSOR_SERVICE) as android.hardware.SensorManager
-        pdrTracker.start(sm)
-
-        // 立即采样一次起点
-        val rssi = getCurrentRssi()
-        if (rssi != Int.MIN_VALUE) {
-            binding.heatMap.addSample(0f, 0f, rssi)
-        }
+        binding.tvHeatmapEmpty.visibility = View.GONE
+        // 立即采样一次
+        sampleAtCenter()
+        handler.post(autoSampleRunnable)
     }
 
-    private fun stopTracking() {
-        isTracking = false
-        pdrTracker.stop()
+    private fun stopAutoSampling() {
+        isAutoSampling = false
+        handler.removeCallbacks(autoSampleRunnable)
         binding.btnToggleHeat.text = getString(R.string.wifi_btn_start)
+    }
+
+    /** 在地图中心采样一个点 */
+    private fun sampleAtCenter() {
+        val rssi = getCurrentRssi()
+        if (rssi == Int.MIN_VALUE) return
+
+        val cx = binding.heatMap.width / 2f
+        val cy = binding.heatMap.height / 2f
+        // 加一点随机抖动，避免点完全重叠
+        val jitterX = (Math.random() - 0.5).toFloat() * 80f
+        val jitterY = (Math.random() - 0.5).toFloat() * 80f
+        binding.heatMap.addSample(cx + jitterX, cy + jitterY, rssi)
+        autoSampleCount++
+        updateSampleCount()
+    }
+
+    private fun updateSampleCount() {
+        val count = binding.heatMap.getSampleCount()
+        binding.tvSteps.text = "已采集 $count 个采样点"
     }
 
     private fun getCurrentRssi(): Int {
@@ -411,20 +451,9 @@ class HeatmapFragment : Fragment() {
         }
     }
 
-    override fun onRequestPermissionsResult(
-        requestCode: Int,
-        permissions: Array<out String>,
-        grantResults: IntArray
-    ) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (requestCode == 1001 && grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-            startTracking()
-        }
-    }
-
     override fun onDestroyView() {
         super.onDestroyView()
-        stopTracking()
+        stopAutoSampling()
         _binding = null
     }
 }
