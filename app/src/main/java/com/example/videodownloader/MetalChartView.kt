@@ -30,6 +30,7 @@ class MetalChartView @JvmOverloads constructor(
 
     private val points = ArrayList<Float>(MAX_POINTS)
     private var maxValue = 100f
+    private var minValue = 0f
     private var threshold = 60f
     /** 是否绘制阈值线 + 超阈值变红（分贝仪等不需要阈值时设为 false） */
     private var showThreshold = true
@@ -62,12 +63,18 @@ class MetalChartView @JvmOverloads constructor(
         textSize = 24f
     }
 
-    /** 配置外观：主色 / 是否显示阈值线 / 初始纵轴上限 */
-    fun configure(color: Int, showThreshold: Boolean, initMax: Float = 100f) {
+    /** 配置外观：主色 / 是否显示阈值线 / 初始纵轴上下限 */
+    fun configure(
+        color: Int,
+        showThreshold: Boolean,
+        initMax: Float = 100f,
+        initMin: Float = 0f
+    ) {
         mainColor = color
         fillColor = (color and 0x00FFFFFF) or 0x33000000.toInt()
         this.showThreshold = showThreshold
         maxValue = initMax
+        minValue = initMin
         linePaint.color = mainColor
         fillPaint.color = fillColor
         invalidate()
@@ -77,9 +84,12 @@ class MetalChartView @JvmOverloads constructor(
     fun addPoint(value: Float) {
         points.add(value)
         while (points.size > MAX_POINTS) points.removeAt(0)
-        // 自动放大纵轴上限
+        // 自动放大纵轴范围
         if (value > maxValue) {
             maxValue = value * 1.2f
+        }
+        if (value < minValue) {
+            minValue = value * 0.8f
         }
         invalidate()
     }
@@ -108,15 +118,17 @@ class MetalChartView @JvmOverloads constructor(
             canvas.drawLine(0f, y, w, y, gridPaint)
         }
 
-        // 2. 阈值线（按 maxValue 缩放）
-        if (showThreshold && threshold > 0 && threshold < maxValue) {
-            val ty = h - (threshold / maxValue) * h
+        // 2. 阈值线（按 maxValue/minValue 缩放）
+        val range = maxValue - minValue
+        if (range > 0f && showThreshold && threshold in minValue..maxValue) {
+            val ty = h - ((threshold - minValue) / range) * h
             canvas.drawLine(0f, ty, w, ty, thresholdPaint)
             canvas.drawText("%.0f".format(threshold), 8f, ty - 4f, textPaint)
         }
 
         // 3. 数据曲线
         if (points.size < 2) return
+        if (range <= 0f) return
         val stepX = w / (MAX_POINTS - 1)
         val linePath = Path()
         val fillPath = Path()
@@ -125,8 +137,8 @@ class MetalChartView @JvmOverloads constructor(
         fillPath.moveTo(0f, h)
         for (i in points.indices) {
             val x = (startIdx + i) * stepX
-            val v = points[i].coerceIn(0f, maxValue)
-            val y = h - (v / maxValue) * h
+            val v = points[i].coerceIn(minValue, maxValue)
+            val y = h - ((v - minValue) / range) * h
             if (first) {
                 linePath.moveTo(x, y)
                 fillPath.lineTo(x, y)

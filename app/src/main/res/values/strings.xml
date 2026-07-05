@@ -157,4 +157,35 @@
     <string name="metal_level_strong">强烈磁场！</string>
     <string name="metal_calibrating">校准中…请将手机远离金属</string>
     <string name="metal_chart_label">磁场强度实时曲线</string>
+
+    <!-- WiFi 信号探测器 -->
+    <string name="tool_wifi_title">WiFi 信号探测器</string>
+    <string name="tool_wifi_desc">实时显示 WiFi 信号强度，走动绘制家庭信号热力图</string>
+    <string name="wifi_tab_realtime">实时信号</string>
+    <string name="wifi_tab_heatmap">信号热力图</string>
+    <string name="wifi_current_rssi">%1$d dBm</string>
+    <string name="wifi_ssid">SSID: %1$s</string>
+    <string name="wifi_freq">%1$s %.1f GHz</string>
+    <string name="wifi_link_speed">连接速率: %1$d Mbps</string>
+    <string name="wifi_distance">估算距离: %1$.1f m</string>
+    <string name="wifi_level_excellent">信号极佳</string>
+    <string name="wifi_level_good">信号良好</string>
+    <string name="wifi_level_fair">信号一般</string>
+    <string name="wifi_level_weak">信号较弱</string>
+    <string name="wifi_level_bad">信号很差</string>
+    <string name="wifi_btn_start">开始探测</string>
+    <string name="wifi_btn_stop">停止探测</string>
+    <string name="wifi_hint">点击开始探测 WiFi 信号强度</string>
+    <string name="wifi_no_connection">未连接 WiFi</string>
+    <string name="wifi_perm_denied">需要位置权限才能读取 WiFi 信息</string>
+    <string name="wifi_chart_label">信号强度实时曲线 (dBm)</string>
+    <string name="wifi_heatmap_label">走动时自动绘制信号热力图，红=弱绿=强</string>
+    <string name="wifi_heatmap_empty">点击「开始探测」后拿着手机在家里走动，路径会自动绘制并标注信号强度</string>
+    <string name="wifi_heatmap_steps">已记录 %1$d 步 / %2$.1f m</string>
+    <string name="wifi_heatmap_clear">清空轨迹</string>
+    <string name="wifi_step_count">步数: %1$d</string>
+    <string name="wifi_walk_hint">请保持手机屏幕朝上水平握持，正常走路</string>
+    <string name="wifi_min">最小：%1$d dBm</string>
+    <string name="wifi_max">最大：%1$d dBm</string>
+    <string name="wifi_avg">平均：%1$.1f dBm</string>
 </resources>

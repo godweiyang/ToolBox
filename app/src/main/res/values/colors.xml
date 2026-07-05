@@ -13,4 +13,10 @@
     <color name="metal_normal">#4CAF50</color>
     <color name="metal_warn">#FF9800</color>
     <color name="metal_alert">#F44336</color>
+    <color name="tool_wifi_bg">#00695C</color>
+    <color name="wifi_excellent">#2E7D32</color>
+    <color name="wifi_good">#558B2F</color>
+    <color name="wifi_fair">#F9A825</color>
+    <color name="wifi_weak">#E65100</color>
+    <color name="wifi_bad">#B71C1C</color>
 </resources>

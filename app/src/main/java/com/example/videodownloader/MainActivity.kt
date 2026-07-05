@@ -87,6 +87,13 @@ class MainActivity : AppCompatActivity() {
             launcher = { ctx -> Intent(ctx, DecibelMeterActivity::class.java) }
         ),
         Tool(
+            title = getString(R.string.tool_wifi_title),
+            desc = getString(R.string.tool_wifi_desc),
+            iconRes = android.R.drawable.ic_menu_compass,
+            bgColorRes = R.color.tool_wifi_bg,
+            launcher = { ctx -> Intent(ctx, WifiSignalActivity::class.java) }
+        ),
+        Tool(
             title = getString(R.string.tool_fileshare_title),
             desc = getString(R.string.tool_fileshare_desc),
             iconRes = android.R.drawable.stat_sys_upload,
