@@ -16,6 +16,16 @@ android {
         versionName = "1.8.9"
     }
 
+    signingConfigs {
+        create("release") {
+            // 复用 Android debug keystore 给 release 包签名，
+            // 避免 vivo 等机型因“未签名”拒绝安装
+            storeFile = file("${System.getProperty("user.home")}/.android/debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
+    }
     buildTypes {
         release {
             isMinifyEnabled = false
@@ -23,6 +33,7 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            signingConfig = signingConfigs.getByName("release")
         }
     }
     compileOptions {
