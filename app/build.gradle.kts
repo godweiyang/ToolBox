@@ -12,8 +12,8 @@ android {
         applicationId = "com.example.videodownloader"
         minSdk = 26
         targetSdk = 34
-        versionCode = 26
-        versionName = "1.8.8"
+        versionCode = 27
+        versionName = "1.8.9"
     }
 
     buildTypes {

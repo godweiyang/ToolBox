@@ -357,7 +357,12 @@ object VideoParser {
 
         // 兜底2：HTML 里正则找。注意 body 里的 URL 含 \u002F 转义，先替换
         val unescaped = html.replace("\\u002F", "/").replace("\\/", "/")
-        val mp4 = Regex("""https?://[^"'\s]+\.mp4[^"'\s]*""").find(unescaped)?.value
+        // 优先选带 sign 参数的主 CDN 直链（sns-video），其次选任意 mp4 URL
+        val mp4WithSign = Regex("""https?://sns-video[^"'\s]+\.mp4\?[^"'\s]*sign=[^"'\s]*""")
+            .find(unescaped)?.value
+        val mp4 = mp4WithSign
+            ?: Regex("""https?://[^"'\s]+\.mp4\?[^"'\s]*sign=[^"'\s]*""").find(unescaped)?.value
+            ?: Regex("""https?://[^"'\s]+\.mp4[^"'\s]*""").find(unescaped)?.value
         if (!mp4.isNullOrBlank()) {
             Log.i(TAG, "小红书视频直链(正则mp4): $mp4")
             return VideoInfo(htmlTitle ?: "小红书视频", "未知作者", mp4, "", "xiaohongshu")
@@ -623,16 +628,31 @@ object VideoParser {
             if (endIdx < 0) return null
 
             val jsonStr = html.substring(openBraceIdx, endIdx + 1)
+            // 清洗 JavaScript 特有的非 JSON 值（undefined/NaN/Infinity），
+            // 小红书等平台的 __INITIAL_STATE__ 可能包含这些值，会导致 Gson 解析失败
+            val sanitized = sanitizeJsJson(jsonStr)
             return try {
-                JsonParser.parseString(jsonStr).asJsonObject
+                JsonParser.parseString(sanitized).asJsonObject
             } catch (_: Exception) {
                 // 可能是被 URL encode 过
-                JsonParser.parseString(URLDecoder.decode(jsonStr, "UTF-8")).asJsonObject
+                JsonParser.parseString(URLDecoder.decode(sanitized, "UTF-8")).asJsonObject
             }
         } catch (e: Exception) {
             Log.w(TAG, "extractJsonObject($varName) 失败: ${e.message}")
             null
         }
+    }
+
+    /**
+     * 清洗 JSON 字符串中的 JavaScript 特有值（undefined/NaN/Infinity/-Infinity），
+     * 替换为 null。仅替换出现在 JSON 值位置的（前面是 : , [ ，后面是 , } ]），
+     * 不会误替换字符串内容中的 "undefined" 等文字。
+     */
+    private fun sanitizeJsJson(jsonStr: String): String {
+        return jsonStr.replace(
+            Regex("""([:,\[]\s*)(?:undefined|NaN|Infinity|-Infinity)(\s*[,}\]])"""),
+            "$1null$2"
+        )
     }
 
     /** 在 JSON 树里递归查找某个 key 下 url_list 的第一个 URL */
