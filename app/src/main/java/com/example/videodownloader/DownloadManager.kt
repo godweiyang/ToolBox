@@ -239,6 +239,107 @@ object DownloadManager {
         }
     }
 
+    /** 图片输出：Android 10+ 用 MediaStore.Images，旧版写 Pictures/VideoDownloader */
+    private fun openImageOutput(context: Context, fileName: String): Pair<Uri, OutputStream>? {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val resolver = context.contentResolver
+            val values = ContentValues().apply {
+                put(MediaStore.Images.Media.DISPLAY_NAME, fileName)
+                put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
+                put(MediaStore.Images.Media.RELATIVE_PATH,
+                    "${Environment.DIRECTORY_PICTURES}/$FOLDER_NAME")
+                put(MediaStore.Images.Media.IS_PENDING, 1)
+            }
+            val collection = MediaStore.Images.Media.getContentUri(
+                MediaStore.VOLUME_EXTERNAL_PRIMARY
+            )
+            val uri = resolver.insert(collection, values) ?: return null
+            val os = resolver.openOutputStream(uri) ?: return null
+            uri to os
+        } else {
+            val picsDir = File(
+                Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES),
+                FOLDER_NAME
+            )
+            if (!picsDir.exists()) picsDir.mkdirs()
+            val file = File(picsDir, fileName)
+            Uri.fromFile(file) to FileOutputStream(file)
+        }
+    }
+
+    /**
+     * 下载图文笔记的所有图片到相册（Pictures/VideoDownloader）。
+     * 多张图片时文件名加序号后缀。
+     */
+    suspend fun downloadImages(
+        context: Context,
+        imageUrls: List<String>,
+        displayName: String,
+        onProgress: (Int) -> Unit = {}
+    ): Result = withContext(Dispatchers.IO) {
+        val savedUris = mutableListOf<Uri>()
+        val savedPaths = mutableListOf<String>()
+        val total = imageUrls.size
+        try {
+            imageUrls.forEachIndexed { index, url ->
+                val req = Request.Builder()
+                    .url(url)
+                    .header("User-Agent", "Mozilla/5.0 (Linux; Android 13) " +
+                        "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Mobile Safari/537.36")
+                    .header("Referer", "https://www.douyin.com/")
+                    .header("Accept", "*/*")
+                    .get()
+                    .build()
+
+                client.newCall(req).execute().use { resp ->
+                    if (!resp.isSuccessful) {
+                        return@withContext Result.Failure("图片 ${index + 1} 下载失败：HTTP ${resp.code}")
+                    }
+                    val body = resp.body ?: return@withContext Result.Failure("图片 ${index + 1} 响应体为空")
+                    val suffix = if (total > 1) "_${index + 1}" else ""
+                    val fileName = "${sanitizeFileName(displayName)}$suffix.jpg"
+                    val (uri, output) = openImageOutput(context, fileName)
+                        ?: return@withContext Result.Failure("无法创建图片文件")
+                    output.use { os ->
+                        body.byteStream().use { input ->
+                            val buf = ByteArray(8 * 1024)
+                            var read: Int
+                            while (input.read(buf).also { read = it } != -1) {
+                                os.write(buf, 0, read)
+                            }
+                            os.flush()
+                        }
+                    }
+                    savedUris.add(uri)
+                    savedPaths.add(fileName)
+                    // 通知相册刷新
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                        val values = ContentValues().apply {
+                            put(MediaStore.Images.Media.IS_PENDING, 0)
+                        }
+                        try { context.contentResolver.update(uri, values, null, null) } catch (_: Exception) {}
+                    } else {
+                        val path = uri.path
+                        if (path != null) {
+                            @Suppress("DEPRECATION")
+                            android.media.MediaScannerConnection.scanFile(
+                                context, arrayOf(path), arrayOf("image/jpeg"), null
+                            )
+                        }
+                        Unit
+                    }
+                }
+                val pct = ((index + 1) * 100 / total).coerceIn(0, 100)
+                onProgress(pct)
+            }
+            Log.i(TAG, "图片下载完成: ${savedPaths.size} 张")
+            Result.Success(savedPaths.joinToString(", "), savedUris.first())
+        } catch (e: Exception) {
+            Log.e(TAG, "图片下载异常", e)
+            Result.Failure(e.message ?: "图片下载异常")
+        }
+    }
+
     private fun openViaMediaStore(
         context: Context,
         fileName: String

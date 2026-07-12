@@ -115,7 +115,7 @@ object VideoParser {
 
         // 3. 兜底：直接抓 share 页 HTML
         val sharePageUrl =
-            if (videoId != null) "https://www.iesdouyin.com/share/video/$videoId/"
+            if (videoId != null) "https://www.iesdouyin.com/share/note/$videoId/"
             else resolvedUrl
         return parseFromSharePageHtml(sharePageUrl)
             ?: throw IllegalStateException("抖音视频解析失败，可能接口已变更")
@@ -145,11 +145,13 @@ object VideoParser {
         }
     }
 
-    /** 从 URL 里提取抖音 video_id，例如 /share/video/7123456789012345678/ */
+    /** 从 URL 里提取抖音 video_id，例如 /share/video/7123456789012345678/ 或 /share/note/xxx/ */
     private fun extractDouyinVideoId(url: String): String? {
         val patterns = listOf(
-            Regex("""/video/(\d+)"""),
+            Regex("""/share/note/(\d+)"""),
             Regex("""/share/video/(\d+)"""),
+            Regex("""/video/(\d+)"""),
+            Regex("""/note/(\d+)"""),
             Regex("""item_ids=(\d+)"""),
             Regex("""modal_id=(\d+)""")
         )
@@ -204,7 +206,7 @@ object VideoParser {
         )
     }
 
-    /** HTML 兜底：从 share 页里抓视频地址 */
+    /** HTML 兜底：从 share 页里抓视频地址或图片 */
     private fun parseFromSharePageHtml(sharePageUrl: String): VideoInfo? {
         return try {
             val html = httpGet(sharePageUrl)
@@ -213,30 +215,75 @@ object VideoParser {
             val title = Regex("""<title>([^<]+)</title>""").find(html)
                 ?.groupValues?.get(1)?.trim()?.ifBlank { null } ?: "抖音视频"
 
-            // 1) 直接在 HTML 里搜 play_addr + url_list 模式（最常见、最稳）
+            // 优先解析 _ROUTER_DATA，检测图文笔记（有 images 数组，无真实视频）
+            val routerData = extractJsonObject(html, "_ROUTER_DATA")
+                ?: extractJsonObject(html, "RENDER_DATA")
+            if (routerData != null) {
+                val author = deepFindString(routerData, "nickname") ?: "未知作者"
+                val awemeType = deepFindInt(routerData, "aweme_type") ?: -1
+                val imagesArray = deepFindArray(routerData, "images")
+
+                // 图文笔记：aweme_type==2 或有 images 数组
+                if (awemeType == 2 || (imagesArray != null && imagesArray.size() > 0)) {
+                    val imgUrls = mutableListOf<String>()
+                    if (imagesArray != null) {
+                        for (i in 0 until imagesArray.size()) {
+                            val imgObj = imagesArray[i].asJsonObject
+                            // url_list 里的图是无水印原图
+                            val urlList = imgObj.getAsJsonArray("url_list")
+                            if (urlList != null && urlList.size() > 0) {
+                                // 优先取 jpeg 版本（兼容性最好），取不到就取第一个
+                                var picked: String? = null
+                                for (j in 0 until urlList.size()) {
+                                    val u = urlList[j].asString
+                                        .replace("\\u002F", "/")
+                                        .replace("\\/", "/")
+                                        .replace("&amp;", "&")
+                                    if (u.contains(".jpeg")) { picked = u; break }
+                                }
+                                if (picked == null) {
+                                    picked = urlList[0].asString
+                                        .replace("\\u002F", "/")
+                                        .replace("\\/", "/")
+                                        .replace("&amp;", "&")
+                                }
+                                if (picked.startsWith("http")) imgUrls.add(picked)
+                            }
+                        }
+                    }
+                    if (imgUrls.isNotEmpty()) {
+                        Log.i(TAG, "抖音图文笔记，共 ${imgUrls.size} 张图片")
+                        return VideoInfo(
+                            title = title,
+                            author = author,
+                            videoUrl = "",
+                            platform = "douyin",
+                            isImage = true,
+                            imageUrls = imgUrls
+                        )
+                    }
+                }
+
+                // 视频笔记：从 _ROUTER_DATA 里找 play_addr
+                val videoUrl = deepFindUrl(routerData, listOf("play_addr", "url_list"))
+                    ?.replace("playwm", "play")
+                if (!videoUrl.isNullOrBlank() && !videoUrl.contains(".mp3")) {
+                    val finalUrl = resolveFinalUrl(videoUrl) ?: videoUrl
+                    val cover = deepFindUrl(routerData, listOf("cover", "url_list")) ?: ""
+                    return VideoInfo(title, author, finalUrl, cover, "douyin")
+                }
+            }
+
+            // 兜底1：直接在 HTML 里搜 play_addr + url_list 模式
             val playAddrUrl = findPlayAddrUrl(html)
-            if (!playAddrUrl.isNullOrBlank()) {
+            if (!playAddrUrl.isNullOrBlank() && !playAddrUrl.contains(".mp3")) {
                 val noWm = playAddrUrl.replace("playwm", "play")
                 val finalUrl = resolveFinalUrl(noWm) ?: noWm
                 val cover = findCoverUrl(html) ?: ""
                 return VideoInfo(title, "未知作者", finalUrl, cover, "douyin")
             }
 
-            // 2) 尝试从 _ROUTER_DATA / RENDER_DATA 里解析 JSON
-            val routerData = extractJsonObject(html, "_ROUTER_DATA")
-                ?: extractJsonObject(html, "RENDER_DATA")
-            if (routerData != null) {
-                val videoUrl = deepFindUrl(routerData, listOf("play_addr", "url_list"))
-                    ?.replace("playwm", "play")
-                if (!videoUrl.isNullOrBlank()) {
-                    val finalUrl = resolveFinalUrl(videoUrl) ?: videoUrl
-                    val cover = deepFindUrl(routerData, listOf("cover", "url_list")) ?: ""
-                    val author = deepFindString(routerData, "nickname") ?: "未知作者"
-                    return VideoInfo(title, author, finalUrl, cover, "douyin")
-                }
-            }
-
-            // 3) 最后兜底：直接找 mp4 链接
+            // 兜底2：直接找 mp4 链接
             val mp4 = Regex("""https?://[^"'\s\\]+\.mp4[^"'\s\\]*""").find(html)?.value
             if (!mp4.isNullOrBlank()) {
                 return VideoInfo(title, "未知作者", mp4, "", "douyin")
@@ -737,6 +784,32 @@ object VideoParser {
             element.isJsonArray -> {
                 for (e in element.asJsonArray) {
                     val r = deepFindArray(e, targetKey)
+                    if (r != null) return r
+                }
+            }
+        }
+        return null
+    }
+
+    /** 在 JSON 树里递归查找第一个 key == targetKey 的整数值 */
+    private fun deepFindInt(
+        element: com.google.gson.JsonElement,
+        targetKey: String
+    ): Int? {
+        when {
+            element.isJsonObject -> {
+                val obj = element.asJsonObject
+                if (obj.has(targetKey) && obj.get(targetKey).isJsonPrimitive && !obj.get(targetKey).isJsonNull) {
+                    try { return obj.get(targetKey).asInt } catch (_: Exception) {}
+                }
+                for ((_, v) in obj.entrySet()) {
+                    val r = deepFindInt(v, targetKey)
+                    if (r != null) return r
+                }
+            }
+            element.isJsonArray -> {
+                for (e in element.asJsonArray) {
+                    val r = deepFindInt(e, targetKey)
                     if (r != null) return r
                 }
             }

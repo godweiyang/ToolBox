@@ -1,9 +1,10 @@
 package com.example.videodownloader
 
 /**
- * 解析后的视频信息。
+ * 解析后的视频/图片信息。
  *
  * - 抖音 / 快手 / 小红书：单 mp4 直链，只填 [videoUrl]
+ * - 抖音图文笔记：无视频，只有图片，填 [isImage]=true 和 [imageUrls]
  * - B站 dash：音视频分离，[videoUrl] 填视频流，[audioUrl] 填音频流，
  *   下载后用 [BiliMuxer] 合成 mp4
  */
@@ -18,5 +19,9 @@ data class VideoInfo(
     /** dash 音频流直链（仅 isDash=true 时有效） */
     val audioUrl: String = "",
     /** 清晰度标签，如 "1080P 高清" / "480P" */
-    val qualityLabel: String = ""
+    val qualityLabel: String = "",
+    /** 是否为图文笔记（无视频，只有图片） */
+    val isImage: Boolean = false,
+    /** 图文笔记的图片直链列表（仅 isImage=true 时有效） */
+    val imageUrls: List<String> = emptyList()
 )

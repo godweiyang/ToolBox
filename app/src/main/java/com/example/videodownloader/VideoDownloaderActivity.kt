@@ -158,16 +158,33 @@ class VideoDownloaderActivity : AppCompatActivity() {
             log("标题：${video.title}")
             log("作者：${video.author}")
             log("平台：${video.platform}")
-            if (video.qualityLabel.isNotBlank()) {
-                log("画质：${video.qualityLabel}")
-            }
-            log("视频直链：${video.videoUrl}")
-            if (video.isDash) {
-                log("音频直链：${video.audioUrl}")
-                log("B站高清 dash 模式：下载视频+音频 → 合成 mp4")
+            if (video.isImage) {
+                log("类型：图文笔记（${video.imageUrls.size} 张图片）")
+            } else {
+                if (video.qualityLabel.isNotBlank()) {
+                    log("画质：${video.qualityLabel}")
+                }
+                log("视频直链：${video.videoUrl}")
+                if (video.isDash) {
+                    log("音频直链：${video.audioUrl}")
+                    log("B站高清 dash 模式：下载视频+音频 → 合成 mp4")
+                }
             }
 
-            val result = if (video.isDash) {
+            val result = if (video.isImage) {
+                binding.tvProgress.text = "下载图片 0%"
+                log("下载图片…")
+                DownloadManager.downloadImages(
+                    context = applicationContext,
+                    imageUrls = video.imageUrls,
+                    displayName = video.title
+                ) { percent ->
+                    runOnUiIfAlive {
+                        binding.progressBar.progress = percent
+                        binding.tvProgress.text = "下载图片 $percent%"
+                    }
+                }
+            } else if (video.isDash) {
                 binding.tvProgress.text = "下载视频流 0%"
                 log("下载视频流…")
                 DownloadManager.downloadDash(
@@ -205,9 +222,15 @@ class VideoDownloaderActivity : AppCompatActivity() {
             if (!isActivityAlive()) return@launch
             when (result) {
                 is DownloadManager.Result.Success -> {
-                    DownloadManager.notifyGallery(applicationContext, result.uri)
+                    if (!video.isImage) {
+                        DownloadManager.notifyGallery(applicationContext, result.uri)
+                    }
                     log("下载完成：${result.filePath}")
-                    log("已保存到相册：Movies/VideoDownloader/")
+                    if (video.isImage) {
+                        log("已保存到相册：Pictures/VideoDownloader/")
+                    } else {
+                        log("已保存到相册：Movies/VideoDownloader/")
+                    }
                     binding.tvProgress.text = "完成"
                     toast("已保存到相册")
                 }
