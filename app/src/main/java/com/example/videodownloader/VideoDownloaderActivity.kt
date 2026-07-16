@@ -160,6 +160,12 @@ class VideoDownloaderActivity : AppCompatActivity() {
             log("平台：${video.platform}")
             if (video.isImage) {
                 log("类型：图文笔记（${video.imageUrls.size} 张图片）")
+                if (video.musicUrl.isNotBlank()) {
+                    log("背景音乐：${video.musicDuration}秒")
+                }
+                // 图文笔记：弹出选择对话框
+                showImageDownloadDialog(video)
+                return@launch
             } else {
                 if (video.qualityLabel.isNotBlank()) {
                     log("画质：${video.qualityLabel}")
@@ -171,20 +177,7 @@ class VideoDownloaderActivity : AppCompatActivity() {
                 }
             }
 
-            val result = if (video.isImage) {
-                binding.tvProgress.text = "下载图片 0%"
-                log("下载图片…")
-                DownloadManager.downloadImages(
-                    context = applicationContext,
-                    imageUrls = video.imageUrls,
-                    displayName = video.title
-                ) { percent ->
-                    runOnUiIfAlive {
-                        binding.progressBar.progress = percent
-                        binding.tvProgress.text = "下载图片 $percent%"
-                    }
-                }
-            } else if (video.isDash) {
+            val result = if (video.isDash) {
                 binding.tvProgress.text = "下载视频流 0%"
                 log("下载视频流…")
                 DownloadManager.downloadDash(
@@ -222,15 +215,9 @@ class VideoDownloaderActivity : AppCompatActivity() {
             if (!isActivityAlive()) return@launch
             when (result) {
                 is DownloadManager.Result.Success -> {
-                    if (!video.isImage) {
-                        DownloadManager.notifyGallery(applicationContext, result.uri)
-                    }
+                    DownloadManager.notifyGallery(applicationContext, result.uri)
                     log("下载完成：${result.filePath}")
-                    if (video.isImage) {
-                        log("已保存到相册：Pictures/VideoDownloader/")
-                    } else {
-                        log("已保存到相册：Movies/VideoDownloader/")
-                    }
+                    log("已保存到相册：Movies/VideoDownloader/")
                     binding.tvProgress.text = "完成"
                     toast("已保存到相册")
                 }
@@ -242,6 +229,110 @@ class VideoDownloaderActivity : AppCompatActivity() {
             }
             setUiBusy(false)
         }
+    }
+
+    /** 图文笔记下载方式选择对话框 */
+    private fun showImageDownloadDialog(video: VideoInfo) {
+        setUiBusy(false)
+        val hasMusic = video.musicUrl.isNotBlank()
+        val items = mutableListOf<String>()
+        // 选项索引映射
+        val idxImages = items.size; items.add("下载图片（${video.imageUrls.size} 张）")
+        val idxSlideShow = if (hasMusic) { val i = items.size; items.add("合成视频（图片+背景音乐）"); i } else -1
+        val idxGif = items.size; items.add("下载 GIF 动图")
+
+        com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
+            .setTitle("图文笔记下载方式")
+            .setItems(items.toTypedArray()) { _, which ->
+                when (which) {
+                    idxImages -> startDownloadImages(video)
+                    idxSlideShow -> startDownloadSlideShow(video)
+                    idxGif -> startDownloadGif(video)
+                }
+            }
+            .setNegativeButton("取消", null)
+            .show()
+    }
+
+    private fun startDownloadImages(video: VideoInfo) {
+        lifecycleScope.launch {
+            setUiBusy(true)
+            binding.progressBar.progress = 0
+            binding.tvProgress.text = "下载图片 0%"
+            log("下载图片…")
+            val result = DownloadManager.downloadImages(
+                context = applicationContext,
+                imageUrls = video.imageUrls,
+                displayName = video.title
+            ) { percent ->
+                runOnUiIfAlive {
+                    binding.progressBar.progress = percent
+                    binding.tvProgress.text = "下载图片 $percent%"
+                }
+            }
+            handleDownloadResult(result, "Pictures/VideoDownloader/")
+        }
+    }
+
+    private fun startDownloadSlideShow(video: VideoInfo) {
+        lifecycleScope.launch {
+            setUiBusy(true)
+            binding.progressBar.progress = 0
+            binding.tvProgress.text = "下载图片 0%"
+            log("合成视频（图片+音乐）…")
+            val result = DownloadManager.downloadSlideShow(
+                context = applicationContext,
+                imageUrls = video.imageUrls,
+                musicUrl = video.musicUrl,
+                displayName = video.title,
+                musicDurationSec = video.musicDuration
+            ) { percent ->
+                runOnUiIfAlive {
+                    binding.progressBar.progress = percent
+                    binding.tvProgress.text = "合成视频 $percent%"
+                }
+            }
+            handleDownloadResult(result, "Movies/VideoDownloader/")
+        }
+    }
+
+    private fun startDownloadGif(video: VideoInfo) {
+        lifecycleScope.launch {
+            setUiBusy(true)
+            binding.progressBar.progress = 0
+            binding.tvProgress.text = "下载图片 0%"
+            log("合成 GIF 动图…")
+            val result = DownloadManager.downloadGif(
+                context = applicationContext,
+                imageUrls = video.imageUrls,
+                displayName = video.title
+            ) { percent ->
+                runOnUiIfAlive {
+                    binding.progressBar.progress = percent
+                    binding.tvProgress.text = "合成 GIF $percent%"
+                }
+            }
+            handleDownloadResult(result, "Pictures/VideoDownloader/")
+        }
+    }
+
+    private fun handleDownloadResult(result: DownloadManager.Result, folder: String) {
+        if (!isActivityAlive()) return
+        when (result) {
+            is DownloadManager.Result.Success -> {
+                DownloadManager.notifyGallery(applicationContext, result.uri)
+                log("下载完成：${result.filePath}")
+                log("已保存到相册：$folder")
+                binding.tvProgress.text = "完成"
+                toast("已保存到相册")
+            }
+            is DownloadManager.Result.Failure -> {
+                log("下载失败：${result.message}")
+                binding.tvProgress.text = "失败"
+                toast("下载失败")
+            }
+        }
+        setUiBusy(false)
     }
 
     private fun isActivityAlive(): Boolean = !isFinishing && !isDestroyed

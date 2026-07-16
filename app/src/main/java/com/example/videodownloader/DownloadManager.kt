@@ -340,6 +340,189 @@ object DownloadManager {
         }
     }
 
+    /**
+     * 下载图文笔记的图片并合成为 GIF 动图，保存到相册。
+     */
+    suspend fun downloadGif(
+        context: Context,
+        imageUrls: List<String>,
+        displayName: String,
+        frameDelayMs: Int = 1000,
+        onProgress: (Int) -> Unit = {}
+    ): Result = withContext(Dispatchers.IO) {
+        val cacheDir = context.cacheDir
+        val tmpImages = mutableListOf<File>()
+        val tmpGif = File(cacheDir, "gif_${System.currentTimeMillis()}.gif")
+        try {
+            // 1. 下载所有图片到临时文件
+            Log.i(TAG, "下载图片用于 GIF 合成…")
+            imageUrls.forEachIndexed { index, url ->
+                downloadToTempWithReferer(url, File(cacheDir, "gif_img_$index.jpg"), "https://www.douyin.com/")
+                tmpImages.add(File(cacheDir, "gif_img_$index.jpg"))
+                onProgress((index * 50 / imageUrls.size).coerceIn(0, 50))
+            }
+
+            // 2. 解码为 Bitmap
+            val bitmaps = mutableListOf<android.graphics.Bitmap>()
+            for (f in tmpImages) {
+                val bmp = android.graphics.BitmapFactory.decodeFile(f.absolutePath)
+                if (bmp != null) bitmaps.add(bmp)
+            }
+            if (bitmaps.isEmpty()) return@withContext Result.Failure("无法解码图片")
+
+            // 3. 合成 GIF
+            Log.i(TAG, "合成 GIF…")
+            val ok = GifEncoder.encode(bitmaps, tmpGif, frameDelayMs) { p ->
+                onProgress(50 + p / 2)
+            }
+            if (!ok || !tmpGif.exists() || tmpGif.length() == 0L) {
+                return@withContext Result.Failure("GIF 合成失败")
+            }
+
+            // 4. 写入相册
+            val fileName = sanitizeFileName(displayName) + ".gif"
+            val (uri, output) = openImageOutput(context, fileName)
+                ?: return@withContext Result.Failure("无法创建输出文件")
+            output.use { os ->
+                tmpGif.inputStream().use { it.copyTo(os) }
+                os.flush()
+            }
+            // 通知相册
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                val values = ContentValues().apply {
+                    put(MediaStore.Images.Media.IS_PENDING, 0)
+                    put(MediaStore.Images.Media.MIME_TYPE, "image/gif")
+                }
+                try { context.contentResolver.update(uri, values, null, null) } catch (_: Exception) {}
+            } else {
+                val path = uri.path
+                if (path != null) {
+                    @Suppress("DEPRECATION")
+                    android.media.MediaScannerConnection.scanFile(
+                        context, arrayOf(path), arrayOf("image/gif"), null
+                    )
+                }
+                Unit
+            }
+            onProgress(100)
+            Log.i(TAG, "GIF 下载完成: $fileName (${tmpGif.length() / 1024}KB)")
+            Result.Success(fileName, uri)
+        } catch (e: Exception) {
+            Log.e(TAG, "GIF 下载异常", e)
+            Result.Failure(e.message ?: "GIF 下载异常")
+        } finally {
+            tmpImages.forEach { it.delete() }
+            tmpGif.delete()
+        }
+    }
+
+    /**
+     * 下载图文笔记的图片+音频，合成为 mp4 视频保存到相册。
+     */
+    suspend fun downloadSlideShow(
+        context: Context,
+        imageUrls: List<String>,
+        musicUrl: String,
+        displayName: String,
+        musicDurationSec: Int,
+        onProgress: (Int) -> Unit = {}
+    ): Result = withContext(Dispatchers.IO) {
+        val cacheDir = context.cacheDir
+        val tmpImages = mutableListOf<File>()
+        val tmpAudio = File(cacheDir, "slide_audio_${System.currentTimeMillis()}.mp3")
+        val tmpVideo = File(cacheDir, "slide_video_${System.currentTimeMillis()}.mp4")
+        try {
+            // 1. 下载所有图片
+            Log.i(TAG, "下载图片用于视频合成…")
+            imageUrls.forEachIndexed { index, url ->
+                val f = File(cacheDir, "slide_img_$index.jpg")
+                downloadToTempWithReferer(url, f, "https://www.douyin.com/")
+                tmpImages.add(f)
+                onProgress((index * 30 / imageUrls.size).coerceIn(0, 30))
+            }
+
+            // 2. 下载音频
+            var audioFile: File? = null
+            if (musicUrl.isNotBlank()) {
+                Log.i(TAG, "下载背景音乐…")
+                val ok = downloadToTempWithReferer(musicUrl, tmpAudio, "https://www.douyin.com/")
+                if (ok && tmpAudio.exists() && tmpAudio.length() > 0) {
+                    audioFile = tmpAudio
+                }
+            }
+            onProgress(35)
+
+            // 3. 计算每帧显示时间
+            val total = imageUrls.size
+            val frameDurationMs = if (musicDurationSec > 0) {
+                (musicDurationSec * 1000L / total)
+            } else {
+                2000L
+            }
+
+            // 4. 合成视频
+            Log.i(TAG, "合成视频… frameDuration=${frameDurationMs}ms")
+            val muxOk = SlideShowMuxer.mux(
+                imageFiles = tmpImages,
+                audioFile = audioFile,
+                outputFile = tmpVideo,
+                frameDurationMs = frameDurationMs,
+                width = 720,
+                height = 1280
+            ) { p ->
+                onProgress(35 + (p * 60 / 100).coerceIn(0, 60))
+            }
+            if (!muxOk || !tmpVideo.exists() || tmpVideo.length() == 0L) {
+                return@withContext Result.Failure("视频合成失败")
+            }
+            onProgress(95)
+
+            // 5. 写入相册
+            val fileName = sanitizeFileName(displayName) + ".mp4"
+            val (uri, output) = openOutput(context, fileName)
+                ?: return@withContext Result.Failure("无法创建输出文件")
+            output.use { os ->
+                tmpVideo.inputStream().use { it.copyTo(os) }
+                os.flush()
+            }
+            onProgress(100)
+            Log.i(TAG, "图文视频合成完成: $fileName (${tmpVideo.length() / 1024}KB)")
+            Result.Success(fileName, uri)
+        } catch (e: Exception) {
+            Log.e(TAG, "图文视频合成异常", e)
+            Result.Failure(e.message ?: "图文视频合成异常")
+        } finally {
+            tmpImages.forEach { it.delete() }
+            tmpAudio.delete()
+            tmpVideo.delete()
+        }
+    }
+
+    /** 下载 URL 到临时文件（带自定义 Referer） */
+    private suspend fun downloadToTempWithReferer(
+        url: String, dest: File, referer: String
+    ): Boolean = withContext(Dispatchers.IO) {
+        try {
+            val req = Request.Builder()
+                .url(url)
+                .header("User-Agent", "Mozilla/5.0 (Linux; Android 13) " +
+                    "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Mobile Safari/537.36")
+                .header("Referer", referer)
+                .header("Accept", "*/*")
+                .get()
+                .build()
+            client.newCall(req).execute().use { resp ->
+                if (!resp.isSuccessful) return@withContext false
+                val body = resp.body ?: return@withContext false
+                dest.outputStream().use { os -> body.byteStream().use { it.copyTo(os) } }
+                true
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "下载到临时文件失败: ${e.message}")
+            false
+        }
+    }
+
     private fun openViaMediaStore(
         context: Context,
         fileName: String

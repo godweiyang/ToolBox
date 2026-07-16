@@ -23,5 +23,9 @@ data class VideoInfo(
     /** 是否为图文笔记（无视频，只有图片） */
     val isImage: Boolean = false,
     /** 图文笔记的图片直链列表（仅 isImage=true 时有效） */
-    val imageUrls: List<String> = emptyList()
+    val imageUrls: List<String> = emptyList(),
+    /** 图文笔记的背景音乐 mp3 直链（用于合成视频） */
+    val musicUrl: String = "",
+    /** 图文笔记的音乐时长（秒），用于计算每张图显示时间 */
+    val musicDuration: Int = 0
 )

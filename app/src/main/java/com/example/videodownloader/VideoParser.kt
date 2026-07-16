@@ -4,6 +4,9 @@ import android.util.Log
 import com.google.gson.JsonParser
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import okhttp3.Cookie
+import okhttp3.CookieJar
+import okhttp3.HttpUrl
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.net.URLDecoder
@@ -40,6 +43,7 @@ object VideoParser {
             .connectTimeout(15, TimeUnit.SECONDS)
             .readTimeout(20, TimeUnit.SECONDS)
             .followRedirects(true)
+            .cookieJar(SimpleCookieJar())
             .build()
     }
 
@@ -99,13 +103,20 @@ object VideoParser {
 
         var videoId = extractDouyinVideoId(resolvedUrl)
         if (videoId == null) {
-            // 有些短链直接是 share/video/xxx 形式，尝试从原文本里再抓一遍
             videoId = extractDouyinVideoId(shareUrl)
         }
 
-        if (videoId != null) {
+        // 2. 判断页面类型：/share/slides/ 和 /share/note/ 需要 cookie
+        val isNoteOrSlides = resolvedUrl.contains("/share/note/") ||
+            resolvedUrl.contains("/share/slides/")
+        if (isNoteOrSlides) {
+            // 预热 cookie：先访问首页，cookieJar 会自动保存
+            try { httpGet("https://www.iesdouyin.com/") } catch (_: Exception) {}
+        }
+
+        // 3. 尝试 iteminfo 接口（仅对视频类型）
+        if (videoId != null && !isNoteOrSlides) {
             Log.i(TAG, "video_id = $videoId")
-            // 2. 尝试 iteminfo 接口
             try {
                 return parseViaItemInfoApi(videoId)
             } catch (e: Exception) {
@@ -113,10 +124,14 @@ object VideoParser {
             }
         }
 
-        // 3. 兜底：直接抓 share 页 HTML
-        val sharePageUrl =
-            if (videoId != null) "https://www.iesdouyin.com/share/note/$videoId/"
-            else resolvedUrl
+        // 4. 兜底：直接抓 share 页 HTML
+        // slides → note 路径替换（slides 页面需要 cookie 且结构不同，note 页面可用）
+        val sharePageUrl = if (videoId != null) {
+            if (isNoteOrSlides) "https://www.iesdouyin.com/share/note/$videoId/"
+            else "https://www.iesdouyin.com/share/video/$videoId/"
+        } else {
+            resolvedUrl.replace("/share/slides/", "/share/note/")
+        }
         return parseFromSharePageHtml(sharePageUrl)
             ?: throw IllegalStateException("抖音视频解析失败，可能接口已变更")
     }
@@ -145,13 +160,15 @@ object VideoParser {
         }
     }
 
-    /** 从 URL 里提取抖音 video_id，例如 /share/video/7123456789012345678/ 或 /share/note/xxx/ */
+    /** 从 URL 里提取抖音 video_id，例如 /share/video/xxx/ 或 /share/note/xxx/ 或 /share/slides/xxx/ */
     private fun extractDouyinVideoId(url: String): String? {
         val patterns = listOf(
+            Regex("""/share/slides/(\d+)"""),
             Regex("""/share/note/(\d+)"""),
             Regex("""/share/video/(\d+)"""),
             Regex("""/video/(\d+)"""),
             Regex("""/note/(\d+)"""),
+            Regex("""/slides/(\d+)"""),
             Regex("""item_ids=(\d+)"""),
             Regex("""modal_id=(\d+)""")
         )
@@ -229,42 +246,39 @@ object VideoParser {
                     if (imagesArray != null) {
                         for (i in 0 until imagesArray.size()) {
                             val imgObj = imagesArray[i].asJsonObject
-                            // url_list 里的图是无水印原图
                             val urlList = imgObj.getAsJsonArray("url_list")
                             if (urlList != null && urlList.size() > 0) {
-                                // 优先取 jpeg 版本（兼容性最好），取不到就取第一个
                                 var picked: String? = null
                                 for (j in 0 until urlList.size()) {
-                                    val u = urlList[j].asString
-                                        .replace("\\u002F", "/")
-                                        .replace("\\/", "/")
-                                        .replace("&amp;", "&")
+                                    val u = unescapeJson(urlList[j].asString)
                                     if (u.contains(".jpeg")) { picked = u; break }
                                 }
                                 if (picked == null) {
-                                    picked = urlList[0].asString
-                                        .replace("\\u002F", "/")
-                                        .replace("\\/", "/")
-                                        .replace("&amp;", "&")
+                                    picked = unescapeJson(urlList[0].asString)
                                 }
                                 if (picked.startsWith("http")) imgUrls.add(picked)
                             }
                         }
                     }
+                    // 提取背景音乐 mp3
+                    val musicUrl = extractMusicUrl(routerData)
+                    val musicDuration = deepFindInt(routerData, "duration") ?: 0
                     if (imgUrls.isNotEmpty()) {
-                        Log.i(TAG, "抖音图文笔记，共 ${imgUrls.size} 张图片")
+                        Log.i(TAG, "抖音图文笔记，${imgUrls.size} 张图片, music=$musicUrl")
                         return VideoInfo(
                             title = title,
                             author = author,
                             videoUrl = "",
                             platform = "douyin",
                             isImage = true,
-                            imageUrls = imgUrls
+                            imageUrls = imgUrls,
+                            musicUrl = musicUrl,
+                            musicDuration = musicDuration
                         )
                     }
                 }
 
-                // 视频笔记：从 _ROUTER_DATA 里找 play_addr
+                // 视频笔记：从 _ROUTER_DATA 里找 play_addr（过滤掉 mp3 伪装的）
                 val videoUrl = deepFindUrl(routerData, listOf("play_addr", "url_list"))
                     ?.replace("playwm", "play")
                 if (!videoUrl.isNullOrBlank() && !videoUrl.contains(".mp3")) {
@@ -293,6 +307,28 @@ object VideoParser {
             Log.w(TAG, "HTML 兜底失败: ${e.message}")
             null
         }
+    }
+
+    /** 从 _ROUTER_DATA 里提取 music 的 mp3 直链 */
+    private fun extractMusicUrl(routerData: com.google.gson.JsonObject): String {
+        return try {
+            // music.play_addr.uri 或 music.play_addr.url_list[0]
+            val musicObj = deepFindObject(routerData, "music") ?: return ""
+            val playAddr = musicObj.asJsonObject.get("play_addr") ?: return ""
+            val uri = playAddr.asJsonObject.get("uri")?.asString ?: ""
+            if (uri.startsWith("http")) unescapeJson(uri) else {
+                val urlList = playAddr.asJsonObject.getAsJsonArray("url_list")
+                if (urlList != null && urlList.size() > 0) unescapeJson(urlList[0].asString)
+                else ""
+            }
+        } catch (_: Exception) { "" }
+    }
+
+    /** JSON 字符串反转义（\u002F → /, \/ → /, &amp; → &） */
+    private fun unescapeJson(s: String): String {
+        return s.replace("\\u002F", "/")
+            .replace("\\/", "/")
+            .replace("&amp;", "&")
     }
 
     /** 在 HTML 里直接找 "play_addr":{"url_list":["xxx"]} 的第一个 URL */
@@ -817,6 +853,32 @@ object VideoParser {
         return null
     }
 
+    /** 在 JSON 树里递归查找第一个 key == targetKey 的对象值 */
+    private fun deepFindObject(
+        element: com.google.gson.JsonElement,
+        targetKey: String
+    ): com.google.gson.JsonElement? {
+        when {
+            element.isJsonObject -> {
+                val obj = element.asJsonObject
+                if (obj.has(targetKey) && obj.get(targetKey).isJsonObject) {
+                    return obj.get(targetKey)
+                }
+                for ((_, v) in obj.entrySet()) {
+                    val r = deepFindObject(v, targetKey)
+                    if (r != null) return r
+                }
+            }
+            element.isJsonArray -> {
+                for (e in element.asJsonArray) {
+                    val r = deepFindObject(e, targetKey)
+                    if (r != null) return r
+                }
+            }
+        }
+        return null
+    }
+
     // ---- Gson 便捷扩展 ----
     private fun com.google.gson.JsonObject.safeObj(key: String): com.google.gson.JsonObject? =
         if (this.has(key) && this.get(key).isJsonObject) this.getAsJsonObject(key) else null
@@ -829,4 +891,15 @@ object VideoParser {
         if (this.has(key) && this.get(key).isJsonPrimitive && !this.get(key).isJsonNull) {
             try { this.get(key).asInt } catch (_: Exception) { null }
         } else null
+}
+
+/** 内存 CookieJar：自动保存和回传 cookie，用于抖音 note/slides 页面 */
+private class SimpleCookieJar : CookieJar {
+    private val store = mutableMapOf<String, List<Cookie>>()
+    override fun saveFromResponse(url: HttpUrl, cookies: List<Cookie>) {
+        store[url.host] = cookies
+    }
+    override fun loadForRequest(url: HttpUrl): List<Cookie> {
+        return store[url.host] ?: emptyList()
+    }
 }
