@@ -354,28 +354,60 @@ object DownloadManager {
         val tmpImages = mutableListOf<File>()
         val tmpGif = File(cacheDir, "gif_${System.currentTimeMillis()}.gif")
         try {
-            // 1. 下载所有图片到临时文件
+            // 1. 下载所有图片到临时文件（检查结果，跳过失败的）
             Log.i(TAG, "下载图片用于 GIF 合成…")
             imageUrls.forEachIndexed { index, url ->
-                downloadToTempWithReferer(url, File(cacheDir, "gif_img_$index.jpg"), "https://www.douyin.com/")
-                tmpImages.add(File(cacheDir, "gif_img_$index.jpg"))
+                val imgFile = File(cacheDir, "gif_img_$index.jpg")
+                val ok = downloadToTempWithReferer(url, imgFile, "https://www.douyin.com/")
+                if (ok && imgFile.exists() && imgFile.length() > 100) {
+                    tmpImages.add(imgFile)
+                    Log.i(TAG, "图片 ${index + 1} 下载成功: ${imgFile.length()} bytes")
+                } else {
+                    Log.w(TAG, "图片 ${index + 1} 下载失败或文件太小")
+                    imgFile.delete()
+                }
                 onProgress((index * 50 / imageUrls.size).coerceIn(0, 50))
             }
+            if (tmpImages.isEmpty()) return@withContext Result.Failure("图片下载失败，可能 URL 已过期")
 
-            // 2. 解码为 Bitmap
+            // 2. 解码为 Bitmap（强制 ARGB_8888，避免 HARDWARE 配置导致 getPixels 失败）
             val bitmaps = mutableListOf<android.graphics.Bitmap>()
             for (f in tmpImages) {
-                val bmp = android.graphics.BitmapFactory.decodeFile(f.absolutePath)
-                if (bmp != null) bitmaps.add(bmp)
+                val opts = android.graphics.BitmapFactory.Options().apply {
+                    inPreferredConfig = android.graphics.Bitmap.Config.ARGB_8888
+                }
+                val bmp = android.graphics.BitmapFactory.decodeFile(f.absolutePath, opts)
+                if (bmp != null) {
+                    bitmaps.add(bmp)
+                    Log.i(TAG, "图片解码成功: ${bmp.width}x${bmp.height}")
+                } else {
+                    Log.w(TAG, "图片解码失败: ${f.absolutePath}")
+                }
             }
-            if (bitmaps.isEmpty()) return@withContext Result.Failure("无法解码图片")
+            if (bitmaps.isEmpty()) return@withContext Result.Failure("无法解码图片，可能 URL 已过期")
 
-            // 3. 合成 GIF
+            // 3. 用 AnimatedGifEncoder 合成 GIF（NeuQuant 量化器，比 3-3-2 更可靠）
             Log.i(TAG, "合成 GIF…")
-            val ok = GifEncoder.encode(bitmaps, tmpGif, frameDelayMs) { p ->
-                onProgress(50 + p / 2)
+            val encoder = AnimatedGifEncoder()
+            encoder.setSize(bitmaps[0].width, bitmaps[0].height)
+            encoder.setDelay(frameDelayMs)
+            encoder.setQuality(10)
+            encoder.setRepeat(0)
+            val fos = FileOutputStream(tmpGif)
+            val started = encoder.start(fos)
+            var framesOk = started
+            for ((i, bmp) in bitmaps.withIndex()) {
+                if (!encoder.addFrame(bmp)) {
+                    Log.w(TAG, "帧 ${i + 1} 添加失败")
+                    framesOk = false
+                }
+                bmp.recycle()
+                val pct = 50 + (i + 1) * 50 / bitmaps.size
+                onProgress(pct.coerceIn(50, 100))
             }
-            if (!ok || !tmpGif.exists() || tmpGif.length() == 0L) {
+            val finished = encoder.finish()
+            fos.close()
+            if (!started || !finished || !tmpGif.exists() || tmpGif.length() == 0L) {
                 return@withContext Result.Failure("GIF 合成失败")
             }
 
@@ -432,14 +464,21 @@ object DownloadManager {
         val tmpAudio = File(cacheDir, "slide_audio_${System.currentTimeMillis()}.mp3")
         val tmpVideo = File(cacheDir, "slide_video_${System.currentTimeMillis()}.mp4")
         try {
-            // 1. 下载所有图片
+            // 1. 下载所有图片（检查结果，跳过失败的）
             Log.i(TAG, "下载图片用于视频合成…")
             imageUrls.forEachIndexed { index, url ->
                 val f = File(cacheDir, "slide_img_$index.jpg")
-                downloadToTempWithReferer(url, f, "https://www.douyin.com/")
-                tmpImages.add(f)
+                val ok = downloadToTempWithReferer(url, f, "https://www.douyin.com/")
+                if (ok && f.exists() && f.length() > 100) {
+                    tmpImages.add(f)
+                    Log.i(TAG, "图片 ${index + 1} 下载成功: ${f.length()} bytes")
+                } else {
+                    Log.w(TAG, "图片 ${index + 1} 下载失败或文件太小")
+                    f.delete()
+                }
                 onProgress((index * 30 / imageUrls.size).coerceIn(0, 30))
             }
+            if (tmpImages.isEmpty()) return@withContext Result.Failure("图片下载失败，可能 URL 已过期")
 
             // 2. 下载音频
             var audioFile: File? = null

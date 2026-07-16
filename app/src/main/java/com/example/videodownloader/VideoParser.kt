@@ -207,6 +207,17 @@ object VideoParser {
         // 关键一步：把带水印的 playwm 替换为 play 得到无水印地址
         playUrl = playUrl.replace("playwm", "play")
 
+        // 过滤音频 URL：如果第一个是音频，尝试找非音频的
+        if (isAudioUrl(playUrl)) {
+            for (i in 1 until urlList.size()) {
+                val alt = urlList[i].asString.replace("playwm", "play")
+                if (!isAudioUrl(alt)) { playUrl = alt; break }
+            }
+            if (isAudioUrl(playUrl)) {
+                throw IllegalStateException("iteminfo 只返回了音频地址")
+            }
+        }
+
         // 跟随一次重定向拿到最终直链（无水印地址会 302）
         val finalUrl = resolveFinalUrl(playUrl) ?: playUrl
 
@@ -278,10 +289,14 @@ object VideoParser {
                     }
                 }
 
-                // 视频笔记：从 _ROUTER_DATA 里找 play_addr（过滤掉 mp3 伪装的）
-                val videoUrl = deepFindUrl(routerData, listOf("play_addr", "url_list"))
-                    ?.replace("playwm", "play")
-                if (!videoUrl.isNullOrBlank() && !videoUrl.contains(".mp3")) {
+                // 视频笔记：优先从 video 对象下找 play_addr（避免误取 music.play_addr）
+                val videoObj = deepFindObject(routerData, "video")
+                val videoUrl = (if (videoObj != null) {
+                    deepFindUrl(videoObj, listOf("play_addr", "url_list"))
+                } else {
+                    deepFindUrl(routerData, listOf("play_addr", "url_list"))
+                })?.replace("playwm", "play")
+                if (!videoUrl.isNullOrBlank() && !isAudioUrl(videoUrl)) {
                     val finalUrl = resolveFinalUrl(videoUrl) ?: videoUrl
                     val cover = deepFindUrl(routerData, listOf("cover", "url_list")) ?: ""
                     return VideoInfo(title, author, finalUrl, cover, "douyin")
@@ -290,7 +305,7 @@ object VideoParser {
 
             // 兜底1：直接在 HTML 里搜 play_addr + url_list 模式
             val playAddrUrl = findPlayAddrUrl(html)
-            if (!playAddrUrl.isNullOrBlank() && !playAddrUrl.contains(".mp3")) {
+            if (!playAddrUrl.isNullOrBlank() && !isAudioUrl(playAddrUrl)) {
                 val noWm = playAddrUrl.replace("playwm", "play")
                 val finalUrl = resolveFinalUrl(noWm) ?: noWm
                 val cover = findCoverUrl(html) ?: ""
@@ -329,6 +344,16 @@ object VideoParser {
         return s.replace("\\u002F", "/")
             .replace("\\/", "/")
             .replace("&amp;", "&")
+    }
+
+    /** 检查 URL 是否是音频（mp3/aac/m4a 或 music 路径），用于过滤误取的音乐地址 */
+    private fun isAudioUrl(url: String): Boolean {
+        val lower = url.lowercase()
+        return lower.contains(".mp3") ||
+            lower.contains(".aac") ||
+            lower.contains(".m4a") ||
+            lower.contains("/music/") ||
+            lower.contains("music.play_addr")
     }
 
     /** 在 HTML 里直接找 "play_addr":{"url_list":["xxx"]} 的第一个 URL */
