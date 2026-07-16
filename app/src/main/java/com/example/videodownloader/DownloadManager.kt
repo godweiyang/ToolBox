@@ -461,6 +461,186 @@ object DownloadManager {
     }
 
     /**
+     * 下载实况照片：保存所有图片到相册，同时合成一个短视频（图片+背景音乐）与第一张图配对保存。
+     * Google Photos 等相册应用会识别同名（去扩展名）的 JPEG + MP4 为实况照片。
+     */
+    suspend fun downloadLivePhoto(
+        context: Context,
+        imageUrls: List<String>,
+        musicUrl: String,
+        displayName: String,
+        musicDurationSec: Int,
+        onProgress: (Int) -> Unit = {}
+    ): Result = withContext(Dispatchers.IO) {
+        val cacheDir = context.cacheDir
+        val tmpImages = mutableListOf<File>()
+        val tmpAudio = File(cacheDir, "live_audio_${System.currentTimeMillis()}.mp3")
+        val tmpVideo = File(cacheDir, "live_video_${System.currentTimeMillis()}.mp4")
+        try {
+            val baseName = sanitizeFileName(displayName)
+            val totalImages = imageUrls.size
+
+            // 1. 下载所有图片并保存到相册 Pictures/VideoDownloader/
+            Log.i(TAG, "下载图片用于实况照片…")
+            val savedImageUris = mutableListOf<Uri>()
+            imageUrls.forEachIndexed { index, url ->
+                val imgFile = File(cacheDir, "live_img_$index.jpg")
+                val ok = downloadToTempWithReferer(url, imgFile, "https://www.douyin.com/")
+                if (ok && imgFile.exists() && imgFile.length() > 100) {
+                    tmpImages.add(imgFile)
+                    // 保存图片到相册
+                    val suffix = if (totalImages > 1) "_${index + 1}" else ""
+                    val imgFileName = "$baseName$suffix.jpg"
+                    val (imgUri, imgOut) = openImageOutput(context, imgFileName)
+                        ?: run { Log.w(TAG, "无法创建图片文件: $imgFileName"); return@forEachIndexed }
+                    imgOut.use { os ->
+                        imgFile.inputStream().use { it.copyTo(os) }
+                        os.flush()
+                    }
+                    // 通知相册
+                    finalizeImage(context, imgUri)
+                    savedImageUris.add(imgUri)
+                    Log.i(TAG, "图片 ${index + 1} 保存成功: $imgFileName")
+                } else {
+                    Log.w(TAG, "图片 ${index + 1} 下载失败或文件太小")
+                    imgFile.delete()
+                }
+                onProgress((index * 40 / totalImages).coerceIn(0, 40))
+            }
+            if (tmpImages.isEmpty()) return@withContext Result.Failure("图片下载失败，可能 URL 已过期")
+
+            // 2. 下载背景音乐
+            var audioFile: File? = null
+            if (musicUrl.isNotBlank()) {
+                Log.i(TAG, "下载背景音乐…")
+                val ok = downloadToTempWithReferer(musicUrl, tmpAudio, "https://www.douyin.com/")
+                if (ok && tmpAudio.exists() && tmpAudio.length() > 0) {
+                    audioFile = tmpAudio
+                    Log.i(TAG, "背景音乐下载成功: ${tmpAudio.length()} bytes")
+                } else {
+                    Log.w(TAG, "背景音乐下载失败，将保存为无声实况照片")
+                }
+            }
+            onProgress(45)
+
+            // 3. 合成短视频（所有图轮播 + 背景音乐）
+            val frameDurationMs = if (musicDurationSec > 0) {
+                (musicDurationSec * 1000L / tmpImages.size)
+            } else {
+                2000L
+            }
+            Log.i(TAG, "合成实况照片视频… frameDuration=${frameDurationMs}ms, ${tmpImages.size} 图")
+            val muxOk = SlideShowMuxer.mux(
+                imageFiles = tmpImages,
+                audioFile = audioFile,
+                outputFile = tmpVideo,
+                frameDurationMs = frameDurationMs,
+                width = 720,
+                height = 1280
+            ) { p ->
+                onProgress(45 + (p * 50 / 100).coerceIn(0, 50))
+            }
+            if (!muxOk || !tmpVideo.exists() || tmpVideo.length() == 0L) {
+                // 视频合成失败，但图片已保存，返回图片成功
+                Log.w(TAG, "短视频合成失败，但图片已保存")
+                onProgress(100)
+                return@withContext Result.Success(
+                    "$baseName.jpg (+${savedImageUris.size - 1} 张图片)",
+                    savedImageUris.first()
+                )
+            }
+            onProgress(95)
+
+            // 4. 短视频保存到相册 Pictures/VideoDownloader/（与第一张图同名配对）
+            val videoFileName = "$baseName.mp4"
+            val (videoUri, videoOut) = openVideoOutputToPictures(context, videoFileName)
+                ?: run {
+                    Log.w(TAG, "无法创建视频文件，但图片已保存")
+                    onProgress(100)
+                    return@withContext Result.Success(
+                        "$baseName.jpg (+${savedImageUris.size - 1} 张图片)",
+                        savedImageUris.first()
+                    )
+                }
+            videoOut.use { os ->
+                tmpVideo.inputStream().use { it.copyTo(os) }
+                os.flush()
+            }
+            finalizeVideo(context, videoUri)
+            onProgress(100)
+            Log.i(TAG, "实况照片保存完成: $baseName.jpg + $videoFileName (${tmpVideo.length() / 1024}KB)")
+            Result.Success("$baseName.jpg + $videoFileName", savedImageUris.first())
+        } catch (e: Exception) {
+            Log.e(TAG, "实况照片保存异常", e)
+            Result.Failure(e.message ?: "实况照片保存异常")
+        } finally {
+            tmpImages.forEach { it.delete() }
+            tmpAudio.delete()
+            tmpVideo.delete()
+        }
+    }
+
+    /** 把视频保存到 Pictures/VideoDownloader/（与图片同目录，便于 Live Photo 配对识别） */
+    private fun openVideoOutputToPictures(context: Context, fileName: String): Pair<Uri, OutputStream>? {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val resolver = context.contentResolver
+            val values = ContentValues().apply {
+                put(MediaStore.Video.Media.DISPLAY_NAME, fileName)
+                put(MediaStore.Video.Media.MIME_TYPE, "video/mp4")
+                put(MediaStore.Video.Media.RELATIVE_PATH,
+                    "${Environment.DIRECTORY_PICTURES}/$FOLDER_NAME")
+                put(MediaStore.Video.Media.IS_PENDING, 1)
+            }
+            val collection = MediaStore.Video.Media.getContentUri(
+                MediaStore.VOLUME_EXTERNAL_PRIMARY
+            )
+            val uri = resolver.insert(collection, values) ?: return null
+            val os = resolver.openOutputStream(uri) ?: return null
+            uri to os
+        } else {
+            val picsDir = File(
+                Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES),
+                FOLDER_NAME
+            )
+            if (!picsDir.exists()) picsDir.mkdirs()
+            val file = File(picsDir, fileName)
+            Uri.fromFile(file) to FileOutputStream(file)
+        }
+    }
+
+    /** 通知 MediaStore 图片写入完成 */
+    private fun finalizeImage(context: Context, uri: Uri) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val values = ContentValues().apply {
+                put(MediaStore.Images.Media.IS_PENDING, 0)
+            }
+            try { context.contentResolver.update(uri, values, null, null) } catch (_: Exception) {}
+        } else {
+            val path = uri.path ?: return
+            @Suppress("DEPRECATION")
+            android.media.MediaScannerConnection.scanFile(
+                context, arrayOf(path), arrayOf("image/jpeg"), null
+            )
+        }
+    }
+
+    /** 通知 MediaStore 视频写入完成 */
+    private fun finalizeVideo(context: Context, uri: Uri) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val values = ContentValues().apply {
+                put(MediaStore.Video.Media.IS_PENDING, 0)
+            }
+            try { context.contentResolver.update(uri, values, null, null) } catch (_: Exception) {}
+        } else {
+            val path = uri.path ?: return
+            @Suppress("DEPRECATION")
+            android.media.MediaScannerConnection.scanFile(
+                context, arrayOf(path), arrayOf("video/mp4"), null
+            )
+        }
+    }
+
+    /**
      * 下载图文笔记的图片+音频，合成为 mp4 视频保存到相册。
      */
     suspend fun downloadSlideShow(

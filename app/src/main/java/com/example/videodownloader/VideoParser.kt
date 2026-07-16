@@ -99,37 +99,48 @@ object VideoParser {
     private fun parseDouyin(shareUrl: String): VideoInfo {
         // 1. 拿到跳转后的真实 URL，从中提取 video_id
         val resolvedUrl = resolveFirstRedirect(shareUrl) ?: shareUrl
+        Log.i(TAG, "原始链接: $shareUrl")
         Log.i(TAG, "跳转后 URL: $resolvedUrl")
 
         var videoId = extractDouyinVideoId(resolvedUrl)
         if (videoId == null) {
             videoId = extractDouyinVideoId(shareUrl)
+            Log.w(TAG, "从跳转URL提取videoId失败，尝试原始链接: $videoId")
         }
+        Log.i(TAG, "提取到 videoId = $videoId")
 
         // 2. 判断页面类型：/share/slides/ 和 /share/note/ 需要 cookie
         val isNoteOrSlides = resolvedUrl.contains("/share/note/") ||
-            resolvedUrl.contains("/share/slides/")
+            resolvedUrl.contains("/share/slides/") ||
+            resolvedUrl.contains("/note/") && !resolvedUrl.contains("/video/")
         if (isNoteOrSlides) {
             // 预热 cookie：先访问首页，cookieJar 会自动保存
+            Log.i(TAG, "检测到图文笔记/slides，预热 cookie…")
             try { httpGet("https://www.iesdouyin.com/") } catch (_: Exception) {}
         }
 
         // 3. 尝试 iteminfo 接口（仅对视频类型）
         if (videoId != null && !isNoteOrSlides) {
-            Log.i(TAG, "video_id = $videoId")
+            Log.i(TAG, "尝试 iteminfo 接口…")
             try {
                 return parseViaItemInfoApi(videoId)
             } catch (e: Exception) {
-                Log.w(TAG, "iteminfo 接口失败，尝试 HTML 兜底: ${e.message}")
+                Log.w(TAG, "iteminfo 接口失败: ${e.message}，尝试 HTML 兜底")
             }
         }
 
         // 4. 兜底：直接抓 share 页 HTML
         // slides → note 路径替换（slides 页面需要 cookie 且结构不同，note 页面可用）
         val sharePageUrl = if (videoId != null) {
-            if (isNoteOrSlides) "https://www.iesdouyin.com/share/note/$videoId/"
-            else "https://www.iesdouyin.com/share/video/$videoId/"
+            if (isNoteOrSlides) {
+                Log.i(TAG, "使用 note 页: https://www.iesdouyin.com/share/note/$videoId/")
+                "https://www.iesdouyin.com/share/note/$videoId/"
+            } else {
+                Log.i(TAG, "使用 video 页: https://www.iesdouyin.com/share/video/$videoId/")
+                "https://www.iesdouyin.com/share/video/$videoId/"
+            }
         } else {
+            Log.w(TAG, "无法提取 videoId，直接使用跳转URL: $resolvedUrl")
             resolvedUrl.replace("/share/slides/", "/share/note/")
         }
         return parseFromSharePageHtml(sharePageUrl)
@@ -173,7 +184,7 @@ object VideoParser {
         }
     }
 
-    /** 从 URL 里提取抖音 video_id，例如 /share/video/xxx/ 或 /share/note/xxx/ 或 /share/slides/xxx/ */
+    /** 从 URL 里提取抖音 video_id，覆盖各种抖音链接格式 */
     private fun extractDouyinVideoId(url: String): String? {
         val patterns = listOf(
             Regex("""/share/slides/(\d+)"""),
@@ -182,12 +193,22 @@ object VideoParser {
             Regex("""/video/(\d+)"""),
             Regex("""/note/(\d+)"""),
             Regex("""/slides/(\d+)"""),
+            // 短剧/合集相关
+            Regex("""/collection/(\d+)"""),
+            Regex("""/episode/(\d+)"""),
+            Regex("""aweme_id=(\d+)"""),
             Regex("""item_ids=(\d+)"""),
-            Regex("""modal_id=(\d+)""")
+            Regex("""modal_id=(\d+)"""),
+            Regex("""/discover/?\?.*?modal_id=(\d+)"""),
+            // 兜底：URL 末尾的纯数字 ID（如 https://www.douyin.com/1234567890123）
+            Regex("""/(\d{15,})""")
         )
         for (p in patterns) {
             val m = p.find(url)
-            if (m != null) return m.groupValues[1]
+            if (m != null) {
+                Log.i(TAG, "正则匹配到 videoId: ${m.groupValues[1]} (pattern: ${p.pattern})")
+                return m.groupValues[1]
+            }
         }
         return null
     }

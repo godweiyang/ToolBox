@@ -234,22 +234,17 @@ class VideoDownloaderActivity : AppCompatActivity() {
     /** 图文笔记下载方式选择对话框 */
     private fun showImageDownloadDialog(video: VideoInfo) {
         setUiBusy(false)
-        val hasMusic = video.musicUrl.isNotBlank()
         val items = mutableListOf<String>()
         // 选项索引映射
-        val idxImages = items.size; items.add("下载图片（${video.imageUrls.size} 张）")
-        val idxSlideShow = items.size; items.add(
-            if (hasMusic) "合成视频（图片+背景音乐）" else "合成视频（无声）"
-        )
-        val idxGif = items.size; items.add("下载 GIF 动图")
+        val idxImages = items.size; items.add("保存图片（${video.imageUrls.size} 张）")
+        val idxLivePhoto = items.size; items.add("保存实况照片（图片+背景音乐）")
 
         com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
             .setTitle("图文笔记下载方式")
             .setItems(items.toTypedArray()) { _, which ->
                 when (which) {
                     idxImages -> startDownloadImages(video)
-                    idxSlideShow -> startDownloadSlideShow(video)
-                    idxGif -> startDownloadGif(video)
+                    idxLivePhoto -> startDownloadLivePhoto(video)
                 }
             }
             .setNegativeButton("取消", null)
@@ -276,13 +271,13 @@ class VideoDownloaderActivity : AppCompatActivity() {
         }
     }
 
-    private fun startDownloadSlideShow(video: VideoInfo) {
+    private fun startDownloadLivePhoto(video: VideoInfo) {
         lifecycleScope.launch {
             setUiBusy(true)
             binding.progressBar.progress = 0
-            binding.tvProgress.text = "下载图片 0%"
-            log("合成视频（图片+音乐）…")
-            val result = DownloadManager.downloadSlideShow(
+            binding.tvProgress.text = "保存实况照片 0%"
+            log("保存实况照片（图片+背景音乐）…")
+            val result = DownloadManager.downloadLivePhoto(
                 context = applicationContext,
                 imageUrls = video.imageUrls,
                 musicUrl = video.musicUrl,
@@ -291,27 +286,7 @@ class VideoDownloaderActivity : AppCompatActivity() {
             ) { percent ->
                 runOnUiIfAlive {
                     binding.progressBar.progress = percent
-                    binding.tvProgress.text = "合成视频 $percent%"
-                }
-            }
-            handleDownloadResult(result, "Movies/VideoDownloader/")
-        }
-    }
-
-    private fun startDownloadGif(video: VideoInfo) {
-        lifecycleScope.launch {
-            setUiBusy(true)
-            binding.progressBar.progress = 0
-            binding.tvProgress.text = "下载图片 0%"
-            log("合成 GIF 动图…")
-            val result = DownloadManager.downloadGif(
-                context = applicationContext,
-                imageUrls = video.imageUrls,
-                displayName = video.title
-            ) { percent ->
-                runOnUiIfAlive {
-                    binding.progressBar.progress = percent
-                    binding.tvProgress.text = "合成 GIF $percent%"
+                    binding.tvProgress.text = "保存实况照片 $percent%"
                 }
             }
             handleDownloadResult(result, "Pictures/VideoDownloader/")
