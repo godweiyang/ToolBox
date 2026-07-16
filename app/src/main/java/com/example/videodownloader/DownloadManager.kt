@@ -371,36 +371,48 @@ object DownloadManager {
             if (tmpImages.isEmpty()) return@withContext Result.Failure("图片下载失败，可能 URL 已过期")
 
             // 2. 解码为 Bitmap（强制 ARGB_8888，避免 HARDWARE 配置导致 getPixels 失败）
-            val bitmaps = mutableListOf<android.graphics.Bitmap>()
+            //    所有图片缩放到第一帧尺寸，避免 AnimatedGifEncoder 内部数组越界
+            val rawBitmaps = mutableListOf<android.graphics.Bitmap>()
             for (f in tmpImages) {
                 val opts = android.graphics.BitmapFactory.Options().apply {
                     inPreferredConfig = android.graphics.Bitmap.Config.ARGB_8888
                 }
                 val bmp = android.graphics.BitmapFactory.decodeFile(f.absolutePath, opts)
                 if (bmp != null) {
-                    bitmaps.add(bmp)
+                    rawBitmaps.add(bmp)
                     Log.i(TAG, "图片解码成功: ${bmp.width}x${bmp.height}")
                 } else {
                     Log.w(TAG, "图片解码失败: ${f.absolutePath}")
                 }
             }
-            if (bitmaps.isEmpty()) return@withContext Result.Failure("无法解码图片，可能 URL 已过期")
+            if (rawBitmaps.isEmpty()) return@withContext Result.Failure("无法解码图片，可能 URL 已过期")
 
-            // 3. 用 AnimatedGifEncoder 合成 GIF（NeuQuant 量化器，比 3-3-2 更可靠）
-            Log.i(TAG, "合成 GIF…")
+            // 缩放所有帧到统一尺寸（第一帧尺寸），避免 setSize 与实际像素数不匹配导致越界
+            val targetW = rawBitmaps[0].width
+            val targetH = rawBitmaps[0].height
+            val bitmaps = mutableListOf<android.graphics.Bitmap>()
+            for ((i, bmp) in rawBitmaps.withIndex()) {
+                if (bmp.width == targetW && bmp.height == targetH) {
+                    bitmaps.add(bmp)
+                } else {
+                    val scaled = android.graphics.Bitmap.createScaledBitmap(bmp, targetW, targetH, true)
+                    bmp.recycle()
+                    bitmaps.add(scaled)
+                    Log.i(TAG, "帧 ${i + 1} 缩放: ${bmp.width}x${bmp.height} -> ${targetW}x${targetH}")
+                }
+            }
+
+            // 3. 用 AnimatedGifEncoder 合成 GIF
+            Log.i(TAG, "合成 GIF… ${bitmaps.size} 帧, ${targetW}x${targetH}")
             val encoder = AnimatedGifEncoder()
-            encoder.setSize(bitmaps[0].width, bitmaps[0].height)
+            encoder.setSize(targetW, targetH)
             encoder.setDelay(frameDelayMs)
             encoder.setQuality(10)
             encoder.setRepeat(0)
             val fos = FileOutputStream(tmpGif)
             val started = encoder.start(fos)
-            var framesOk = started
             for ((i, bmp) in bitmaps.withIndex()) {
-                if (!encoder.addFrame(bmp)) {
-                    Log.w(TAG, "帧 ${i + 1} 添加失败")
-                    framesOk = false
-                }
+                encoder.addFrame(bmp)
                 bmp.recycle()
                 val pct = 50 + (i + 1) * 50 / bitmaps.size
                 onProgress(pct.coerceIn(50, 100))

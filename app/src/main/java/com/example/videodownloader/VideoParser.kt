@@ -136,24 +136,37 @@ object VideoParser {
             ?: throw IllegalStateException("抖音视频解析失败，可能接口已变更")
     }
 
-    /** 手动跟随一次 302，返回 Location 头里的 URL；如果不是 302 则返回 null */
+    /** 手动跟随重定向（最多3次），返回最终 Location；无重定向时返回请求 URL */
     private fun resolveFirstRedirect(url: String): String? {
         return try {
-            val req = Request.Builder()
-                .url(url)
-                .header("User-Agent", UA_MOBILE)
-                .header("Accept", "text/html,application/xhtml+xml,*/*")
-                .header("Accept-Language", "zh-CN,zh;q=0.9")
-                .get()
-                .build()
-            client.newCall(req).execute().use { resp ->
-                if (resp.isRedirect) {
-                    resp.header("Location")
-                } else {
-                    // 没有重定向，直接返回请求 URL
-                    null
+            var currentUrl = url
+            var redirectCount = 0
+            while (redirectCount < 3) {
+                val req = Request.Builder()
+                    .url(currentUrl)
+                    .header("User-Agent", UA_MOBILE)
+                    .header("Accept", "text/html,application/xhtml+xml,*/*")
+                    .header("Accept-Language", "zh-CN,zh;q=0.9")
+                    .get()
+                    .build()
+                client.newCall(req).execute().use { resp ->
+                    if (resp.isRedirect) {
+                        val location = resp.header("Location") ?: return null
+                        currentUrl = if (location.startsWith("http")) location else {
+                            // 相对路径：拼接当前 URL 的域名
+                            val base = currentUrl.substringBefore("://") + "://" +
+                                currentUrl.substringAfter("://").substringBefore("/")
+                            base + location
+                        }
+                        redirectCount++
+                    } else {
+                        // 不再重定向，返回最终请求 URL
+                        return resp.request.url.toString()
+                    }
                 }
             }
+            // 跟随3次后返回最终 URL
+            currentUrl
         } catch (e: Exception) {
             Log.w(TAG, "resolveFirstRedirect 失败: ${e.message}")
             null
@@ -326,17 +339,46 @@ object VideoParser {
 
     /** 从 _ROUTER_DATA 里提取 music 的 mp3 直链 */
     private fun extractMusicUrl(routerData: com.google.gson.JsonObject): String {
+        // 尝试多个可能的 music 路径
         return try {
-            // music.play_addr.uri 或 music.play_addr.url_list[0]
-            val musicObj = deepFindObject(routerData, "music") ?: return ""
-            val playAddr = musicObj.asJsonObject.get("play_addr") ?: return ""
-            val uri = playAddr.asJsonObject.get("uri")?.asString ?: ""
-            if (uri.startsWith("http")) unescapeJson(uri) else {
-                val urlList = playAddr.asJsonObject.getAsJsonArray("url_list")
-                if (urlList != null && urlList.size() > 0) unescapeJson(urlList[0].asString)
-                else ""
+            // 方式1：music.play_addr.url_list[0]
+            val musicObj = deepFindObject(routerData, "music")
+            if (musicObj != null && musicObj.isJsonObject) {
+                val music = musicObj.asJsonObject
+                val playAddr = music.get("play_addr")
+                if (playAddr != null && playAddr.isJsonObject) {
+                    val pa = playAddr.asJsonObject
+                    // 优先 url_list
+                    val urlList = pa.getAsJsonArray("url_list")
+                    if (urlList != null && urlList.size() > 0) {
+                        val u = unescapeJson(urlList[0].asString)
+                        if (u.startsWith("http")) {
+                            Log.i(TAG, "提取到音乐URL(url_list): $u")
+                            return u
+                        }
+                    }
+                    // uri 字段
+                    val uri = pa.get("uri")?.asString
+                    if (uri != null && uri.startsWith("http")) {
+                        val u = unescapeJson(uri)
+                        Log.i(TAG, "提取到音乐URL(uri): $u")
+                        return u
+                    }
+                }
+                // 方式2：music.url 直接字段
+                val directUrl = music.get("url")?.asString
+                if (directUrl != null && directUrl.startsWith("http")) {
+                    val u = unescapeJson(directUrl)
+                    Log.i(TAG, "提取到音乐URL(direct): $u")
+                    return u
+                }
             }
-        } catch (_: Exception) { "" }
+            Log.w(TAG, "未能提取到音乐URL")
+            ""
+        } catch (e: Exception) {
+            Log.w(TAG, "提取音乐URL异常: ${e.message}")
+            ""
+        }
     }
 
     /** JSON 字符串反转义（\u002F → /, \/ → /, &amp; → &） */

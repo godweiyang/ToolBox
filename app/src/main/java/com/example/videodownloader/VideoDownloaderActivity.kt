@@ -238,7 +238,9 @@ class VideoDownloaderActivity : AppCompatActivity() {
         val items = mutableListOf<String>()
         // 选项索引映射
         val idxImages = items.size; items.add("下载图片（${video.imageUrls.size} 张）")
-        val idxSlideShow = if (hasMusic) { val i = items.size; items.add("合成视频（图片+背景音乐）"); i } else -1
+        val idxSlideShow = items.size; items.add(
+            if (hasMusic) "合成视频（图片+背景音乐）" else "合成视频（无声）"
+        )
         val idxGif = items.size; items.add("下载 GIF 动图")
 
         com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
