@@ -209,13 +209,18 @@ object VideoParser {
             val html = httpGet(sharePageUrl)
             if (html.isBlank()) return null
 
-            val title = Regex("""<title>([^<]+)</title>""").find(html)
+            var title = Regex("""<title>([^<]+)</title>""").find(html)
                 ?.groupValues?.get(1)?.trim()?.ifBlank { null } ?: "抖音视频"
 
             // 优先解析 _ROUTER_DATA，检测图文笔记（有 images 数组，无真实视频）
             val routerData = extractJsonObject(html, "_ROUTER_DATA")
                 ?: extractJsonObject(html, "RENDER_DATA")
             if (routerData != null) {
+                // 新版 share 页经常没有 <title>，优先使用作品描述，避免所有文件都叫“抖音视频”
+                title = deepFindString(routerData, "desc")
+                    ?.trim()
+                    ?.takeIf { it.isNotBlank() }
+                    ?: title
                 val author = deepFindString(routerData, "nickname") ?: "未知作者"
                 val awemeType = deepFindInt(routerData, "aweme_type") ?: -1
                 val imagesArray = deepFindArray(routerData, "images")

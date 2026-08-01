@@ -65,6 +65,7 @@ object DownloadManager {
         val tmpVideo = File(cacheDir, "bili_video_${System.currentTimeMillis()}.m4s")
         val tmpAudio = File(cacheDir, "bili_audio_${System.currentTimeMillis()}.m4s")
         val tmpMux = File(cacheDir, "bili_mux_${System.currentTimeMillis()}.mp4")
+        var pendingUri: Uri? = null
         try {
             // 1. 下载视频流（0-40%）
             Log.i(TAG, "下载 B站视频流…")
@@ -93,16 +94,25 @@ object DownloadManager {
             val fileName = sanitizeFileName(displayName) + ".mp4"
             val (uri, output) = openOutput(context, fileName)
                 ?: return@withContext Result.Failure("无法创建输出文件")
+            pendingUri = uri
             output.use { os ->
                 tmpMux.inputStream().use { input ->
                     input.copyTo(os)
                 }
                 os.flush()
             }
+            val publishedUri = publishVideo(context, uri)
+                ?: run {
+                    deleteOutput(context, uri)
+                    pendingUri = null
+                    return@withContext Result.Failure("视频已写入，但发布到系统相册失败")
+                }
+            pendingUri = null
             onProgress(100)
             Log.i(TAG, "B站 dash 下载合成完成: $fileName")
-            Result.Success(fileName, uri)
+            Result.Success(fileName, publishedUri)
         } catch (e: Exception) {
+            pendingUri?.let { deleteOutput(context, it) }
             Log.e(TAG, "B站 dash 下载异常", e)
             Result.Failure(e.message ?: "下载异常")
         } finally {
@@ -176,6 +186,7 @@ object DownloadManager {
         displayName: String,
         onProgress: (Int) -> Unit = {}
     ): Result = withContext(Dispatchers.IO) {
+        var pendingUri: Uri? = null
         try {
             val req = Request.Builder()
                 .url(videoUrl)
@@ -198,6 +209,7 @@ object DownloadManager {
 
                 val (uri, output) = openOutput(context, fileName)
                     ?: return@withContext Result.Failure("无法创建输出文件")
+                pendingUri = uri
 
                 output.use { os ->
                     body.byteStream().use { input ->
@@ -220,11 +232,19 @@ object DownloadManager {
                         os.flush()
                     }
                 }
+                val publishedUri = publishVideo(context, uri)
+                    ?: run {
+                        deleteOutput(context, uri)
+                        pendingUri = null
+                        return@withContext Result.Failure("视频已写入，但发布到系统相册失败")
+                    }
+                pendingUri = null
                 onProgress(100)
-                Log.i(TAG, "下载完成: $fileName")
-                Result.Success(fileName, uri)
+                Log.i(TAG, "下载并发布完成: $fileName, uri=$publishedUri")
+                Result.Success(fileName, publishedUri)
             }
         } catch (e: Exception) {
+            pendingUri?.let { deleteOutput(context, it) }
             Log.e(TAG, "下载异常", e)
             Result.Failure(e.message ?: "下载异常")
         }
@@ -566,7 +586,16 @@ object DownloadManager {
                 tmpVideo.inputStream().use { it.copyTo(os) }
                 os.flush()
             }
-            finalizeVideo(context, videoUri)
+            val publishedVideoUri = publishVideo(context, videoUri)
+            if (publishedVideoUri == null) {
+                deleteOutput(context, videoUri)
+                Log.w(TAG, "实况照片视频发布失败，但图片已保存")
+                onProgress(100)
+                return@withContext Result.Success(
+                    "$baseName.jpg (+${savedImageUris.size - 1} 张图片)",
+                    savedImageUris.first()
+                )
+            }
             onProgress(100)
             Log.i(TAG, "实况照片保存完成: $baseName.jpg + $videoFileName (${tmpVideo.length() / 1024}KB)")
             Result.Success("$baseName.jpg + $videoFileName", savedImageUris.first())
@@ -595,7 +624,10 @@ object DownloadManager {
                 MediaStore.VOLUME_EXTERNAL_PRIMARY
             )
             val uri = resolver.insert(collection, values) ?: return null
-            val os = resolver.openOutputStream(uri) ?: return null
+            val os = resolver.openOutputStream(uri, "w") ?: run {
+                try { resolver.delete(uri, null, null) } catch (_: Exception) {}
+                return null
+            }
             uri to os
         } else {
             val picsDir = File(
@@ -624,22 +656,6 @@ object DownloadManager {
         }
     }
 
-    /** 通知 MediaStore 视频写入完成 */
-    private fun finalizeVideo(context: Context, uri: Uri) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            val values = ContentValues().apply {
-                put(MediaStore.Video.Media.IS_PENDING, 0)
-            }
-            try { context.contentResolver.update(uri, values, null, null) } catch (_: Exception) {}
-        } else {
-            val path = uri.path ?: return
-            @Suppress("DEPRECATION")
-            android.media.MediaScannerConnection.scanFile(
-                context, arrayOf(path), arrayOf("video/mp4"), null
-            )
-        }
-    }
-
     /**
      * 下载图文笔记的图片+音频，合成为 mp4 视频保存到相册。
      */
@@ -655,6 +671,7 @@ object DownloadManager {
         val tmpImages = mutableListOf<File>()
         val tmpAudio = File(cacheDir, "slide_audio_${System.currentTimeMillis()}.mp3")
         val tmpVideo = File(cacheDir, "slide_video_${System.currentTimeMillis()}.mp4")
+        var pendingUri: Uri? = null
         try {
             // 1. 下载所有图片（检查结果，跳过失败的）
             Log.i(TAG, "下载图片用于视频合成…")
@@ -712,14 +729,23 @@ object DownloadManager {
             val fileName = sanitizeFileName(displayName) + ".mp4"
             val (uri, output) = openOutput(context, fileName)
                 ?: return@withContext Result.Failure("无法创建输出文件")
+            pendingUri = uri
             output.use { os ->
                 tmpVideo.inputStream().use { it.copyTo(os) }
                 os.flush()
             }
+            val publishedUri = publishVideo(context, uri)
+                ?: run {
+                    deleteOutput(context, uri)
+                    pendingUri = null
+                    return@withContext Result.Failure("视频已写入，但发布到系统相册失败")
+                }
+            pendingUri = null
             onProgress(100)
             Log.i(TAG, "图文视频合成完成: $fileName (${tmpVideo.length() / 1024}KB)")
-            Result.Success(fileName, uri)
+            Result.Success(fileName, publishedUri)
         } catch (e: Exception) {
+            pendingUri?.let { deleteOutput(context, it) }
             Log.e(TAG, "图文视频合成异常", e)
             Result.Failure(e.message ?: "图文视频合成异常")
         } finally {
@@ -770,7 +796,10 @@ object DownloadManager {
             MediaStore.VOLUME_EXTERNAL_PRIMARY
         )
         val uri = resolver.insert(collection, values) ?: return null
-        val os = resolver.openOutputStream(uri) ?: return null
+        val os = resolver.openOutputStream(uri, "w") ?: run {
+            try { resolver.delete(uri, null, null) } catch (_: Exception) {}
+            return null
+        }
         return uri to os
     }
 
@@ -785,17 +814,167 @@ object DownloadManager {
         return Uri.fromFile(file) to fos
     }
 
-    /** 下载完成后告诉系统扫描这个视频，让它出现在相册里 */
-    fun notifyGallery(context: Context, uri: Uri) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            // Q+ 用 MediaStore 写入的，更新 IS_PENDING = 0 即可
+    /**
+     * 将 MediaStore 中的待处理视频正式发布。
+     *
+     * 正常路径把 IS_PENDING 设为 0；部分厂商系统若拒绝更新，则把内容复制到一个
+     * 默认即为可见状态的新条目，避免界面显示成功但文件仍被系统隐藏。
+     */
+    private fun publishVideo(context: Context, uri: Uri): Uri? {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+            val path = uri.path ?: return null
+            @Suppress("DEPRECATION")
+            android.media.MediaScannerConnection.scanFile(
+                context, arrayOf(path), arrayOf("video/mp4"), null
+            )
+            return uri
+        }
+
+        val resolver = context.contentResolver
+        try {
             val values = ContentValues().apply {
                 put(MediaStore.Video.Media.IS_PENDING, 0)
+                put(MediaStore.Video.Media.DATE_MODIFIED, System.currentTimeMillis() / 1000L)
             }
+            val updated = resolver.update(uri, values, null, null)
+            if (updated > 0) {
+                resolver.notifyChange(uri, null)
+                Log.i(TAG, "MediaStore 视频发布成功: uri=$uri")
+                return uri
+            }
+            Log.w(TAG, "MediaStore 发布更新 0 行，尝试可见条目兜底: uri=$uri")
+        } catch (e: Exception) {
+            Log.w(TAG, "MediaStore 发布失败，尝试可见条目兜底: ${e.message}")
+        }
+
+        return copyToVisibleVideoEntry(context, uri)
+    }
+
+    /** 把待处理视频复制到不带 IS_PENDING 的可见 MediaStore 条目。 */
+    private fun copyToVisibleVideoEntry(context: Context, sourceUri: Uri): Uri? {
+        val resolver = context.contentResolver
+        var displayName = "video_${System.currentTimeMillis()}.mp4"
+        var relativePath = "${Environment.DIRECTORY_MOVIES}/$FOLDER_NAME"
+        try {
+            resolver.query(
+                sourceUri,
+                arrayOf(
+                    MediaStore.Video.Media.DISPLAY_NAME,
+                    MediaStore.Video.Media.RELATIVE_PATH
+                ),
+                null,
+                null,
+                null
+            )?.use { cursor ->
+                if (cursor.moveToFirst()) {
+                    cursor.getString(0)?.takeIf { it.isNotBlank() }?.let { displayName = it }
+                    cursor.getString(1)?.takeIf { it.isNotBlank() }?.let { relativePath = it }
+                }
+            }
+
+            val values = ContentValues().apply {
+                put(MediaStore.Video.Media.DISPLAY_NAME, displayName)
+                put(MediaStore.Video.Media.MIME_TYPE, "video/mp4")
+                put(MediaStore.Video.Media.RELATIVE_PATH, relativePath)
+                put(MediaStore.Video.Media.DATE_ADDED, System.currentTimeMillis() / 1000L)
+                put(MediaStore.Video.Media.DATE_MODIFIED, System.currentTimeMillis() / 1000L)
+                // 故意不写 IS_PENDING，插入后即对相册和文件管理器可见
+            }
+            val collection = MediaStore.Video.Media.getContentUri(
+                MediaStore.VOLUME_EXTERNAL_PRIMARY
+            )
+            val targetUri = resolver.insert(collection, values) ?: return null
             try {
-                context.contentResolver.update(uri, values, null, null)
+                val input = resolver.openInputStream(sourceUri)
+                    ?: throw IllegalStateException("无法读取待发布视频")
+                val output = resolver.openOutputStream(targetUri, "w")
+                    ?: throw IllegalStateException("无法创建可见视频")
+                input.use { src ->
+                    output.use { dst -> src.copyTo(dst) }
+                }
+                try { resolver.delete(sourceUri, null, null) } catch (_: Exception) {}
+                resolver.notifyChange(targetUri, null)
+                Log.i(TAG, "MediaStore 可见条目兜底成功: uri=$targetUri")
+                return targetUri
             } catch (e: Exception) {
-                Log.w(TAG, "更新 IS_PENDING 失败: ${e.message}")
+                try { resolver.delete(targetUri, null, null) } catch (_: Exception) {}
+                throw e
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "MediaStore 可见条目兜底失败", e)
+            return null
+        }
+    }
+
+    /** 删除失败或未发布的输出，避免残留隐藏文件。 */
+    private fun deleteOutput(context: Context, uri: Uri) {
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                context.contentResolver.delete(uri, null, null)
+            } else {
+                uri.path?.let { File(it).delete() }
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "清理输出失败: ${e.message}")
+        }
+    }
+
+    /**
+     * 恢复旧版本可能遗留的隐藏视频。
+     *
+     * v1.9.4 及以前把视频先写成 IS_PENDING=1，再由 Activity 事后发布；
+     * 如果发布失败，界面仍会提示成功。应用升级后进入下载页时调用本方法，
+     * 会重新发布 Movies/Pictures/VideoDownloader 下仍处于 pending 的视频。
+     */
+    suspend fun recoverPendingVideos(context: Context): Int = withContext(Dispatchers.IO) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return@withContext 0
+
+        val resolver = context.contentResolver
+        val collection = MediaStore.Video.Media.getContentUri(
+            MediaStore.VOLUME_EXTERNAL_PRIMARY
+        )
+        val pendingUris = mutableListOf<Uri>()
+        val moviesPath = "${Environment.DIRECTORY_MOVIES}/$FOLDER_NAME"
+        val picturesPath = "${Environment.DIRECTORY_PICTURES}/$FOLDER_NAME"
+        try {
+            resolver.query(
+                collection,
+                arrayOf(MediaStore.Video.Media._ID),
+                "${MediaStore.Video.Media.IS_PENDING}=1 AND " +
+                    "(${MediaStore.Video.Media.RELATIVE_PATH} LIKE ? OR " +
+                    "${MediaStore.Video.Media.RELATIVE_PATH} LIKE ?)",
+                arrayOf("$moviesPath%", "$picturesPath%"),
+                null
+            )?.use { cursor ->
+                val idIndex = cursor.getColumnIndexOrThrow(MediaStore.Video.Media._ID)
+                while (cursor.moveToNext()) {
+                    pendingUris.add(
+                        Uri.withAppendedPath(collection, cursor.getLong(idIndex).toString())
+                    )
+                }
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "查询历史隐藏视频失败: ${e.message}")
+            return@withContext 0
+        }
+
+        var recovered = 0
+        pendingUris.forEach { uri ->
+            if (publishVideo(context, uri) != null) recovered++
+        }
+        if (recovered > 0) {
+            Log.i(TAG, "已恢复 $recovered 个历史隐藏视频")
+        }
+        recovered
+    }
+
+    /** 下载完成后通知相册刷新；发布动作已在各下载方法返回成功前完成。 */
+    fun notifyGallery(context: Context, uri: Uri) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            try {
+                context.contentResolver.notifyChange(uri, null)
+            } catch (e: Exception) {
+                Log.w(TAG, "通知 MediaStore 刷新失败: ${e.message}")
             }
         } else {
             // 旧版用 file:// 触发 MediaScanner
@@ -809,6 +988,13 @@ object DownloadManager {
 
     private fun sanitizeFileName(name: String): String {
         val cleaned = name.replace(Regex("[\\\\/:*?\"<>|]"), "_").trim()
-        return if (cleaned.isBlank()) "video_${System.currentTimeMillis()}" else cleaned
+        if (cleaned.isBlank()) return "video_${System.currentTimeMillis()}"
+        val maxCodePoints = 80
+        val end = if (cleaned.codePointCount(0, cleaned.length) > maxCodePoints) {
+            cleaned.offsetByCodePoints(0, maxCodePoints)
+        } else {
+            cleaned.length
+        }
+        return cleaned.substring(0, end)
     }
 }

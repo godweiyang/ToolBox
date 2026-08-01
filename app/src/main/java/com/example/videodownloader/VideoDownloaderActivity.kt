@@ -109,6 +109,15 @@ class VideoDownloaderActivity : AppCompatActivity() {
         }
 
         refreshBiliStatus()
+
+        // 恢复旧版本可能已下载成功、但因 IS_PENDING 未清除而被系统隐藏的视频
+        lifecycleScope.launch {
+            val recovered = DownloadManager.recoverPendingVideos(applicationContext)
+            if (recovered > 0 && isActivityAlive()) {
+                log("已恢复 $recovered 个之前未显示的视频，请到相册或 Movies/VideoDownloader 查看")
+                toast("已恢复 $recovered 个历史视频")
+            }
+        }
     }
 
     /** 刷新 B站登录状态显示 */
