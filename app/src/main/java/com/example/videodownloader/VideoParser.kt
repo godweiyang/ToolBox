@@ -20,11 +20,11 @@ import java.util.concurrent.TimeUnit
  * 抖音解析思路：
  * 1. 从分享文本中用正则提取短链（如 https://v.douyin.com/D68hRKDKps8/）
  * 2. 不自动跟随重定向，手动 HEAD/GET 拿到 Location，从跳转后的 URL 里提取 video_id
- * 3. 调用 https://www.iesdouyin.com/web/api/v2/aweme/iteminfo/?item_ids=ID
- *    从 item_list[0].video.play_addr.url_list[0] 拿到带水印地址，
- *    把 playwm 替换成 play 得到无水印地址，再跟随一次 302 拿最终直链。
- * 4. 兜底：iteminfo 接口失效时，直接请求 share 页 HTML，
- *    从中正则提取视频地址 / RENDER_DATA / _ROUTER_DATA。
+ * 3. 请求 share 页 HTML（/share/video/ID 或 /share/note/ID），
+ *    从 _ROUTER_DATA / RENDER_DATA 里提取 play_addr（图文则提取 images + music）
+ * 4. 把 playwm 地址改写为 www.iesdouyin.com 域名的无水印 play 地址，
+ *    再跟随一次 302 拿最终 CDN 直链。
+ * 注：web/api/v2/aweme/iteminfo 接口已要求加密参数（返回 encrypt_data_miss），不可用。
  */
 object VideoParser {
 
@@ -119,17 +119,7 @@ object VideoParser {
             try { httpGet("https://www.iesdouyin.com/") } catch (_: Exception) {}
         }
 
-        // 3. 尝试 iteminfo 接口（仅对视频类型）
-        if (videoId != null && !isNoteOrSlides) {
-            Log.i(TAG, "尝试 iteminfo 接口…")
-            try {
-                return parseViaItemInfoApi(videoId)
-            } catch (e: Exception) {
-                Log.w(TAG, "iteminfo 接口失败: ${e.message}，尝试 HTML 兜底")
-            }
-        }
-
-        // 4. 兜底：直接抓 share 页 HTML
+        // 3. 抓 share 页 HTML 解析（iteminfo 接口已要求加密参数，不可用，直接走 HTML）
         // slides → note 路径替换（slides 页面需要 cookie 且结构不同，note 页面可用）
         val sharePageUrl = if (videoId != null) {
             if (isNoteOrSlides) {
@@ -213,62 +203,7 @@ object VideoParser {
         return null
     }
 
-    /** 通过 iteminfo API 解析 */
-    private fun parseViaItemInfoApi(videoId: String): VideoInfo {
-        val apiUrl = "https://www.iesdouyin.com/web/api/v2/aweme/iteminfo/?item_ids=$videoId"
-        val body = httpGet(apiUrl)
-        if (body.isBlank()) throw IllegalStateException("iteminfo 返回空")
-
-        val root = JsonParser.parseString(body).asJsonObject
-        val itemList = root.getAsJsonArray("item_list")
-        if (itemList == null || itemList.size() == 0) {
-            throw IllegalStateException("iteminfo 没有返回 item_list")
-        }
-        val item = itemList[0].asJsonObject
-
-        val title = item.safeStr("desc") ?: "抖音视频"
-        val author = item
-            .safeObj("author")?.safeStr("nickname") ?: "未知作者"
-
-        val videoObj = item.safeObj("video") ?: throw IllegalStateException("没有视频字段")
-        val playAddrObj = videoObj.safeObj("play_addr")
-            ?: throw IllegalStateException("没有 play_addr")
-        val urlList = playAddrObj.getAsJsonArray("url_list")
-        if (urlList == null || urlList.size() == 0) {
-            throw IllegalStateException("没有 url_list")
-        }
-        var playUrl = urlList[0].asString
-        // 关键一步：把带水印的 playwm 替换为 play 得到无水印地址
-        playUrl = playUrl.replace("playwm", "play")
-
-        // 过滤音频 URL：如果第一个是音频，尝试找非音频的
-        if (isAudioUrl(playUrl)) {
-            for (i in 1 until urlList.size()) {
-                val alt = urlList[i].asString.replace("playwm", "play")
-                if (!isAudioUrl(alt)) { playUrl = alt; break }
-            }
-            if (isAudioUrl(playUrl)) {
-                throw IllegalStateException("iteminfo 只返回了音频地址")
-            }
-        }
-
-        // 跟随一次重定向拿到最终直链（无水印地址会 302）
-        val finalUrl = resolveFinalUrl(playUrl) ?: playUrl
-
-        val coverUrl = videoObj.safeObj("cover")?.getAsJsonArray("url_list")?.let {
-            if (it.size() > 0) it[0].asString else ""
-        } ?: ""
-
-        return VideoInfo(
-            title = title,
-            author = author,
-            videoUrl = finalUrl,
-            coverUrl = coverUrl,
-            platform = "douyin"
-        )
-    }
-
-    /** HTML 兜底：从 share 页里抓视频地址或图片 */
+    /** 从 share 页 HTML 里解析视频地址或图文 */
     private fun parseFromSharePageHtml(sharePageUrl: String): VideoInfo? {
         return try {
             val html = httpGet(sharePageUrl)
@@ -329,7 +264,7 @@ object VideoParser {
                     deepFindUrl(videoObj, listOf("play_addr", "url_list"))
                 } else {
                     deepFindUrl(routerData, listOf("play_addr", "url_list"))
-                })?.replace("playwm", "play")
+                })?.let { toNoWatermarkUrl(it) }
                 if (!videoUrl.isNullOrBlank() && !isAudioUrl(videoUrl)) {
                     val finalUrl = resolveFinalUrl(videoUrl) ?: videoUrl
                     val cover = deepFindUrl(routerData, listOf("cover", "url_list")) ?: ""
@@ -340,7 +275,7 @@ object VideoParser {
             // 兜底1：直接在 HTML 里搜 play_addr + url_list 模式
             val playAddrUrl = findPlayAddrUrl(html)
             if (!playAddrUrl.isNullOrBlank() && !isAudioUrl(playAddrUrl)) {
-                val noWm = playAddrUrl.replace("playwm", "play")
+                val noWm = toNoWatermarkUrl(playAddrUrl)
                 val finalUrl = resolveFinalUrl(noWm) ?: noWm
                 val cover = findCoverUrl(html) ?: ""
                 return VideoInfo(title, "未知作者", finalUrl, cover, "douyin")
@@ -362,28 +297,30 @@ object VideoParser {
     private fun extractMusicUrl(routerData: com.google.gson.JsonObject): String {
         // 尝试多个可能的 music 路径
         return try {
-            // 方式1：music.play_addr.url_list[0]
+            // 方式1：music.play_addr（uri 直连优先，url_list 兜底）
             val musicObj = deepFindObject(routerData, "music")
             if (musicObj != null && musicObj.isJsonObject) {
                 val music = musicObj.asJsonObject
                 val playAddr = music.get("play_addr")
                 if (playAddr != null && playAddr.isJsonObject) {
                     val pa = playAddr.asJsonObject
-                    // 优先 url_list
-                    val urlList = pa.getAsJsonArray("url_list")
-                    if (urlList != null && urlList.size() > 0) {
-                        val u = unescapeJson(urlList[0].asString)
-                        if (u.startsWith("http")) {
-                            Log.i(TAG, "提取到音乐URL(url_list): $u")
-                            return u
-                        }
-                    }
-                    // uri 字段
+                    // uri 字段现在是音频直连地址，优先使用
                     val uri = pa.get("uri")?.asString
-                    if (uri != null && uri.startsWith("http")) {
+                    if (!uri.isNullOrBlank() && uri.startsWith("http")) {
                         val u = unescapeJson(uri)
                         Log.i(TAG, "提取到音乐URL(uri): $u")
                         return u
+                    }
+                    // url_list：跳过 video_id=https://... 形式的嵌套死链（会 404）
+                    val urlList = pa.getAsJsonArray("url_list")
+                    if (urlList != null) {
+                        for (i in 0 until urlList.size()) {
+                            val u = unescapeJson(urlList[i].asString)
+                            if (u.startsWith("http") && !u.contains("video_id=http")) {
+                                Log.i(TAG, "提取到音乐URL(url_list): $u")
+                                return u
+                            }
+                        }
                     }
                 }
                 // 方式2：music.url 直接字段
@@ -407,6 +344,17 @@ object VideoParser {
         return s.replace("\\u002F", "/")
             .replace("\\/", "/")
             .replace("&amp;", "&")
+    }
+
+    /**
+     * 把带水印的 playwm 地址改写为无水印播放地址。
+     * aweme.snssdk.com 域名的 /play/ 接口已下线（404），
+     * 需要整体换到 www.iesdouyin.com 域名才能正常 302 到 CDN。
+     */
+    private fun toNoWatermarkUrl(playwmUrl: String): String {
+        return playwmUrl
+            .replace("playwm", "play")
+            .replace("aweme.snssdk.com", "www.iesdouyin.com")
     }
 
     /** 检查 URL 是否是音频（mp3/aac/m4a 或 music 路径），用于过滤误取的音乐地址 */
