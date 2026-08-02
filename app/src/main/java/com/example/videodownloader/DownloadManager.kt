@@ -37,6 +37,13 @@ object DownloadManager {
             .build()
     }
 
+    private fun refererForPlatform(platform: String): String = when (platform) {
+        "xiaohongshu" -> "https://www.xiaohongshu.com/"
+        "kuaishou" -> "https://www.kuaishou.com/"
+        "bilibili" -> "https://www.bilibili.com/"
+        else -> "https://www.douyin.com/"
+    }
+
     /** 下载结果 */
     sealed class Result {
         data class Success(val filePath: String, val uri: Uri) : Result()
@@ -178,12 +185,14 @@ object DownloadManager {
     /**
      * @param videoUrl 视频直链
      * @param displayName 想要的文件名（不带扩展名）
+     * @param platform 视频来源平台，用于设置 CDN 防盗链 Referer
      * @param onProgress 进度回调，percent ∈ [0,100]
      */
     suspend fun download(
         context: Context,
         videoUrl: String,
         displayName: String,
+        platform: String = "douyin",
         onProgress: (Int) -> Unit = {}
     ): Result = withContext(Dispatchers.IO) {
         var pendingUri: Uri? = null
@@ -193,7 +202,7 @@ object DownloadManager {
                 .header("User-Agent",
                     "Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 " +
                         "(KHTML, like Gecko) Chrome/120.0 Mobile Safari/537.36")
-                .header("Referer", "https://www.douyin.com/")
+                .header("Referer", refererForPlatform(platform))
                 .header("Accept", "*/*")
                 .get()
                 .build()

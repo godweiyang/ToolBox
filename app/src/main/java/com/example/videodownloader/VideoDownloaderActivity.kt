@@ -212,7 +212,8 @@ class VideoDownloaderActivity : AppCompatActivity() {
                 DownloadManager.download(
                     context = applicationContext,
                     videoUrl = video.videoUrl,
-                    displayName = video.title
+                    displayName = video.title,
+                    platform = video.platform
                 ) { percent ->
                     runOnUiIfAlive {
                         binding.progressBar.progress = percent

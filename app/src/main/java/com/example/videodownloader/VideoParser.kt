@@ -88,7 +88,8 @@ object VideoParser {
         url.contains("v.douyin.com") || url.contains("iesdouyin.com") ||
             url.contains("douyin.com") -> "douyin"
         url.contains("v.kuaishou.com") || url.contains("kuaishou.com") -> "kuaishou"
-        url.contains("xhslink.com") || url.contains("xiaohongshu.com") -> "xiaohongshu"
+        url.contains("xhslink.cn") || url.contains("xhslink.com") ||
+            url.contains("xiaohongshu.com") -> "xiaohongshu"
         url.contains("ixigua.com") -> "douyin" // 西瓜视频走抖音相同思路
         url.contains("b23.tv") || url.contains("bilibili.com") -> "bilibili"
         else -> "unknown"
@@ -429,7 +430,7 @@ object VideoParser {
 
     /**
      * 小红书解析：
-     * 短链 http://xhslink.com/o/xxx  302 →
+     * 短链 http://xhslink.cn/o/xxx（旧域名 xhslink.com） 302 →
      *   https://www.xiaohongshu.com/discovery/item/{noteId}?xsec_token=xxx&type=video&...
      *
      * 重点：跳转后的 URL 必须原样使用（xsec_token 是访问凭证，丢掉会拿不到数据）。
@@ -444,7 +445,7 @@ object VideoParser {
         Log.i(TAG, "小红书跳转后 URL: $resolvedUrl")
 
         // 2. 直接用 resolvedUrl 请求页面（不要重新拼接，否则丢 token）
-        val html = httpGet(resolvedUrl)
+        val html = httpGet(resolvedUrl, referer = "https://www.xiaohongshu.com/")
         if (html.isBlank()) throw IllegalStateException("小红书页面获取失败")
 
         // 提取标题（<title>）作为兜底标题
@@ -653,13 +654,16 @@ object VideoParser {
 
     // ===================== 工具方法 =====================
 
-    private fun httpGet(url: String): String {
+    private fun httpGet(
+        url: String,
+        referer: String = "https://www.douyin.com/"
+    ): String {
         val req = Request.Builder()
             .url(url)
             .header("User-Agent", UA_MOBILE)
             .header("Accept", "*/*")
             .header("Accept-Language", "zh-CN,zh;q=0.9")
-            .header("Referer", "https://www.douyin.com/")
+            .header("Referer", referer)
             .get()
             .build()
         // 用跟随重定向的 client，避免 share 页 302 时拿到空 body
