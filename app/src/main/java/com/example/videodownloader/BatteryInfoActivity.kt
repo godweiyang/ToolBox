@@ -9,6 +9,7 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.view.Gravity
+import android.view.View
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
@@ -38,8 +39,18 @@ class BatteryInfoActivity : AppCompatActivity() {
     private var lastBatteryIntent: Intent? = null
     private var tickCount = 0
 
+    /** 最近一次从电源节点提取到的充电器输入端数据（Vbus 侧），null 表示机型不可读 */
+    private var lastChargerInput: ChargerInput? = null
+
     @Volatile
     private var sysfsScanning = false
+
+    /** 充电器输入端（Vbus 侧）数据：电压 V、电流 A、来源节点名 */
+    private data class ChargerInput(
+        val voltageV: Double?,
+        val currentA: Double?,
+        val source: String
+    )
 
     private val batteryReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
@@ -190,6 +201,16 @@ class BatteryInfoActivity : AppCompatActivity() {
         capacityPct?.let { rows.add("电量计容量" to "$it %") }
         maxChargeCurrentUa?.takeIf { it > 0 }?.let { rows.add("最大充电电流" to "${it / 1000} mA") }
         maxChargeVoltageUv?.takeIf { it > 0 }?.let { rows.add("最大充电电压" to "${it / 1000} mV") }
+        // 充电器输入端（Vbus 侧，来自电源节点）
+        lastChargerInput?.let { input ->
+            input.voltageV?.let { rows.add("充电器输入电压（Vbus）" to "%.2f V".format(it)) }
+            input.currentA?.let { rows.add("充电器输入电流（Ibus）" to "%.2f A".format(abs(it))) }
+            if (input.voltageV != null && input.currentA != null) {
+                rows.add(
+                    "充电器输入功率" to "%.1f W".format(input.voltageV * abs(input.currentA))
+                )
+            }
+        }
         rebuildDetails(rows)
 
         // 广播原始数据
@@ -274,32 +295,118 @@ class BatteryInfoActivity : AppCompatActivity() {
         if (sysfsScanning) return
         sysfsScanning = true
         Thread {
-            val ps = scanPowerSupply()
+            val (psText, psData) = scanPowerSupply()
             val th = scanThermal()
+            val input = extractChargerInput(psData)
             runOnUiThread {
-                binding.tvSysfs.text = ps
+                binding.tvSysfs.text = psText
                 binding.tvThermal.text = th
+                lastChargerInput = input
+                updateInputCard(input)
                 sysfsScanning = false
             }
         }.apply { isDaemon = true; start() }
+    }
+
+    /** 更新充电器输入端卡片：读不到数据时隐藏 */
+    private fun updateInputCard(input: ChargerInput?) {
+        if (input == null || (input.voltageV == null && input.currentA == null)) {
+            binding.inputCard.visibility = View.GONE
+            return
+        }
+        binding.inputCard.visibility = View.VISIBLE
+        binding.tvInputVoltage.text = input.voltageV?.let { "%.2f".format(it) } ?: "--"
+        binding.tvInputCurrent.text = input.currentA?.let { "%.2f".format(abs(it)) } ?: "--"
+        val power =
+            if (input.voltageV != null && input.currentA != null)
+                input.voltageV * abs(input.currentA)
+            else null
+        binding.tvInputPower.text = power?.let { "%.1f".format(it) } ?: "--"
+        binding.tvInputSource.text = "节点：${input.source}"
+    }
+
+    /**
+     * 从电源节点结构化数据中提取充电器输入端（Vbus/Ibus）。
+     * 优先在 usb / charger / main 等输入侧节点里找电压电流；
+     * battery / bms 节点里的 VOLTAGE_NOW 是电池电压，不算输入端。
+     */
+    private fun extractChargerInput(
+        data: Map<String, Map<String, String>>
+    ): ChargerInput? {
+        val preferred = data.keys.sortedBy { name ->
+            when {
+                "usb" in name.lowercase() -> 0
+                "charger" in name.lowercase() || "charge_pump" in name.lowercase() -> 1
+                "main" in name.lowercase() || "pmic" in name.lowercase() ||
+                        "wireless" in name.lowercase() -> 2
+                "battery" in name.lowercase() || "bms" in name.lowercase() -> 4
+                else -> 3
+            }
+        }
+        for (name in preferred) {
+            val isBatteryNode = "battery" in name.lowercase() || "bms" in name.lowercase()
+            val props = data[name] ?: continue
+            var vRaw: Double? = null
+            var iRaw: Double? = null
+            for ((k, v) in props) {
+                val key = k.uppercase()
+                val num = v.toDoubleOrNull() ?: continue
+                if (vRaw == null && ("VBUS" in key || key == "INPUT_VOLTAGE_NOW" ||
+                            (key == "VOLTAGE_NOW" && !isBatteryNode))
+                ) {
+                    vRaw = num
+                }
+                if (iRaw == null && (key == "INPUT_CURRENT_NOW" || "IBUS" in key ||
+                            (key == "CURRENT_NOW" && !isBatteryNode))
+                ) {
+                    iRaw = num
+                }
+            }
+            if (vRaw != null || iRaw != null) {
+                return ChargerInput(normalizeVoltage(vRaw), normalizeCurrent(iRaw), name)
+            }
+        }
+        return null
+    }
+
+    /** 内核电源节点电压标准是 µV，按量级兼容 mV / V 的厂商私有节点 */
+    private fun normalizeVoltage(raw: Double?): Double? = raw?.let {
+        when {
+            it > 100_000 -> it / 1e6
+            it > 100 -> it / 1e3
+            else -> it
+        }
+    }
+
+    /** 内核电源节点电流标准是 µA，按量级兼容 mA / A 的厂商私有节点 */
+    private fun normalizeCurrent(raw: Double?): Double? = raw?.let {
+        when {
+            abs(it) > 100_000 -> it / 1e6
+            abs(it) > 100 -> it / 1e3
+            else -> it
+        }
     }
 
     /**
      * 扫描 /sys/class/power_supply 下所有电源节点。
      * 优先读 uevent（一个文件包含该节点全部属性）；读不到则逐个文件尝试。
      * 能否读取取决于机型 SELinux 策略，全部不可读时返回提示。
+     *
+     * 返回：展示文本 + 结构化数据（节点名 -> 属性名 -> 原始值），后者用于提取 Vbus/Ibus。
      */
-    private fun scanPowerSupply(): String {
+    private fun scanPowerSupply(): Pair<String, Map<String, Map<String, String>>> {
         val base = File("/sys/class/power_supply")
         val dirs = try {
             base.listFiles()?.sortedBy { it.name }
         } catch (_: Exception) {
             null
         }
-        if (dirs.isNullOrEmpty()) return "无法访问 /sys/class/power_supply（系统限制）"
+        if (dirs.isNullOrEmpty()) {
+            return "无法访问 /sys/class/power_supply（系统限制）" to emptyMap()
+        }
 
         val sb = StringBuilder()
-        var anyReadable = false
+        val structured = LinkedHashMap<String, Map<String, String>>()
         for (dir in dirs) {
             val values = LinkedHashMap<String, String>()
             try {
@@ -332,13 +439,13 @@ class BatteryInfoActivity : AppCompatActivity() {
                 }
             }
             if (values.isNotEmpty()) {
-                anyReadable = true
+                structured[dir.name] = values
                 sb.append("【").append(dir.name).append("】\n")
                 values.forEach { (k, v) -> sb.append("  ").append(k).append(" = ").append(v).append('\n') }
             }
         }
-        if (!anyReadable) sb.append("所有节点均被系统 SELinux 限制，无法读取（部分机型可读）")
-        return sb.toString().trim()
+        if (structured.isEmpty()) sb.append("所有节点均被系统 SELinux 限制，无法读取（部分机型可读）")
+        return sb.toString().trim() to structured
     }
 
     /**
