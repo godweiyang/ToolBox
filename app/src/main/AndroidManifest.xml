@@ -95,6 +95,10 @@
             android:name=".WifiSignalActivity"
             android:exported="false" />
 
+        <activity
+            android:name=".BatteryInfoActivity"
+            android:exported="false" />
+
         <!-- 局域网文件互传 HTTP server，前台 Service 保活 -->
         <service
             android:name=".FileShareService"

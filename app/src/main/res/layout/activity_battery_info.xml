@@ -1,0 +1,386 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fillViewport="true">
+
+<LinearLayout
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="16dp">
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/tool_battery_title"
+        android:textSize="22sp"
+        android:textStyle="bold"
+        android:gravity="center"
+        android:paddingBottom="8dp" />
+
+    <!-- 顶部：电量百分比 + 充电状态 -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center"
+        android:paddingBottom="12dp">
+
+        <TextView
+            android:id="@+id/tvLevelBig"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="--%"
+            android:textSize="48sp"
+            android:textStyle="bold"
+            android:textColor="@color/tool_battery_bg" />
+
+        <TextView
+            android:id="@+id/tvStatus"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="--"
+            android:textSize="15sp"
+            android:layout_marginStart="16dp" />
+    </LinearLayout>
+
+    <!-- 4 大指标卡片：电流 / 电压 / 功率 / 温度 -->
+    <GridLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:columnCount="2">
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_columnWeight="1"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:background="#0F000000"
+            android:layout_margin="4dp"
+            android:padding="12dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="电流"
+                android:textColor="#666666"
+                android:textSize="13sp" />
+
+            <TextView
+                android:id="@+id/tvCurrent"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="--"
+                android:textSize="30sp"
+                android:textStyle="bold"
+                android:textColor="#FB8C00" />
+
+            <TextView
+                android:id="@+id/tvCurrentCaption"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="mA"
+                android:textColor="#888888"
+                android:textSize="11sp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_columnWeight="1"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:background="#0F000000"
+            android:layout_margin="4dp"
+            android:padding="12dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="电压"
+                android:textColor="#666666"
+                android:textSize="13sp" />
+
+            <TextView
+                android:id="@+id/tvVoltage"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="--"
+                android:textSize="30sp"
+                android:textStyle="bold"
+                android:textColor="#1E88E5" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="V"
+                android:textColor="#888888"
+                android:textSize="11sp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_columnWeight="1"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:background="#0F000000"
+            android:layout_margin="4dp"
+            android:padding="12dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="功率"
+                android:textColor="#666666"
+                android:textSize="13sp" />
+
+            <TextView
+                android:id="@+id/tvPower"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="--"
+                android:textSize="30sp"
+                android:textStyle="bold"
+                android:textColor="#E53935" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="W · 电压×电流估算"
+                android:textColor="#888888"
+                android:textSize="11sp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_columnWeight="1"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:background="#0F000000"
+            android:layout_margin="4dp"
+            android:padding="12dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="电池温度"
+                android:textColor="#666666"
+                android:textSize="13sp" />
+
+            <TextView
+                android:id="@+id/tvTemp"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="--"
+                android:textSize="30sp"
+                android:textStyle="bold"
+                android:textColor="#43A047" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="°C"
+                android:textColor="#888888"
+                android:textSize="11sp" />
+        </LinearLayout>
+    </GridLayout>
+
+    <!-- 实时曲线 -->
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/battery_section_chart"
+        android:textSize="14sp"
+        android:textStyle="bold"
+        android:layout_marginTop="20dp"
+        android:paddingBottom="6dp" />
+
+    <GridLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:columnCount="2">
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_columnWeight="1"
+            android:orientation="vertical"
+            android:layout_margin="4dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="电流 (mA)"
+                android:textColor="#666666"
+                android:textSize="12sp"
+                android:paddingBottom="2dp" />
+
+            <com.example.videodownloader.MetalChartView
+                android:id="@+id/chartCurrent"
+                android:layout_width="match_parent"
+                android:layout_height="110dp"
+                android:background="#1A000000" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_columnWeight="1"
+            android:orientation="vertical"
+            android:layout_margin="4dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="电压 (V)"
+                android:textColor="#666666"
+                android:textSize="12sp"
+                android:paddingBottom="2dp" />
+
+            <com.example.videodownloader.MetalChartView
+                android:id="@+id/chartVoltage"
+                android:layout_width="match_parent"
+                android:layout_height="110dp"
+                android:background="#1A000000" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_columnWeight="1"
+            android:orientation="vertical"
+            android:layout_margin="4dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="功率 (W)"
+                android:textColor="#666666"
+                android:textSize="12sp"
+                android:paddingBottom="2dp" />
+
+            <com.example.videodownloader.MetalChartView
+                android:id="@+id/chartPower"
+                android:layout_width="match_parent"
+                android:layout_height="110dp"
+                android:background="#1A000000" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_columnWeight="1"
+            android:orientation="vertical"
+            android:layout_margin="4dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="温度 (°C)"
+                android:textColor="#666666"
+                android:textSize="12sp"
+                android:paddingBottom="2dp" />
+
+            <com.example.videodownloader.MetalChartView
+                android:id="@+id/chartTemp"
+                android:layout_width="match_parent"
+                android:layout_height="110dp"
+                android:background="#1A000000" />
+        </LinearLayout>
+    </GridLayout>
+
+    <!-- 全部参数（动态生成） -->
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/battery_section_details"
+        android:textSize="14sp"
+        android:textStyle="bold"
+        android:layout_marginTop="20dp"
+        android:paddingBottom="6dp" />
+
+    <LinearLayout
+        android:id="@+id/detailsContainer"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical" />
+
+    <!-- 广播原始数据 -->
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/battery_section_raw"
+        android:textSize="14sp"
+        android:textStyle="bold"
+        android:layout_marginTop="20dp"
+        android:paddingBottom="6dp" />
+
+    <TextView
+        android:id="@+id/tvRawExtras"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:typeface="monospace"
+        android:textSize="12sp"
+        android:textColor="#444444"
+        android:background="#0D000000"
+        android:padding="12dp"
+        android:text="--" />
+
+    <!-- 电源节点 -->
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/battery_section_sysfs"
+        android:textSize="14sp"
+        android:textStyle="bold"
+        android:layout_marginTop="20dp"
+        android:paddingBottom="6dp" />
+
+    <TextView
+        android:id="@+id/tvSysfs"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:typeface="monospace"
+        android:textSize="12sp"
+        android:textColor="#444444"
+        android:background="#0D000000"
+        android:padding="12dp"
+        android:text="读取中…" />
+
+    <!-- 温度节点 -->
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/battery_section_thermal"
+        android:textSize="14sp"
+        android:textStyle="bold"
+        android:layout_marginTop="20dp"
+        android:paddingBottom="6dp" />
+
+    <TextView
+        android:id="@+id/tvThermal"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:typeface="monospace"
+        android:textSize="12sp"
+        android:textColor="#444444"
+        android:background="#0D000000"
+        android:padding="12dp"
+        android:text="读取中…" />
+
+    <!-- 说明 -->
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/battery_hint"
+        android:textSize="12sp"
+        android:textColor="#999999"
+        android:layout_marginTop="20dp"
+        android:paddingBottom="8dp" />
+
+</LinearLayout>
+</ScrollView>

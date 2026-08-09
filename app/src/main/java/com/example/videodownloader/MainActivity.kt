@@ -210,6 +210,14 @@ class MainActivity : AppCompatActivity() {
             iconRes = android.R.drawable.ic_menu_compass,
             bgColorRes = R.color.tool_metal_bg,
             launcher = { ctx -> Intent(ctx, MetalDetectorActivity::class.java) }
+        ),
+        Tool(
+            id = "battery_info",
+            title = getString(R.string.tool_battery_title),
+            desc = getString(R.string.tool_battery_desc),
+            iconRes = android.R.drawable.ic_lock_idle_charging,
+            bgColorRes = R.color.tool_battery_bg,
+            launcher = { ctx -> Intent(ctx, BatteryInfoActivity::class.java) }
         )
     )
 }
