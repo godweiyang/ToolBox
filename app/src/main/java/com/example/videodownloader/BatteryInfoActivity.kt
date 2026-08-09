@@ -135,9 +135,14 @@ class BatteryInfoActivity : AppCompatActivity() {
         val tempRaw = intent.getIntExtra("temperature", Int.MIN_VALUE)
         val technology = intent.getStringExtra("technology")
         val present = intent.getBooleanExtra("present", true)
-        // 以下三个 extra 只在较新系统 / 部分机型上存在，用字符串 key 读取以兼容旧版本
-        val cycleCount =
-            if (intent.hasExtra("cycle_count")) intent.getIntExtra("cycle_count", -1) else null
+        // 以下 extra 只在较新系统 / 部分机型上存在，用字符串 key 读取以兼容旧版本。
+        // 注意 API 34 的官方 key 带 "android.os.extra." 前缀（如 EXTRA_CYCLE_COUNT）
+        val cycleCount = when {
+            intent.hasExtra("android.os.extra.CYCLE_COUNT") ->
+                intent.getIntExtra("android.os.extra.CYCLE_COUNT", -1)
+            intent.hasExtra("cycle_count") -> intent.getIntExtra("cycle_count", -1)
+            else -> null
+        }
         val maxChargeCurrentUa =
             if (intent.hasExtra("max_charging_current")) intent.getIntExtra(
                 "max_charging_current", -1
@@ -145,6 +150,17 @@ class BatteryInfoActivity : AppCompatActivity() {
         val maxChargeVoltageUv =
             if (intent.hasExtra("max_charging_voltage")) intent.getIntExtra(
                 "max_charging_voltage", -1
+            ) else null
+        // vivo 等厂商私有字段
+        val adapterPowerW =
+            if (intent.hasExtra("adapter_power")) intent.getIntExtra("adapter_power", 0) else null
+        val socDecimal =
+            if (intent.hasExtra("soc_decimal")) intent.getIntExtra("soc_decimal", -1) else null
+        val chargingSpeed =
+            if (intent.hasExtra("charging_speed")) intent.getIntExtra("charging_speed", -1) else null
+        val boardTempStatus =
+            if (intent.hasExtra("board_temp_status")) intent.getIntExtra(
+                "board_temp_status", -1
             ) else null
 
         val currentNowUa = getIntProp(BatteryManager.BATTERY_PROPERTY_CURRENT_NOW)
@@ -160,8 +176,12 @@ class BatteryInfoActivity : AppCompatActivity() {
         val powerW = if (currentMa != null && voltageV != null) currentMa / 1000.0 * voltageV else null
         val tempC = if (tempRaw != Int.MIN_VALUE) tempRaw / 10.0 else null
 
-        // 顶部：电量 + 状态
-        binding.tvLevelBig.text = if (level >= 0) "%d%%".format(level * 100 / scale) else "--"
+        // 顶部：电量 + 状态（有 soc_decimal 时显示两位小数的精确电量）
+        binding.tvLevelBig.text = when {
+            socDecimal != null && socDecimal >= 0 -> "%.2f%%".format(socDecimal / 100.0)
+            level >= 0 -> "%d%%".format(level * 100 / scale)
+            else -> "--"
+        }
         binding.tvStatus.text = listOf(statusText(status), pluggedText(plugged))
             .filter { it.isNotEmpty() }
             .joinToString(" · ")
@@ -194,6 +214,12 @@ class BatteryInfoActivity : AppCompatActivity() {
         rows.add("健康度" to healthText(health))
         thermalStatusTextOrNull()?.let { rows.add("系统热状态" to it) }
         cycleCount?.takeIf { it >= 0 }?.let { rows.add("循环次数" to "$it 次") }
+        socDecimal?.takeIf { it >= 0 }?.let { rows.add("精确电量" to "%.2f %%".format(it / 100.0)) }
+        adapterPowerW?.takeIf { it > 0 }
+            ?.let { rows.add("适配器额定功率" to "$it W（适配器能力，非实时输入功率）") }
+        chargingSpeed?.takeIf { it >= 0 }?.let { rows.add("充电速度档位（厂商定义）" to "$it") }
+        boardTempStatus?.takeIf { it >= 0 }
+            ?.let { rows.add("主板温度状态" to if (it == 0) "正常" else "异常（$it）") }
         currentNowUa?.let { rows.add("瞬时电流（原始值）" to "$it µA") }
         currentAvgUa?.let { rows.add("平均电流" to "%.0f mA".format(abs(it) / 1000.0)) }
         if (voltageMv > 0) rows.add("电池电压" to "$voltageMv mV")
