@@ -1,4 +1,4 @@
-package com.example.videodownloader
+﻿package com.example.videodownloader
 
 import android.content.Intent
 import android.os.Bundle
@@ -218,6 +218,14 @@ class MainActivity : AppCompatActivity() {
             iconRes = android.R.drawable.ic_lock_idle_charging,
             bgColorRes = R.color.tool_battery_bg,
             launcher = { ctx -> Intent(ctx, BatteryInfoActivity::class.java) }
+        ),
+        Tool(
+            id = "gnss_sky",
+            title = getString(R.string.tool_gnss_title),
+            desc = getString(R.string.tool_gnss_desc),
+            iconRes = android.R.drawable.ic_menu_mylocation,
+            bgColorRes = R.color.tool_gnss_bg,
+            launcher = { ctx -> Intent(ctx, GnssSkyActivity::class.java) }
         )
     )
 }

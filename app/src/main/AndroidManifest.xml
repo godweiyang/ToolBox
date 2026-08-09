@@ -29,7 +29,7 @@
     <!-- 金属探测器:震动报警 -->
     <uses-permission android:name="android.permission.VIBRATE" />
 
-    <!-- WiFi 信号探测器:读取 WiFi 信息需要位置权限（Android 6+） -->
+    <!-- WiFi 信号探测器 / 卫星天空图:位置权限（Android 6+） -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
 
@@ -97,6 +97,10 @@
 
         <activity
             android:name=".BatteryInfoActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".GnssSkyActivity"
             android:exported="false" />
 
         <!-- 局域网文件互传 HTTP server，前台 Service 保活 -->

@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">工具百宝箱</string>
 
@@ -202,4 +202,11 @@
     <string name="battery_section_sysfs">电源节点（/sys/class/power_supply）</string>
     <string name="battery_section_thermal">温度节点（/sys/class/thermal）</string>
     <string name="battery_hint">说明：上方大卡片为电池端（Vbat 侧）数据——电压是电芯两端电压（充电约 4.3V），电流是充进电芯的电流，功率 = 电压 × 电流，即电池实际接收的功率。快充时充电器输出的是 9V 等高压（Vbus），经手机充电 IC 降压后才给电池，所以 USB 电流表测的电压/电流与电池端不同属正常现象，两侧功率差为充电 IC 转换损耗。若机型允许读取电源节点（或在电池广播中带有厂商私有字段），会额外显示「充电器输入（Vbus 侧）」，与 USB 电流表读数对应；若电源/温度节点显示无法访问，可查看「广播原始数据」区确认是否有厂商私有字段。与 vivo 工程模式（拨号 *#*#113#*#*）对照：Ibat≈电流、Vbat≈电压、Tbat≈电池温度、Tboard≈温度节点中的主板温度、Vbus≈充电器输入电压。</string>
+    <string name="tool_gnss_title">卫星天空图</string>
+    <string name="tool_gnss_desc">实时显示 GPS / 北斗 / GLONASS / Galileo 卫星分布与信号</string>
+    <string name="gnss_section_skyplot">卫星天空图（点击卫星查看详情）</string>
+    <string name="gnss_section_chart">信号强度曲线</string>
+    <string name="gnss_section_list">卫星列表</string>
+    <string name="gnss_permission_prompt">需要位置权限才能读取 GNSS 卫星状态。请到系统设置中授予精确定位权限后重试。</string>
+    <string name="gnss_hint">天空图以你的头顶为中心，圆心为天顶（仰角 90°），外圈为地平线（仰角 0°）。方位角：北=0°、东=90°、南=180°、西=270°。卫星点越大表示信号越强，半透明表示未用于定位。颜色区分星座：蓝=GPS、红=GLONASS、绿=Galileo、橙=北斗。</string>
 </resources>
