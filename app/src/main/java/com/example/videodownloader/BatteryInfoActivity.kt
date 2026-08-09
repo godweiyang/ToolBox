@@ -5,9 +5,11 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.os.BatteryManager
+import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.os.PowerManager
 import android.view.Gravity
 import android.view.View
 import android.widget.LinearLayout
@@ -190,6 +192,7 @@ class BatteryInfoActivity : AppCompatActivity() {
         rows.add("电池存在" to if (present) "是" else "否")
         if (!technology.isNullOrBlank()) rows.add("电池技术" to technology)
         rows.add("健康度" to healthText(health))
+        thermalStatusTextOrNull()?.let { rows.add("系统热状态" to it) }
         cycleCount?.takeIf { it >= 0 }?.let { rows.add("循环次数" to "$it 次") }
         currentNowUa?.let { rows.add("瞬时电流（原始值）" to "$it µA") }
         currentAvgUa?.let { rows.add("平均电流" to "%.0f mA".format(abs(it) / 1000.0)) }
@@ -201,8 +204,10 @@ class BatteryInfoActivity : AppCompatActivity() {
         capacityPct?.let { rows.add("电量计容量" to "$it %") }
         maxChargeCurrentUa?.takeIf { it > 0 }?.let { rows.add("最大充电电流" to "${it / 1000} mA") }
         maxChargeVoltageUv?.takeIf { it > 0 }?.let { rows.add("最大充电电压" to "${it / 1000} mV") }
-        // 充电器输入端（Vbus 侧，来自电源节点）
-        lastChargerInput?.let { input ->
+        // 充电器输入端（Vbus 侧）：sysfs 电源节点优先，厂商广播私有字段兜底
+        val chargerInput = lastChargerInput ?: extractChargerInputFromExtras(intent)
+        updateInputCard(chargerInput)
+        chargerInput?.let { input ->
             input.voltageV?.let { rows.add("充电器输入电压（Vbus）" to "%.2f V".format(it)) }
             input.currentA?.let { rows.add("充电器输入电流（Ibus）" to "%.2f A".format(abs(it))) }
             if (input.voltageV != null && input.currentA != null) {
@@ -301,8 +306,8 @@ class BatteryInfoActivity : AppCompatActivity() {
             runOnUiThread {
                 binding.tvSysfs.text = psText
                 binding.tvThermal.text = th
+                // 卡片刷新统一由 updateUi 每秒处理（含广播字段兜底），这里只存结果
                 lastChargerInput = input
-                updateInputCard(input)
                 sysfsScanning = false
             }
         }.apply { isDaemon = true; start() }
@@ -384,6 +389,59 @@ class BatteryInfoActivity : AppCompatActivity() {
             abs(it) > 100_000 -> it / 1e6
             abs(it) > 100 -> it / 1e3
             else -> it
+        }
+    }
+
+    /**
+     * 部分厂商（如三星）会在电池广播里塞私有字段。
+     * sysfs 被 SELinux 禁用时，尝试从广播 extra 里提取充电器输入端电压/电流。
+     */
+    @Suppress("DEPRECATION")
+    private fun extractChargerInputFromExtras(intent: Intent): ChargerInput? {
+        val extras = intent.extras ?: return null
+        var vRaw: Double? = null
+        var iRaw: Double? = null
+        var vKey = ""
+        var iKey = ""
+        for (key in extras.keySet()) {
+            val k = key.lowercase()
+            val num = when (val v = extras.get(key)) {
+                is Int -> v.toDouble()
+                is Long -> v.toDouble()
+                is Float -> v.toDouble()
+                is Double -> v
+                is String -> v.toDoubleOrNull()
+                else -> null
+            } ?: continue
+            if (vRaw == null &&
+                ("vbus" in k || "charger_voltage" in k || "input_voltage" in k)
+            ) {
+                vRaw = num; vKey = key
+            }
+            if (iRaw == null &&
+                ("ibus" in k || "charger_current" in k || "input_current" in k)
+            ) {
+                iRaw = num; iKey = key
+            }
+        }
+        if (vRaw == null && iRaw == null) return null
+        val source = listOf(vKey, iKey).filter { it.isNotEmpty() }.joinToString(" / ")
+        return ChargerInput(normalizeVoltage(vRaw), normalizeCurrent(iRaw), "广播字段 $source")
+    }
+
+    /** 系统热状态（API 29+）：温度节点被限制时的官方替代信息 */
+    private fun thermalStatusTextOrNull(): String? {
+        if (Build.VERSION.SDK_INT < 29) return null
+        val pm = getSystemService(PowerManager::class.java) ?: return null
+        return when (pm.currentThermalStatus) {
+            PowerManager.THERMAL_STATUS_NONE -> "无压力"
+            PowerManager.THERMAL_STATUS_LIGHT -> "轻微"
+            PowerManager.THERMAL_STATUS_MODERATE -> "中度"
+            PowerManager.THERMAL_STATUS_SEVERE -> "严重"
+            PowerManager.THERMAL_STATUS_CRITICAL -> "危急"
+            PowerManager.THERMAL_STATUS_EMERGENCY -> "紧急"
+            PowerManager.THERMAL_STATUS_SHUTDOWN -> "即将关机"
+            else -> "未知"
         }
     }
 
