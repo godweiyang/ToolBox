@@ -44,6 +44,9 @@ class BatteryInfoActivity : AppCompatActivity() {
     /** 最近一次从电源节点提取到的充电器输入端数据（Vbus 侧），null 表示机型不可读 */
     private var lastChargerInput: ChargerInput? = null
 
+    /** soc_decimal 会瞬态广播 0（电量计刷新间隙），保留最后一次有效值避免顶部电量跳 0 */
+    private var lastSocDecimal: Int? = null
+
     @Volatile
     private var sysfsScanning = false
 
@@ -176,9 +179,10 @@ class BatteryInfoActivity : AppCompatActivity() {
         val powerW = if (currentMa != null && voltageV != null) currentMa / 1000.0 * voltageV else null
         val tempC = if (tempRaw != Int.MIN_VALUE) tempRaw / 10.0 else null
 
-        // 顶部：电量 + 状态（有 soc_decimal 时显示两位小数的精确电量）
+        // 顶部：电量 + 状态（有 soc_decimal 时显示两位小数的精确电量；0 为瞬态无效值，沿用上次）
+        if (socDecimal != null && socDecimal > 0) lastSocDecimal = socDecimal
         binding.tvLevelBig.text = when {
-            socDecimal != null && socDecimal >= 0 -> "%.2f%%".format(socDecimal / 100.0)
+            lastSocDecimal != null -> "%.2f%%".format(lastSocDecimal!! / 100.0)
             level >= 0 -> "%d%%".format(level * 100 / scale)
             else -> "--"
         }
@@ -214,7 +218,7 @@ class BatteryInfoActivity : AppCompatActivity() {
         rows.add("健康度" to healthText(health))
         thermalStatusTextOrNull()?.let { rows.add("系统热状态" to it) }
         cycleCount?.takeIf { it >= 0 }?.let { rows.add("循环次数" to "$it 次") }
-        socDecimal?.takeIf { it >= 0 }?.let { rows.add("精确电量" to "%.2f %%".format(it / 100.0)) }
+        lastSocDecimal?.let { rows.add("精确电量" to "%.2f %%".format(it / 100.0)) }
         adapterPowerW?.takeIf { it > 0 }
             ?.let { rows.add("适配器额定功率" to "$it W（适配器能力，非实时输入功率）") }
         chargingSpeed?.takeIf { it >= 0 }?.let { rows.add("充电速度档位（厂商定义）" to "$it") }
