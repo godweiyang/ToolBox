@@ -7,6 +7,7 @@ import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
 import android.util.Log
+import com.example.videodownloader.parser.PlatformRegistry
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
@@ -37,12 +38,16 @@ object DownloadManager {
             .build()
     }
 
-    private fun refererForPlatform(platform: String): String = when (platform) {
-        "xiaohongshu" -> "https://www.xiaohongshu.com/"
-        "kuaishou" -> "https://www.kuaishou.com/"
-        "bilibili" -> "https://www.bilibili.com/"
-        else -> "https://www.douyin.com/"
-    }
+    /** 各平台 CDN 防盗链 Referer：优先取注册表配置，兜底老平台映射与抖音 */
+    private fun refererForPlatform(platform: String): String =
+        PlatformRegistry.refererFor(platform).ifBlank {
+            when (platform) {
+                "xiaohongshu" -> "https://www.xiaohongshu.com/"
+                "kuaishou" -> "https://www.kuaishou.com/"
+                "bilibili" -> "https://www.bilibili.com/"
+                else -> "https://www.douyin.com/"
+            }
+        }
 
     /** 下载结果 */
     sealed class Result {
@@ -304,6 +309,7 @@ object DownloadManager {
         context: Context,
         imageUrls: List<String>,
         displayName: String,
+        platform: String = "douyin",
         onProgress: (Int) -> Unit = {}
     ): Result = withContext(Dispatchers.IO) {
         val savedUris = mutableListOf<Uri>()
@@ -315,7 +321,7 @@ object DownloadManager {
                     .url(url)
                     .header("User-Agent", "Mozilla/5.0 (Linux; Android 13) " +
                         "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Mobile Safari/537.36")
-                    .header("Referer", "https://www.douyin.com/")
+                    .header("Referer", refererForPlatform(platform))
                     .header("Accept", "*/*")
                     .get()
                     .build()
@@ -499,6 +505,7 @@ object DownloadManager {
         musicUrl: String,
         displayName: String,
         musicDurationSec: Int,
+        platform: String = "douyin",
         onProgress: (Int) -> Unit = {}
     ): Result = withContext(Dispatchers.IO) {
         val cacheDir = context.cacheDir
@@ -514,7 +521,7 @@ object DownloadManager {
             val savedImageUris = mutableListOf<Uri>()
             imageUrls.forEachIndexed { index, url ->
                 val imgFile = File(cacheDir, "live_img_$index.jpg")
-                val ok = downloadToTempWithReferer(url, imgFile, "https://www.douyin.com/")
+                val ok = downloadToTempWithReferer(url, imgFile, refererForPlatform(platform))
                 if (ok && imgFile.exists() && imgFile.length() > 100) {
                     tmpImages.add(imgFile)
                     // 保存图片到相册
@@ -542,7 +549,7 @@ object DownloadManager {
             var audioFile: File? = null
             if (musicUrl.isNotBlank()) {
                 Log.i(TAG, "下载背景音乐…")
-                val ok = downloadToTempWithReferer(musicUrl, tmpAudio, "https://www.douyin.com/")
+                val ok = downloadToTempWithReferer(musicUrl, tmpAudio, refererForPlatform(platform))
                 if (ok && tmpAudio.exists() && tmpAudio.length() > 0) {
                     audioFile = tmpAudio
                     Log.i(TAG, "背景音乐下载成功: ${tmpAudio.length()} bytes")
@@ -674,6 +681,7 @@ object DownloadManager {
         musicUrl: String,
         displayName: String,
         musicDurationSec: Int,
+        platform: String = "douyin",
         onProgress: (Int) -> Unit = {}
     ): Result = withContext(Dispatchers.IO) {
         val cacheDir = context.cacheDir
@@ -686,7 +694,7 @@ object DownloadManager {
             Log.i(TAG, "下载图片用于视频合成…")
             imageUrls.forEachIndexed { index, url ->
                 val f = File(cacheDir, "slide_img_$index.jpg")
-                val ok = downloadToTempWithReferer(url, f, "https://www.douyin.com/")
+                val ok = downloadToTempWithReferer(url, f, refererForPlatform(platform))
                 if (ok && f.exists() && f.length() > 100) {
                     tmpImages.add(f)
                     Log.i(TAG, "图片 ${index + 1} 下载成功: ${f.length()} bytes")
@@ -702,7 +710,7 @@ object DownloadManager {
             var audioFile: File? = null
             if (musicUrl.isNotBlank()) {
                 Log.i(TAG, "下载背景音乐…")
-                val ok = downloadToTempWithReferer(musicUrl, tmpAudio, "https://www.douyin.com/")
+                val ok = downloadToTempWithReferer(musicUrl, tmpAudio, refererForPlatform(platform))
                 if (ok && tmpAudio.exists() && tmpAudio.length() > 0) {
                     audioFile = tmpAudio
                 }

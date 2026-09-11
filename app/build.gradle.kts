@@ -12,8 +12,8 @@ android {
         applicationId = "com.example.videodownloader"
         minSdk = 26
         targetSdk = 34
-        versionCode = 40
-        versionName = "1.9.12"
+        versionCode = 41
+        versionName = "1.9.13"
     }
 
     signingConfigs {

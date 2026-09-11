@@ -1,6 +1,8 @@
 package com.example.videodownloader
 
 import android.util.Log
+import com.example.videodownloader.parser.ParseContext
+import com.example.videodownloader.parser.PlatformRegistry
 import com.google.gson.JsonParser
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -72,27 +74,27 @@ object VideoParser {
 
             Log.i(TAG, "提取到的分享链接: $shareUrl")
 
-            // 判断平台
-            val platform = detectPlatform(shareUrl)
-            when (platform) {
+            // 平台识别统一走 PlatformRegistry（域名表驱动，覆盖老平台与新增平台）
+            val key = PlatformRegistry.detect(shareUrl)
+            when (key) {
+                // 老平台：保留 VideoParser 内成熟解析逻辑
                 "douyin" -> parseDouyin(shareUrl)
                 "kuaishou" -> parseKuaishou(shareUrl)
                 "xiaohongshu" -> parseXiaohongshu(shareUrl)
                 "bilibili" -> parseBilibili(shareUrl, context)
-                else -> throw UnsupportedOperationException("暂不支持该平台: $shareUrl")
+                // 西瓜：优先新的字节 VOD 解析，失败回退抖音链路
+                "xigua" -> PlatformRegistry.parse(key, ParseContext(shareUrl, context))
+                    ?: parseDouyin(shareUrl)
+                // 未识别
+                null -> throw UnsupportedOperationException("暂不支持该平台: $shareUrl")
+                // 其余新增平台：走 parser 子包注册表
+                else -> PlatformRegistry.parse(key, ParseContext(shareUrl, context))
+                    ?: throw UnsupportedOperationException(
+                        "暂无法解析该 ${PlatformRegistry.displayName(key)} 链接" +
+                            "（可能需要登录、内容已失效，或仅提供直播/HLS 流）"
+                    )
             }
         }
-    }
-
-    private fun detectPlatform(url: String): String = when {
-        url.contains("v.douyin.com") || url.contains("iesdouyin.com") ||
-            url.contains("douyin.com") -> "douyin"
-        url.contains("v.kuaishou.com") || url.contains("kuaishou.com") -> "kuaishou"
-        url.contains("xhslink.cn") || url.contains("xhslink.com") ||
-            url.contains("xiaohongshu.com") -> "xiaohongshu"
-        url.contains("ixigua.com") -> "douyin" // 西瓜视频走抖音相同思路
-        url.contains("b23.tv") || url.contains("bilibili.com") -> "bilibili"
-        else -> "unknown"
     }
 
     // ===================== 抖音解析 =====================

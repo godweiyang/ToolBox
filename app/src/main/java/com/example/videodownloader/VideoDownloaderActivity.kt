@@ -270,7 +270,8 @@ class VideoDownloaderActivity : AppCompatActivity() {
             val result = DownloadManager.downloadImages(
                 context = applicationContext,
                 imageUrls = video.imageUrls,
-                displayName = video.title
+                displayName = video.title,
+                platform = video.platform
             ) { percent ->
                 runOnUiIfAlive {
                     binding.progressBar.progress = percent
@@ -292,7 +293,8 @@ class VideoDownloaderActivity : AppCompatActivity() {
                 imageUrls = video.imageUrls,
                 musicUrl = video.musicUrl,
                 displayName = video.title,
-                musicDurationSec = video.musicDuration
+                musicDurationSec = video.musicDuration,
+                platform = video.platform
             ) { percent ->
                 runOnUiIfAlive {
                     binding.progressBar.progress = percent
