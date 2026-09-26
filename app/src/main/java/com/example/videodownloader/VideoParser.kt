@@ -136,8 +136,16 @@ object VideoParser {
             Log.w(TAG, "无法提取 videoId，直接使用跳转URL: $resolvedUrl")
             resolvedUrl.replace("/share/slides/", "/share/note/")
         }
-        return parseFromSharePageHtml(sharePageUrl)
-            ?: throw IllegalStateException("抖音视频解析失败，可能接口已变更")
+
+        // 抖音的 share 页在新会话下可能先只返回页面壳，同时下发 ttwid cookie；
+        // 同一会话再次请求才包含 item_list/play_addr。过去首次点击失败、第二次成功，
+        // 正是因为第二次点击复用了第一次留下的 cookie。现在把该重试收敛到一次点击内。
+        var parsed = parseFromSharePageHtml(sharePageUrl)
+        if (parsed == null) {
+            Log.i(TAG, "抖音首次响应未包含作品数据，携带已建立的会话重试一次…")
+            parsed = parseFromSharePageHtml(sharePageUrl)
+        }
+        return parsed ?: throw IllegalStateException("抖音视频解析失败，重试后仍未获取作品数据")
     }
 
     /** 手动跟随重定向（最多3次），返回最终 Location；无重定向时返回请求 URL */
