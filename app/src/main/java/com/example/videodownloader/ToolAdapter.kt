@@ -42,17 +42,12 @@ class ToolAdapter(
     override fun onBindViewHolder(holder: ToolVH, position: Int) {
         val tool = tools[position]
         with(holder.binding) {
-            // 给图标加一个圆形彩色背景
+            // iOS 风格：圆角矩形渐变色块 + 白色图标
             val ctx = root.context
             val tinted = androidx.appcompat.content.res.AppCompatResources.getDrawable(ctx, tool.iconRes)
             ivToolIcon.setImageDrawable(tinted)
-            // 用工具的 bgColor 给 ImageView 着色为圆形背景
-            val bg = android.graphics.drawable.GradientDrawable().apply {
-                shape = android.graphics.drawable.GradientDrawable.OVAL
-                setColor(ctx.getColor(tool.bgColorRes))
-            }
-            ivToolIcon.background = bg
-            // 图标本身用白色 tint
+            ivToolIcon.setBackgroundResource(tool.iconBgRes)
+            ivToolIcon.clipToOutline = true
             ivToolIcon.imageTintList = android.content.res.ColorStateList.valueOf(android.graphics.Color.WHITE)
             tvToolTitle.text = tool.title
             tvToolDesc.text = tool.desc

@@ -1,11 +1,86 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- 全局 iOS 风格主题：浅色、无边框、蓝色强调 -->
     <style name="Theme.VideoDownloader" parent="Theme.MaterialComponents.Light.NoActionBar">
-        <item name="colorPrimary">#FE2C55</item>
-        <item name="colorPrimaryVariant">#C81E40</item>
-        <item name="colorOnPrimary">#FFFFFF</item>
-        <item name="colorSecondary">#25F4EE</item>
-        <item name="android:statusBarColor">#FE2C55</item>
-        <item name="android:windowBackground">@color/bg_light</item>
+        <item name="colorPrimary">@color/ios_blue</item>
+        <item name="colorPrimaryVariant">@color/ios_indigo</item>
+        <item name="colorOnPrimary">@color/white</item>
+        <item name="colorSecondary">@color/ios_cyan</item>
+        <item name="colorOnSecondary">@color/white</item>
+        <item name="colorError">@color/ios_red</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowBackground">@drawable/ios_bg_gradient</item>
+        <item name="android:textColorPrimary">@color/text_primary</item>
+        <item name="android:textColorSecondary">@color/text_secondary</item>
+        <item name="materialButtonStyle">@style/Widget.iOS.Button</item>
+        <item name="editTextStyle">@style/Widget.iOS.EditText</item>
+        <item name="android:windowDrawsSystemBarBackgrounds">true</item>
     </style>
+
+    <!-- 主按钮：蓝色胶囊 -->
+    <style name="Widget.iOS.Button" parent="Widget.MaterialComponents.Button">
+        <item name="cornerRadius">16dp</item>
+        <item name="android:textAllCaps">false</item>
+        <item name="android:textSize">16sp</item>
+        <item name="android:letterSpacing">0</item>
+        <item name="android:fontFamily">sans-serif-medium</item>
+        <item name="android:paddingTop">12dp</item>
+        <item name="android:paddingBottom">12dp</item>
+        <item name="elevation">0dp</item>
+        <item name="rippleColor">#33FFFFFF</item>
+    </style>
+
+    <!-- 次按钮：半透明玻璃 -->
+    <style name="Widget.iOS.Button.Secondary" parent="Widget.MaterialComponents.Button.OutlinedButton">
+        <item name="cornerRadius">16dp</item>
+        <item name="android:textAllCaps">false</item>
+        <item name="android:textSize">15sp</item>
+        <item name="android:textColor">@color/ios_blue</item>
+        <item name="android:fontFamily">sans-serif-medium</item>
+        <item name="elevation">0dp</item>
+        <item name="strokeWidth">0dp</item>
+        <item name="backgroundTint">@color/glass_fill_strong</item>
+    </style>
+
+    <!-- 输入框：玻璃圆角，无下划线 -->
+    <style name="Widget.iOS.EditText" parent="Widget.AppCompat.EditText">
+        <item name="android:background">@drawable/ios_glass_field</item>
+        <item name="android:textColor">@color/text_primary</item>
+        <item name="android:textColorHint">@color/text_tertiary</item>
+        <item name="android:textSize">15sp</item>
+        <item name="android:padding">14dp</item>
+    </style>
+
+    <!-- 页面大标题（iOS Large Title） -->
+    <style name="Text.iOS.LargeTitle" parent="@android:style/TextAppearance">
+        <item name="android:textSize">34sp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:textColor">@color/text_primary</item>
+        <item name="android:letterSpacing">-0.02</item>
+    </style>
+
+    <!-- 页面次级标题 -->
+    <style name="Text.iOS.Headline" parent="@android:style/TextAppearance">
+        <item name="android:textSize">22sp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:textColor">@color/text_primary</item>
+        <item name="android:letterSpacing">-0.01</item>
+    </style>
+
+    <!-- 卡片标题 -->
+    <style name="Text.iOS.CardTitle" parent="@android:style/TextAppearance">
+        <item name="android:textSize">16sp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:textColor">@color/text_primary</item>
+    </style>
+
+    <!-- 次要说明文字 -->
+    <style name="Text.iOS.Caption" parent="@android:style/TextAppearance">
+        <item name="android:textSize">13sp</item>
+        <item name="android:textColor">@color/text_secondary</item>
+    </style>
+
 </resources>

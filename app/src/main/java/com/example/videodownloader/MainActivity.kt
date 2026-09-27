@@ -2,6 +2,7 @@
 
 import android.content.Intent
 import android.os.Bundle
+import android.view.View
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.ItemTouchHelper
@@ -74,16 +75,18 @@ class MainActivity : AppCompatActivity() {
                 super.onSelectedChanged(viewHolder, actionState)
                 if (actionState == ItemTouchHelper.ACTION_STATE_DRAG && viewHolder != null) {
                     // 拖拽中：放大 + 提升阴影
-                    viewHolder.itemView.animate().scaleX(1.08f).scaleY(1.08f).setDuration(100).start()
-                    viewHolder.itemView.elevation = 16f
+                    viewHolder.itemView.animate().scaleX(1.06f).scaleY(1.06f).setDuration(120).start()
+                    viewHolder.itemView.elevation = 18f
+                    viewHolder.itemView.z = 18f
                 }
             }
 
             override fun clearView(rv: RecyclerView, viewHolder: RecyclerView.ViewHolder) {
                 super.clearView(rv, viewHolder)
                 // 松手：还原
-                viewHolder.itemView.animate().scaleX(1f).scaleY(1f).setDuration(100).start()
+                viewHolder.itemView.animate().scaleX(1f).scaleY(1f).setDuration(120).start()
                 viewHolder.itemView.elevation = 0f
+                viewHolder.itemView.z = 0f
                 // 持久化新顺序
                 saveOrder(adapter.getOrderIds())
             }
@@ -144,7 +147,7 @@ class MainActivity : AppCompatActivity() {
             title = getString(R.string.tool_video_downloader_title),
             desc = getString(R.string.tool_video_downloader_desc),
             iconRes = android.R.drawable.ic_media_play,
-            bgColorRes = R.color.douyin_red,
+            iconBgRes = R.drawable.icon_grad_video,
             launcher = { ctx -> Intent(ctx, VideoDownloaderActivity::class.java) }
         ),
         Tool(
@@ -152,7 +155,7 @@ class MainActivity : AppCompatActivity() {
             title = getString(R.string.tool_qrcode_title),
             desc = getString(R.string.tool_qrcode_desc),
             iconRes = android.R.drawable.ic_menu_camera,
-            bgColorRes = R.color.tool_qrcode_bg,
+            iconBgRes = R.drawable.icon_grad_qr,
             launcher = { ctx -> Intent(ctx, QrCodeActivity::class.java) }
         ),
         Tool(
@@ -160,7 +163,7 @@ class MainActivity : AppCompatActivity() {
             title = getString(R.string.tool_video_to_gif_title),
             desc = getString(R.string.tool_video_to_gif_desc),
             iconRes = android.R.drawable.ic_menu_gallery,
-            bgColorRes = R.color.tool_qrcode_bg,
+            iconBgRes = R.drawable.icon_grad_gif,
             launcher = { ctx -> Intent(ctx, VideoToGifActivity::class.java) }
         ),
         Tool(
@@ -168,7 +171,7 @@ class MainActivity : AppCompatActivity() {
             title = getString(R.string.tool_ninegrid_title),
             desc = getString(R.string.tool_ninegrid_desc),
             iconRes = android.R.drawable.ic_menu_crop,
-            bgColorRes = R.color.tool_ninegrid_bg,
+            iconBgRes = R.drawable.icon_grad_grid,
             launcher = { ctx -> Intent(ctx, NineGridActivity::class.java) }
         ),
         Tool(
@@ -176,7 +179,7 @@ class MainActivity : AppCompatActivity() {
             title = getString(R.string.tool_gifreverse_title),
             desc = getString(R.string.tool_gifreverse_desc),
             iconRes = android.R.drawable.ic_menu_rotate,
-            bgColorRes = R.color.tool_gifreverse_bg,
+            iconBgRes = R.drawable.icon_grad_reverse,
             launcher = { ctx -> Intent(ctx, GifReverseActivity::class.java) }
         ),
         Tool(
@@ -184,7 +187,7 @@ class MainActivity : AppCompatActivity() {
             title = getString(R.string.tool_decibel_title),
             desc = getString(R.string.tool_decibel_desc),
             iconRes = android.R.drawable.ic_btn_speak_now,
-            bgColorRes = R.color.tool_decibel_bg,
+            iconBgRes = R.drawable.icon_grad_decibel,
             launcher = { ctx -> Intent(ctx, DecibelMeterActivity::class.java) }
         ),
         Tool(
@@ -192,7 +195,7 @@ class MainActivity : AppCompatActivity() {
             title = getString(R.string.tool_wifi_title),
             desc = getString(R.string.tool_wifi_desc),
             iconRes = android.R.drawable.ic_menu_compass,
-            bgColorRes = R.color.tool_wifi_bg,
+            iconBgRes = R.drawable.icon_grad_wifi,
             launcher = { ctx -> Intent(ctx, WifiSignalActivity::class.java) }
         ),
         Tool(
@@ -200,7 +203,7 @@ class MainActivity : AppCompatActivity() {
             title = getString(R.string.tool_fileshare_title),
             desc = getString(R.string.tool_fileshare_desc),
             iconRes = android.R.drawable.stat_sys_upload,
-            bgColorRes = R.color.tool_fileshare_bg,
+            iconBgRes = R.drawable.icon_grad_share,
             launcher = { ctx -> Intent(ctx, FileShareActivity::class.java) }
         ),
         Tool(
@@ -208,7 +211,7 @@ class MainActivity : AppCompatActivity() {
             title = getString(R.string.tool_metal_title),
             desc = getString(R.string.tool_metal_desc),
             iconRes = android.R.drawable.ic_menu_compass,
-            bgColorRes = R.color.tool_metal_bg,
+            iconBgRes = R.drawable.icon_grad_metal,
             launcher = { ctx -> Intent(ctx, MetalDetectorActivity::class.java) }
         ),
         Tool(
@@ -216,7 +219,7 @@ class MainActivity : AppCompatActivity() {
             title = getString(R.string.tool_battery_title),
             desc = getString(R.string.tool_battery_desc),
             iconRes = android.R.drawable.ic_lock_idle_charging,
-            bgColorRes = R.color.tool_battery_bg,
+            iconBgRes = R.drawable.icon_grad_battery,
             launcher = { ctx -> Intent(ctx, BatteryInfoActivity::class.java) }
         ),
         Tool(
@@ -224,7 +227,7 @@ class MainActivity : AppCompatActivity() {
             title = getString(R.string.tool_gnss_title),
             desc = getString(R.string.tool_gnss_desc),
             iconRes = android.R.drawable.ic_menu_mylocation,
-            bgColorRes = R.color.tool_gnss_bg,
+            iconBgRes = R.drawable.icon_grad_gnss,
             launcher = { ctx -> Intent(ctx, GnssSkyActivity::class.java) }
         )
     )

@@ -358,9 +358,6 @@ class VideoDownloaderActivity : AppCompatActivity() {
         val cur = binding.tvLog.text.toString()
         binding.tvLog.text = if (cur.isBlank() || cur.endsWith("\n")) cur + msg else cur + "\n" + msg
         binding.tvLog.append("\n")
-        binding.scrollLog.post {
-            binding.scrollLog.fullScroll(android.view.View.FOCUS_DOWN)
-        }
     }
 
     private fun toast(msg: String) {

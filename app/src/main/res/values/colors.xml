@@ -2,8 +2,48 @@
 <resources>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
+
+    <!-- 抖音红（保留业务色） -->
     <color name="douyin_red">#FE2C55</color>
-    <color name="bg_light">#FFFAFAFA</color>
+    <color name="bg_light">#FFF6F7FB</color>
+
+    <!-- iOS 设计系统配色 -->
+    <!-- iOS 系统色（图标渐变起点/终点） -->
+    <color name="ios_red">#FF3B30</color>
+    <color name="ios_orange">#FF9500</color>
+    <color name="ios_yellow">#FFCC00</color>
+    <color name="ios_green">#34C759</color>
+    <color name="ios_mint">#00C7BE</color>
+    <color name="ios_teal">#30B0C7</color>
+    <color name="ios_cyan">#32ADE6</color>
+    <color name="ios_blue">#007AFF</color>
+    <color name="ios_indigo">#5856D6</color>
+    <color name="ios_purple">#AF52DE</color>
+    <color name="ios_pink">#FF2D55</color>
+    <color name="ios_brown">#A2845E</color>
+    <color name="ios_gray">#8E8E93</color>
+
+    <!-- 背景渐变（浅灰蓝） -->
+    <color name="bg_gradient_top">#FFE9EEF7</color>
+    <color name="bg_gradient_center">#FFF4F6FB</color>
+    <color name="bg_gradient_bottom">#FFEEF2F8</color>
+
+    <!-- 磨砂玻璃卡片 -->
+    <color name="glass_fill">#E6FFFFFF</color>
+    <color name="glass_fill_strong">#F2FFFFFF</color>
+    <color name="glass_stroke">#33FFFFFF</color>
+    <color name="glass_shadow">#1A3A4A66</color>
+
+    <!-- 文字 -->
+    <color name="text_primary">#FF1C1C1E</color>
+    <color name="text_secondary">#FF6C6C78</color>
+    <color name="text_tertiary">#FF9A9AA4</color>
+
+    <!-- 分隔线 -->
+    <color name="separator">#1E3C3C43</color>
+    <color name="fill_subtle">#0F787880</color>
+
+    <!-- 工具卡片旧色（保留兼容，逐步替换为系统色） -->
     <color name="tool_qrcode_bg">#3F51B5</color>
     <color name="tool_ninegrid_bg">#FF6F00</color>
     <color name="tool_gifreverse_bg">#00897B</color>
@@ -20,4 +60,29 @@
     <color name="wifi_fair">#F9A825</color>
     <color name="wifi_weak">#E65100</color>
     <color name="wifi_bad">#B71C1C</color>
-    <color name="tool_gnss_bg">#5E35B1</color>`n</resources>
+    <color name="tool_gnss_bg">#5E35B1</color>
+
+    <!-- 图标渐变色（11 个工具，两两配对：start/end） -->
+    <color name="grad_video_s">#FF2D55</color>
+    <color name="grad_video_e">#FF6B8A</color>
+    <color name="grad_qr_s">#32ADE6</color>
+    <color name="grad_qr_e">#007AFF</color>
+    <color name="grad_gif_s">#AF52DE</color>
+    <color name="grad_gif_e">#7B4FE0</color>
+    <color name="grad_grid_s">#FF9500</color>
+    <color name="grad_grid_e">#FF6A00</color>
+    <color name="grad_reverse_s">#00C7BE</color>
+    <color name="grad_reverse_e">#009E96</color>
+    <color name="grad_decibel_s">#FF3B30</color>
+    <color name="grad_decibel_e">#FF7A4D</color>
+    <color name="grad_wifi_s">#30B0C7</color>
+    <color name="grad_wifi_e">#1A8FA8</color>
+    <color name="grad_share_s">#5856D6</color>
+    <color name="grad_share_e">#7D7BF0</color>
+    <color name="grad_metal_s">#8E8E93</color>
+    <color name="grad_metal_e">#585C66</color>
+    <color name="grad_battery_s">#34C759</color>
+    <color name="grad_battery_e">#1FAE6B</color>
+    <color name="grad_gnss_s">#FF9500</color>
+    <color name="grad_gnss_e">#FFB340</color>
+</resources>

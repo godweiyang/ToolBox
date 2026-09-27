@@ -10,7 +10,7 @@ import android.content.Intent
  * @param title 工具名称（显示在卡片上）
  * @param desc 工具描述
  * @param iconRes 图标资源 id（drawable）
- * @param bgColor 卡片背景色资源 id
+ * @param iconBgRes 图标背景 drawable（iOS 风格圆角渐变色块）
  * @param launcher 启动该工具的方式：传入 [Context] 返回 [Intent]
  */
 data class Tool(
@@ -18,6 +18,6 @@ data class Tool(
     val title: String,
     val desc: String,
     val iconRes: Int,
-    val bgColorRes: Int,
+    val iconBgRes: Int,
     val launcher: (Context) -> Intent
 )
