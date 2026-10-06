@@ -406,7 +406,7 @@ object StackBlur {
                 routsum -= sir[0]; goutsum -= sir[1]; boutsum -= sir[2]
                 if (x == 0) vmin[y] = min(y + r1, hm) * w
                 p = vmin[y]
-                sir[0] = r[p]; sir[1] = g[p]; sir[2] = b[p]
+                sir[0] = r[p + x]; sir[1] = g[p + x]; sir[2] = b[p + x]
 
                 rinsum += sir[0]; ginsum += sir[1]; binsum += sir[2]
                 rsum += rinsum; gsum += ginsum; bsum += binsum
