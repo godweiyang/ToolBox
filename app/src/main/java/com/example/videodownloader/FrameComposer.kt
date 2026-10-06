@@ -127,40 +127,30 @@ object FrameComposer {
         c.drawColor(Color.WHITE)
         val kx = sw.toFloat() / cw
         val ky = sh.toFloat() / ch
-        val outer = 20f * kx
+        // 实体黑色圆角矩形，比卡片向外扩 12px（全分辨率），模糊后卡片盖住内部只露外缘
+        val spread = 12f * kx
         val black = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.BLACK }
-        val white = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE }
         c.drawRoundRect(
             RectF(
-                card.left * kx - outer,
-                card.top * ky - outer,
-                card.right * kx + outer,
-                card.bottom * ky + outer
+                card.left * kx - spread,
+                card.top * ky - spread,
+                card.right * kx + spread,
+                card.bottom * ky + spread
             ),
-            cardRadius * kx + outer, cardRadius * kx + outer, black
-        )
-        c.drawRoundRect(
-            RectF(
-                card.left * kx,
-                card.top * ky,
-                card.right * kx,
-                card.bottom * ky
-            ),
-            cardRadius * kx, cardRadius * kx, white
+            cardRadius * kx + spread, cardRadius * kx + spread, black
         )
 
         val px = IntArray(sw * sh)
         bmp.getPixels(px, 0, sw, 0, 0, sw, sh)
-        // 取 R 通道作为灰度
+        // 取 R 通道作为灰度；多级 box blur 形成贴边最暗、向外平滑长尾的接触阴影
         val gray = IntArray(sw * sh) { (px[it] shr 16) and 0xff }
-        FastBoxBlur.blur(gray, sw, sh, 2)
-        FastBoxBlur.blur(gray, sw, sh, 7)
-        FastBoxBlur.blur(gray, sw, sh, 8)
+        FastBoxBlur.blur(gray, sw, sh, 10)
+        FastBoxBlur.blur(gray, sw, sh, 11)
 
-        // 灰度反相转 alpha（strength 1.1），RGB 为黑
+        // 灰度反相转 alpha，整体不透明度 0.8，RGB 为黑
         val outPx = IntArray(sw * sh)
         for (i in outPx.indices) {
-            val a = (((255 - gray[i]) * 11) / 10).coerceIn(0, 255)
+            val a = (((255 - gray[i]) * 8) / 10).coerceIn(0, 255)
             outPx[i] = a shl 24
         }
         bmp.setPixels(outPx, 0, sw, 0, 0, sw, sh)
