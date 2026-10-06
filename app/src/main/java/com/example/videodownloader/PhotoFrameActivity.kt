@@ -2,7 +2,6 @@ package com.example.videodownloader
 
 import android.Manifest
 import android.content.ContentValues
-import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
@@ -14,14 +13,12 @@ import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
-import androidx.core.content.FileProvider
 import androidx.exifinterface.media.ExifInterface
 import androidx.lifecycle.lifecycleScope
 import com.example.videodownloader.databinding.ActivityPhotoFrameBinding
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.io.File
 import java.io.OutputStream
 import kotlin.math.max
 
@@ -32,7 +29,7 @@ import kotlin.math.max
  *  - 读取 EXIF：品牌 / 型号 / 焦距 / 光圈 / 快门 / ISO
  *  - 照片放大模糊形成柔和光晕，照片以圆角卡片悬浮
  *  - 底部自动叠加拍摄参数
- *  - 批量自动保存到相册 Pictures/PhotoFrame/，可一次性分享全部成品
+ *  - 选图后仅生成预览，点击「导出到相册」才保存到 Pictures/PhotoFrame/
  */
 class PhotoFrameActivity : AppCompatActivity() {
 
@@ -40,19 +37,19 @@ class PhotoFrameActivity : AppCompatActivity() {
 
     private var processing = false
     private var lastResult: Bitmap? = null
-    private val sharedFiles = mutableListOf<File>()
+    private val preparedUris = mutableListOf<Uri>()
 
     private val writePermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
-        if (granted) launchPicker()
+        if (granted) doExport()
         else toast(getString(R.string.pf_save_fail))
     }
 
     private val pickImagesLauncher = registerForActivityResult(
         ActivityResultContracts.PickMultipleVisualMedia(MAX_BATCH)
     ) { uris: List<Uri> ->
-        if (uris.isNotEmpty()) batch(uris)
+        if (uris.isNotEmpty()) prepare(uris)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -60,14 +57,13 @@ class PhotoFrameActivity : AppCompatActivity() {
         binding = ActivityPhotoFrameBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        // 批量模式下成品自动保存，不需要单独的保存按钮
-        binding.btnSave.visibility = android.view.View.GONE
-
         binding.btnPick.setOnClickListener {
-            if (!processing && ensureLegacyWritePermission()) launchPicker()
+            if (!processing) launchPicker()
         }
-        binding.btnShare.setOnClickListener { shareAll() }
-        binding.btnShare.isEnabled = false
+        binding.btnExport.setOnClickListener {
+            if (!processing && ensureLegacyWritePermission()) doExport()
+        }
+        binding.btnExport.isEnabled = false
     }
 
     private fun launchPicker() = pickImagesLauncher.launch(
@@ -76,13 +72,51 @@ class PhotoFrameActivity : AppCompatActivity() {
         )
     )
 
-    /** 批量处理：逐张解码 → 合成 → 保存相册，同时更新预览。 */
-    private fun batch(uris: List<Uri>) {
+    /** 选图后：逐张解码 → 合成，仅用于预览，不保存。 */
+    private fun prepare(uris: List<Uri>) {
         processing = true
         binding.btnPick.isEnabled = false
-        binding.btnShare.isEnabled = false
-        sharedFiles.clear()
-        val dir = File(cacheDir, "shared").apply { mkdirs() }
+        binding.btnExport.isEnabled = false
+        preparedUris.clear()
+        lastResult?.recycle()
+        lastResult = null
+
+        lifecycleScope.launch {
+            var fail = 0
+            uris.forEachIndexed { index, uri ->
+                binding.tvStatus.text =
+                    getString(R.string.pf_batch_progress, index + 1, uris.size)
+                val composed = withContext(Dispatchers.IO) { processOne(uri) }
+                if (composed == null) {
+                    fail++
+                    return@forEachIndexed
+                }
+                preparedUris.add(uri)
+                lastResult?.recycle()
+                lastResult = composed
+                binding.ivPreview.setImageBitmap(composed)
+            }
+
+            processing = false
+            binding.btnPick.isEnabled = true
+            if (preparedUris.isNotEmpty()) {
+                binding.tvStatus.text = getString(R.string.pf_ready, preparedUris.size)
+                binding.btnExport.isEnabled = true
+            } else {
+                binding.tvStatus.text = getString(R.string.pf_render_fail)
+            }
+        }
+    }
+
+    /** 点击导出：逐张重新合成 → 保存相册。 */
+    private fun doExport() {
+        val uris = preparedUris.toList()
+        if (uris.isEmpty()) {
+            toast(getString(R.string.pf_no_image)); return
+        }
+        processing = true
+        binding.btnPick.isEnabled = false
+        binding.btnExport.isEnabled = false
 
         lifecycleScope.launch {
             var ok = 0
@@ -96,20 +130,17 @@ class PhotoFrameActivity : AppCompatActivity() {
                     return@forEachIndexed
                 }
                 val saved = withContext(Dispatchers.IO) { saveBitmap(composed) }
+                composed.recycle()
                 if (saved) ok++ else fail++
-
-                val f = File(dir, "photoframe_${index}_${System.currentTimeMillis()}.jpg")
-                f.outputStream().use { composed.compress(Bitmap.CompressFormat.JPEG, 95, it) }
-                sharedFiles.add(f)
-
-                lastResult?.recycle()
-                lastResult = composed
-                binding.ivPreview.setImageBitmap(composed)
             }
 
             binding.tvStatus.text = getString(R.string.pf_batch_done, ok, fail)
             binding.btnPick.isEnabled = true
-            binding.btnShare.isEnabled = sharedFiles.isNotEmpty()
+            // 导出完成后停用导出按钮，避免重复保存；重新选图后才再次可用
+            binding.btnExport.isEnabled = false
+            preparedUris.clear()
+            lastResult?.recycle()
+            lastResult = null
             processing = false
         }
     }
@@ -218,35 +249,6 @@ class PhotoFrameActivity : AppCompatActivity() {
             false
         } finally {
             try { os?.close() } catch (_: Exception) {}
-        }
-    }
-
-    /** 一次性分享全部成品（单张时退化为普通分享）。 */
-    private fun shareAll() {
-        val files = sharedFiles.filter { it.exists() }
-        if (files.isEmpty()) {
-            toast(getString(R.string.pf_no_image)); return
-        }
-        try {
-            val uris = ArrayList(files.map {
-                FileProvider.getUriForFile(this, "${packageName}.fileprovider", it)
-            })
-            val intent = if (uris.size == 1) {
-                Intent(Intent.ACTION_SEND).apply {
-                    type = "image/jpeg"
-                    putExtra(Intent.EXTRA_STREAM, uris[0])
-                }
-            } else {
-                Intent(Intent.ACTION_SEND_MULTIPLE).apply {
-                    type = "image/jpeg"
-                    putParcelableArrayListExtra(Intent.EXTRA_STREAM, uris)
-                }
-            }.apply {
-                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            }
-            startActivity(Intent.createChooser(intent, getString(R.string.pf_share)))
-        } catch (e: Exception) {
-            toast(getString(R.string.pf_share_fail))
         }
     }
 

@@ -217,8 +217,8 @@
     <string name="pf_idle">点击下方按钮选择照片</string>
     <string name="pf_preview_desc">边框效果预览</string>
     <string name="pf_btn_pick">选择照片（可多选）</string>
-    <string name="pf_btn_save">保存到相册</string>
-    <string name="pf_btn_share">分享</string>
+    <string name="pf_btn_export">导出到相册</string>
+    <string name="pf_ready">已准备 %1$d 张，点击「导出到相册」保存</string>
     <string name="pf_share">分享边框照片</string>
     <string name="pf_rendering">正在读取照片并生成边框…</string>
     <string name="pf_batch_progress">正在处理 %1$d/%2$d…</string>

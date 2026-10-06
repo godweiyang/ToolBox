@@ -48,10 +48,10 @@ object FrameComposer {
         val canvas = Canvas(out)
         canvas.drawColor(Color.BLACK)
 
-        // 2) 版式：边距与底部文字带
-        val side = cw * 0.064f
-        val topInset = ch * 0.044f
-        val bandH = ch * 0.085f
+        // 2) 版式：边距与底部文字带（按参考成品模板匹配实测）
+        val side = cw * 0.0597f
+        val topInset = ch * 0.0402f
+        val bandH = ch * 0.0792f
         val contentL = side
         val contentR = cw - side
         val contentT = topInset
@@ -65,7 +65,7 @@ object FrameComposer {
         val cardL = (cw - cardW) / 2f
         val cardT = contentT + (availH - cardH) / 2f
         val cardRect = RectF(cardL, cardT, cardL + cardW, cardT + cardH)
-        val cardRadius = min(cardW, cardH) * 0.024f
+        val cardRadius = min(cardW, cardH) * 0.026f
 
         // 3) 光晕：照片放大铺满后重度模糊，外缘裁成大圆角
         drawGlow(canvas, cw, ch, src)
@@ -94,7 +94,7 @@ object FrameComposer {
 
     /**
      * 光晕：照片缩放到 400px 宽铺满画布后重度模糊（保留各边缘真实颜色分布），
-     * 再用大圆角 alpha 蒙版裁掉外圆角，最后放大铺到画布上。
+     * 全画布矩形铺满（不裁外圆角），再放大铺到画布上。
      */
     private fun drawGlow(canvas: Canvas, cw: Int, ch: Int, src: Bitmap) {
         val gw = 400
@@ -105,21 +105,9 @@ object FrameComposer {
         val px = IntArray(gw * gh)
         glow.getPixels(px, 0, gw, 0, 0, gw, gh)
         StackBlur.blur(px, gw, gh, 18)
-
-        // 大圆角蒙版（半径 4.5% 宽）
-        val mask = Bitmap.createBitmap(gw, gh, Bitmap.Config.ALPHA_8)
-        val mc = Canvas(mask)
-        val mp = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE }
-        val mr = gw * 0.045f
-        mc.drawRoundRect(RectF(0f, 0f, gw.toFloat(), gh.toFloat()), mr, mr, mp)
-        val mpx = IntArray(gw * gh)
-        mask.getPixels(mpx, 0, gw, 0, 0, gw, gh)
-        for (i in px.indices) {
-            val a = (mpx[i] shr 24) and 0xff
-            px[i] = (a shl 24) or (px[i] and 0x00FFFFFF)
-        }
         glow.setPixels(px, 0, gw, 0, 0, gw, gh)
 
+        // 光晕全画布铺满（不裁外圆角，保证四角为照片边缘真实颜色）
         val up = Paint(Paint.FILTER_BITMAP_FLAG)
         canvas.drawBitmap(glow, null, RectF(0f, 0f, cw.toFloat(), ch.toFloat()), up)
     }
@@ -203,9 +191,9 @@ object FrameComposer {
         brandTf: android.graphics.Typeface?,
         regTf: android.graphics.Typeface?
     ) {
-        val brandEm = ch * 0.0243f
-        val modelEm = ch * 0.0174f
-        val paramEm = ch * 0.0164f
+        val brandEm = ch * 0.0250f
+        val modelEm = ch * 0.0160f
+        val paramEm = ch * 0.0132f
 
         val brandPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.WHITE
