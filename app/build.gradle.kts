@@ -12,8 +12,8 @@ android {
         applicationId = "com.example.videodownloader"
         minSdk = 26
         targetSdk = 34
-        versionCode = 43
-        versionName = "1.9.15"
+        versionCode = 44
+        versionName = "1.9.16"
     }
 
     signingConfigs {
@@ -70,4 +70,7 @@ dependencies {
 
     // NanoHTTPD：嵌入式 HTTP server，用于局域网文件互传
     implementation("org.nanohttpd:nanohttpd:2.3.1")
+
+    // EXIF 读取（光影边框）
+    implementation("androidx.exifinterface:exifinterface:1.3.7")
 }

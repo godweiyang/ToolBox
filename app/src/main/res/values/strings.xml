@@ -209,4 +209,25 @@
     <string name="gnss_section_list">卫星列表</string>
     <string name="gnss_permission_prompt">需要位置权限才能读取 GNSS 卫星状态。请到系统设置中授予精确定位权限后重试。</string>
     <string name="gnss_hint">天空图以你的头顶为中心，圆心为天顶（仰角 90°），外圈为地平线（仰角 0°）。方位角：北=0°、东=90°、南=180°、西=270°。卫星点越大表示信号越强，半透明表示未用于定位。颜色区分星座：蓝=GPS、红=GLONASS、绿=Galileo、橙=北斗。</string>
+
+    <!-- 光影边框工具 -->
+    <string name="tool_photoframe_title">光影边框</string>
+    <string name="tool_photoframe_desc">照片自动加光影边框，读取 EXIF 叠加相机型号与拍摄参数</string>
+    <string name="pf_subtitle">选择照片，自动生成光晕边框与拍摄信息</string>
+    <string name="pf_idle">点击下方按钮选择照片</string>
+    <string name="pf_preview_desc">边框效果预览</string>
+    <string name="pf_btn_pick">选择照片（可多选）</string>
+    <string name="pf_btn_save">保存到相册</string>
+    <string name="pf_btn_share">分享</string>
+    <string name="pf_share">分享边框照片</string>
+    <string name="pf_rendering">正在读取照片并生成边框…</string>
+    <string name="pf_batch_progress">正在处理 %1$d/%2$d…</string>
+    <string name="pf_batch_done">已导出 %1$d 张，失败 %2$d 张（保存在相册 Pictures/PhotoFrame）</string>
+    <string name="pf_read_fail">读取图片失败</string>
+    <string name="pf_render_fail">边框生成失败</string>
+    <string name="pf_no_image">请先选择照片</string>
+    <string name="pf_no_exif">这张照片没有 EXIF 信息，仅生成边框</string>
+    <string name="pf_save_success">已保存到相册：Pictures/PhotoFrame/</string>
+    <string name="pf_save_fail">保存失败</string>
+    <string name="pf_share_fail">分享失败</string>
 </resources>

@@ -103,6 +103,21 @@
             android:name=".GnssSkyActivity"
             android:exported="false" />
 
+        <activity
+            android:name=".PhotoFrameActivity"
+            android:exported="false" />
+
+        <!-- 分享成品图 -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+
         <!-- 局域网文件互传 HTTP server，前台 Service 保活 -->
         <service
             android:name=".FileShareService"

@@ -229,6 +229,14 @@ class MainActivity : AppCompatActivity() {
             iconRes = android.R.drawable.ic_menu_mylocation,
             iconBgRes = R.drawable.icon_grad_gnss,
             launcher = { ctx -> Intent(ctx, GnssSkyActivity::class.java) }
+        ),
+        Tool(
+            id = "photo_frame",
+            title = getString(R.string.tool_photoframe_title),
+            desc = getString(R.string.tool_photoframe_desc),
+            iconRes = android.R.drawable.ic_menu_gallery,
+            iconBgRes = R.drawable.icon_grad_frame,
+            launcher = { ctx -> Intent(ctx, PhotoFrameActivity::class.java) }
         )
     )
 }
