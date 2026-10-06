@@ -118,7 +118,7 @@ class PhotoFrameActivity : AppCompatActivity() {
     private fun processOne(uri: Uri): Bitmap? {
         val bmp = decodeBitmap(uri) ?: return null
         val info = readExif(uri)
-        return runCatching { FrameComposer.compose(bmp, info) }
+        return runCatching { FrameComposer.compose(bmp, info, this) }
             .getOrNull()
             .also { if (it !== bmp) bmp.recycle() }
     }
