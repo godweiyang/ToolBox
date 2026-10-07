@@ -67,10 +67,10 @@ object FrameComposer {
         val cardRect = RectF(cardL, cardT, cardL + cardW, cardT + cardH)
         val cardRadius = min(cardW, cardH) * 0.026f
 
-        // 3) 光晕：照片放大铺满后重度模糊，外缘裁成大圆角
+        // 3) 光晕：照片铺满后进行 Gaussian 模糊，保留各侧颜色分布
         drawGlow(canvas, cw, ch, src)
 
-        // 4) 卡片阴影（环形灰度 + 多次 box blur，边缘平滑渐变）
+        // 4) 实体接触阴影，归一化 Gaussian 连续衰减
         drawCardShadow(canvas, cw, ch, cardRect, cardRadius)
 
         // 5) 圆角照片卡片
@@ -87,7 +87,10 @@ object FrameComposer {
                 .getFont(context, R.font.texgyreheros_bolditalic)
             val regTf = androidx.core.content.res.ResourcesCompat
                 .getFont(context, R.font.texgyreheros_regular)
-            drawTexts(canvas, cw, ch, cardRect.bottom, bandH, info, brandTf, regTf)
+            val nikon = if (info.brand?.equals("Nikon", ignoreCase = true) == true)
+                androidx.core.content.ContextCompat.getDrawable(context, R.drawable.ic_camera_nikon_wordmark)
+            else null
+            drawTexts(canvas, cw, ch, cardRect.bottom, bandH, info, brandTf, regTf, nikon)
         }
         return out
     }
@@ -97,66 +100,56 @@ object FrameComposer {
      * 全画布矩形铺满（不裁外圆角），再放大铺到画布上。
      */
     private fun drawGlow(canvas: Canvas, cw: Int, ch: Int, src: Bitmap) {
-        val gw = 400
+        val gw = FrameStyle.GLOW_WIDTH
         val gh = (ch.toFloat() * gw / cw).roundToInt().coerceAtLeast(2)
         val glow = Bitmap.createScaledBitmap(src, gw, gh, true)
             .copy(Bitmap.Config.ARGB_8888, true)
 
         val px = IntArray(gw * gh)
         glow.getPixels(px, 0, gw, 0, 0, gw, gh)
-        StackBlur.blur(px, gw, gh, 18)
-        glow.setPixels(px, 0, gw, 0, 0, gw, gh)
+        // Gaussian sigma is not interchangeable with a StackBlur radius.
+        val output = IntArray(px.size) { Color.BLACK }
+        for (shift in intArrayOf(16, 8, 0)) {
+            val channel = FloatArray(px.size) { ((px[it] shr shift) and 0xff).toFloat() }
+            GaussianBlur.blur(channel, gw, gh, FrameStyle.GLOW_SIGMA)
+            for (i in output.indices) {
+                output[i] = output[i] or (channel[i].roundToInt().coerceIn(0, 255) shl shift)
+            }
+        }
+        glow.setPixels(output, 0, gw, 0, 0, gw, gh)
 
         // 光晕全画布铺满（不裁外圆角，保证四角为照片边缘真实颜色）
         val up = Paint(Paint.FILTER_BITMAP_FLAG)
         canvas.drawBitmap(glow, null, RectF(0f, 0f, cw.toFloat(), ch.toFloat()), up)
+        glow.recycle()
     }
 
-    /**
-     * 卡片外一圈柔和黑色阴影。
-     * 在灰度图上画「白底 + 黑色环形（外扩黑圆角矩形减去卡片尺寸白圆角矩形）」，
-     * 做多次 separable box blur，再把灰度反相转成 alpha，边缘自然平滑渐变。
-     */
+    /** 实体接触阴影：边缘最暗，Gaussian 连续衰减；按画布比例缩放。 */
     private fun drawCardShadow(
         canvas: Canvas, cw: Int, ch: Int, card: RectF, cardRadius: Float
     ) {
-        val sw = 480
+        val sw = FrameStyle.SHADOW_WIDTH
         val sh = (ch.toFloat() * sw / cw).roundToInt().coerceAtLeast(2)
         val bmp = Bitmap.createBitmap(sw, sh, Bitmap.Config.ARGB_8888)
-        val c = Canvas(bmp)
-        c.drawColor(Color.WHITE)
         val kx = sw.toFloat() / cw
         val ky = sh.toFloat() / ch
-        // 实体黑色圆角矩形，比卡片向外扩 12px（全分辨率），模糊后卡片盖住内部只露外缘
-        val spread = 12f * kx
-        val black = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.BLACK }
-        c.drawRoundRect(
-            RectF(
-                card.left * kx - spread,
-                card.top * ky - spread,
-                card.right * kx + spread,
-                card.bottom * ky + spread
-            ),
-            cardRadius * kx + spread, cardRadius * kx + spread, black
+        Canvas(bmp).drawRoundRect(
+            RectF(card.left * kx, card.top * ky, card.right * kx, card.bottom * ky),
+            cardRadius * kx, cardRadius * ky,
+            Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE }
         )
-
         val px = IntArray(sw * sh)
         bmp.getPixels(px, 0, sw, 0, 0, sw, sh)
-        // 取 R 通道作为灰度；多级 box blur 形成贴边最暗、向外平滑长尾的接触阴影
-        val gray = IntArray(sw * sh) { (px[it] shr 16) and 0xff }
-        FastBoxBlur.blur(gray, sw, sh, 10)
-        FastBoxBlur.blur(gray, sw, sh, 11)
-
-        // 灰度反相转 alpha，整体不透明度 0.8，RGB 为黑
-        val outPx = IntArray(sw * sh)
-        for (i in outPx.indices) {
-            val a = (((255 - gray[i]) * 8) / 10).coerceIn(0, 255)
-            outPx[i] = a shl 24
+        val alpha = FloatArray(px.size) { (px[it] ushr 24).toFloat() }
+        GaussianBlur.blur(alpha, sw, sh, FrameStyle.SHADOW_SIGMA_RATIO * sw)
+        for (i in px.indices) {
+            px[i] = (alpha[i] * FrameStyle.SHADOW_OPACITY).roundToInt()
+                .coerceIn(0, 255) shl 24
         }
-        bmp.setPixels(outPx, 0, sw, 0, 0, sw, sh)
-
-        val up = Paint(Paint.FILTER_BITMAP_FLAG)
-        canvas.drawBitmap(bmp, null, RectF(0f, 0f, cw.toFloat(), ch.toFloat()), up)
+        bmp.setPixels(px, 0, sw, 0, 0, sw, sh)
+        canvas.drawBitmap(bmp, null, RectF(0f, 0f, cw.toFloat(), ch.toFloat()),
+            Paint(Paint.FILTER_BITMAP_FLAG or Paint.DITHER_FLAG))
+        bmp.recycle()
     }
 
     /** 把位图裁成圆角。 */
@@ -179,11 +172,12 @@ object FrameComposer {
         canvas: Canvas, cw: Int, ch: Int, cardBottom: Float, bandH: Float,
         info: PhotoInfo,
         brandTf: android.graphics.Typeface?,
-        regTf: android.graphics.Typeface?
+        regTf: android.graphics.Typeface?,
+        nikonWordmark: android.graphics.drawable.Drawable?
     ) {
         val brandEm = ch * 0.0250f
         val modelEm = ch * 0.0160f
-        val paramEm = ch * 0.0132f
+        val paramEm = ch * if (nikonWordmark != null) (20.5f / 1442f) else 0.0132f
 
         val brandPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.WHITE
@@ -217,9 +211,56 @@ object FrameComposer {
             info.iso?.let { add("ISO$it") }
         }
         val partWidths = parts.map { paramPaint.measureText(it) }
-        val tokenGap = paramEm * 0.6f
+        val tokenGap = if (nikonWordmark != null) ch * (7.5f / 1442f) else paramEm * 0.6f
         val line2W = if (parts.isNotEmpty())
             partWidths.sum() + tokenGap * (parts.size - 1) else 0f
+
+        // Nikon uses an actual vector wordmark, not an approximation made with a font.
+        // Align visible glyph bounds rather than font ascent/descent (which vary by platform).
+        if (nikonWordmark != null) {
+            val logoH = ch * FrameStyle.NIKON_HEIGHT_RATIO
+            val logoW = logoH * FrameStyle.NIKON_ASPECT
+            val modelBounds = android.graphics.Rect()
+            if (model != null) modelPaint.getTextBounds(model, 0, model.length, modelBounds)
+            val paramBounds = android.graphics.Rect()
+            val parameterText = parts.joinToString(" ")
+            if (parameterText.isNotEmpty())
+                paramPaint.getTextBounds(parameterText, 0, parameterText.length, paramBounds)
+            val paramH = if (parts.isNotEmpty()) ch * (17f / 1442f) else 0f
+            val modelH = if (model != null) ch * (18f / 1442f) else 0f
+            val modelVisibleW = if (model != null) modelBounds.width().toFloat() else 0f
+            val gap = if (model != null) ch * FrameStyle.BRAND_MODEL_GAP_RATIO else 0f
+            val firstW = logoW + gap + modelVisibleW
+            val lineGap = if (parts.isNotEmpty()) ch * FrameStyle.FOOTER_LINE_GAP_RATIO else 0f
+            val footerBottom = ch - ch * FrameStyle.FOOTER_BOTTOM_RATIO
+            val logoTop = footerBottom - paramH - lineGap - logoH
+            val firstX = (cw - firstW) / 2f
+            canvas.save()
+            canvas.translate(firstX, logoTop)
+            canvas.scale(logoW / 990f, logoH / 250f)
+            nikonWordmark.setBounds(0, 0, 990, 250)
+            nikonWordmark.draw(canvas)
+            canvas.restore()
+            if (model != null && modelBounds.height() > 0) {
+                canvas.save()
+                canvas.translate(firstX + logoW + gap, logoTop + (logoH - modelH) / 2f)
+                canvas.scale(1f, modelH / modelBounds.height())
+                canvas.drawText(model, -modelBounds.left.toFloat(), -modelBounds.top.toFloat(), modelPaint)
+                canvas.restore()
+            }
+            if (parts.isNotEmpty() && paramBounds.height() > 0) {
+                canvas.save()
+                canvas.translate(0f, footerBottom - paramH)
+                canvas.scale(1f, paramH / paramBounds.height())
+                var x = (cw - line2W) / 2f
+                for ((i, token) in parts.withIndex()) {
+                    canvas.drawText(token, x, -paramBounds.top.toFloat(), paramPaint)
+                    x += partWidths[i] + tokenGap
+                }
+                canvas.restore()
+            }
+            return
+        }
 
         // 视觉块垂直居中于底部黑带
         val l1vis = brandEm * 0.76f
