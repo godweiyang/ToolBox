@@ -6,7 +6,6 @@ import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Color
-import android.graphics.drawable.ColorDrawable
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -113,24 +112,23 @@ class PhotoFrameActivity : AppCompatActivity() {
         binding.thumbnailRow.removeAllViews()
         preparedUris.forEachIndexed { index, uri ->
             val box = FrameLayout(this).apply {
-                layoutParams = LinearLayout.LayoutParams(dp(72), dp(72)).also { it.marginEnd = dp(8) }
+                layoutParams = LinearLayout.LayoutParams(dp(46), dp(46)).also { it.marginEnd = dp(5) }
                 background = ContextCompat.getDrawable(this@PhotoFrameActivity, R.drawable.frame_editor_option)
                 isSelected = index == selectedIndex
                 setOnClickListener { selectPhoto(index) }
             }
             val image = ImageView(this).apply {
-                layoutParams = FrameLayout.LayoutParams(dp(62), dp(62), Gravity.BOTTOM or Gravity.START)
+                layoutParams = FrameLayout.LayoutParams(dp(40), dp(40), Gravity.CENTER)
                 scaleType = ImageView.ScaleType.CENTER_CROP
-                setPadding(dp(4), dp(4), dp(4), dp(4))
             }
             box.addView(image)
             val close = TextView(this).apply {
-                layoutParams = FrameLayout.LayoutParams(dp(28), dp(28), Gravity.TOP or Gravity.END)
+                layoutParams = FrameLayout.LayoutParams(dp(18), dp(18), Gravity.TOP or Gravity.END)
                 gravity = Gravity.CENTER
                 text = "×"
-                textSize = 23f
+                textSize = 13f
                 setTextColor(Color.WHITE)
-                background = ColorDrawable(Color.rgb(18, 19, 22))
+                background = ContextCompat.getDrawable(this@PhotoFrameActivity, R.drawable.frame_delete_circle)
                 contentDescription = getString(R.string.pf_remove_photo)
                 setOnClickListener { removePhoto(index) }
             }
@@ -142,10 +140,6 @@ class PhotoFrameActivity : AppCompatActivity() {
                     image.setImageBitmap(thumb) else thumb?.recycle()
             }
         }
-        binding.thumbnailRow.addView(binding.btnPick.apply {
-            (parent as? android.view.ViewGroup)?.removeView(this)
-            layoutParams = LinearLayout.LayoutParams(dp(68), dp(68))
-        })
     }
 
     private fun renderSelected() {
@@ -183,10 +177,10 @@ class PhotoFrameActivity : AppCompatActivity() {
         binding.optionRow.removeAllViews()
         when (panel) {
             EditorPanel.RATIO -> {
-                option(getString(R.string.pf_original_ratio), options.ratio == FrameRatio.ORIGINAL) { updateOptions(options.copy(ratio=FrameRatio.ORIGINAL)) }
-                option(getString(R.string.pf_ratio_16_9), options.ratio == FrameRatio.LANDSCAPE_16_9) { updateOptions(options.copy(ratio=FrameRatio.LANDSCAPE_16_9)) }
-                option(getString(R.string.pf_ratio_3_4), options.ratio == FrameRatio.PORTRAIT_3_4) { updateOptions(options.copy(ratio=FrameRatio.PORTRAIT_3_4)) }
-                option(getString(R.string.pf_ratio_9_16), options.ratio == FrameRatio.PORTRAIT_9_16) { updateOptions(options.copy(ratio=FrameRatio.PORTRAIT_9_16)) }
+                ratioOption(getString(R.string.pf_original_ratio), options.ratio == FrameRatio.ORIGINAL) { updateOptions(options.copy(ratio=FrameRatio.ORIGINAL)) }
+                ratioOption(getString(R.string.pf_ratio_16_9), options.ratio == FrameRatio.LANDSCAPE_16_9) { updateOptions(options.copy(ratio=FrameRatio.LANDSCAPE_16_9)) }
+                ratioOption(getString(R.string.pf_ratio_3_4), options.ratio == FrameRatio.PORTRAIT_3_4) { updateOptions(options.copy(ratio=FrameRatio.PORTRAIT_3_4)) }
+                ratioOption(getString(R.string.pf_ratio_9_16), options.ratio == FrameRatio.PORTRAIT_9_16) { updateOptions(options.copy(ratio=FrameRatio.PORTRAIT_9_16)) }
             }
             EditorPanel.LOGO -> {
                 option(getString(R.string.pf_logo_auto), options.showLogo) { updateOptions(options.copy(showLogo=true)) }
@@ -216,17 +210,42 @@ class PhotoFrameActivity : AppCompatActivity() {
 
     private fun option(label: String, selected: Boolean, action: () -> Unit) {
         val view = TextView(this).apply {
-            layoutParams = LinearLayout.LayoutParams(dp(96), dp(96)).also { it.marginEnd = dp(12) }
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
             gravity = Gravity.CENTER
             text = label
-            textSize = 15f
-            setTextColor(Color.WHITE)
-            background = ContextCompat.getDrawable(this@PhotoFrameActivity, R.drawable.frame_editor_option)
-            isSelected = selected
-            setPadding(dp(8), dp(8), dp(8), dp(8))
+            textSize = 14f
+            setTextColor(if (selected) Color.WHITE else Color.rgb(205, 205, 210))
             setOnClickListener { action() }
         }
         binding.optionRow.addView(view)
+    }
+
+    /** 比例面板：单选圈 + 两行居中文案，四列等分。 */
+    private fun ratioOption(label: String, selected: Boolean, action: () -> Unit) {
+        val lines = label.split("\n")
+        val container = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f)
+            isClickable = true
+            setOnClickListener { action() }
+        }
+        val radio = View(this).apply {
+            layoutParams = LinearLayout.LayoutParams(dp(20), dp(20))
+            background = ContextCompat.getDrawable(this@PhotoFrameActivity,
+                if (selected) R.drawable.frame_radio_selected else R.drawable.frame_radio_unselected)
+        }
+        container.addView(radio)
+        lines.forEachIndexed { index, line ->
+            container.addView(TextView(this).apply {
+                text = line
+                setTextColor(Color.WHITE)
+                textSize = if (index == 0) 14f else 12f
+                gravity = Gravity.CENTER
+                setPadding(0, dp(if (index == 0) 8 else 2), 0, 0)
+            })
+        }
+        binding.optionRow.addView(container)
     }
 
     private fun updateOptions(value: FrameOptions) {

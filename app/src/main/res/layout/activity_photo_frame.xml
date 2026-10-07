@@ -3,54 +3,61 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:background="#85584D"
+    android:background="@color/pf_orange_bg"
     android:fitsSystemWindows="true">
 
+    <!-- 顶部控制行：返回 / 标题 / 导出（橙色背景上，控件垂直居中） -->
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="64dp"
+        android:layout_height="wrap_content"
         android:gravity="center_vertical"
-        android:paddingStart="16dp"
-        android:paddingEnd="16dp">
+        android:paddingStart="20dp"
+        android:paddingEnd="20dp"
+        android:paddingTop="18dp">
+
         <TextView
             android:id="@+id/btnBack"
-            android:layout_width="48dp"
-            android:layout_height="48dp"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
             android:gravity="center"
             android:text="‹"
             android:textColor="#FFFFFFFF"
-            android:textSize="42sp" />
+            android:textSize="28sp" />
+
         <TextView
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
+            android:layout_marginStart="14dp"
+            android:singleLine="true"
             android:text="@string/pf_editor_title"
             android:textColor="#FFFFFFFF"
-            android:textSize="24sp"
+            android:textSize="16sp"
             android:textStyle="bold" />
+
         <TextView
             android:id="@+id/btnExport"
             android:layout_width="wrap_content"
-            android:layout_height="48dp"
+            android:layout_height="32dp"
             android:background="@drawable/frame_editor_export"
             android:gravity="center"
             android:drawableStart="@android:drawable/stat_sys_download_done"
             android:drawablePadding="8dp"
             android:enabled="false"
             android:text="@string/pf_export_picture"
-            android:textColor="#FF514B4B"
-            android:textSize="16sp"
+            android:textColor="#FFFFFFFF"
+            android:textSize="14sp"
             android:textStyle="bold" />
     </LinearLayout>
 
+    <!-- 预览卡片区：左右对称留白，卡片底部与深色面板相接 -->
     <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="0.47"
-        android:paddingStart="24dp"
-        android:paddingTop="8dp"
-        android:paddingEnd="24dp"
-        android:paddingBottom="8dp">
+        android:layout_weight="0.51"
+        android:layout_marginStart="31dp"
+        android:layout_marginTop="22dp"
+        android:layout_marginEnd="31dp">
         <ImageView
             android:id="@+id/ivPreview"
             android:layout_width="match_parent"
@@ -62,88 +69,105 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_gravity="bottom|center_horizontal"
-            android:layout_marginBottom="6dp"
+            android:layout_marginBottom="4dp"
             android:background="@drawable/frame_editor_panel"
             android:paddingHorizontal="12dp"
-            android:paddingVertical="6dp"
+            android:paddingVertical="5dp"
             android:text="@string/pf_idle"
             android:textColor="#E8FFFFFF"
-            android:textSize="12sp" />
+            android:textSize="11sp" />
     </FrameLayout>
 
+    <!-- 底部深色面板 -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="0.53"
+        android:layout_weight="0.49"
         android:orientation="vertical"
-        android:background="@drawable/frame_editor_sheet"
-        android:paddingTop="14dp">
+        android:background="@drawable/frame_editor_sheet">
 
         <View
-            android:layout_width="34dp"
-            android:layout_height="5dp"
+            android:layout_width="30dp"
+            android:layout_height="4dp"
             android:layout_gravity="center_horizontal"
-            android:background="@drawable/frame_editor_export" />
+            android:layout_marginTop="13dp"
+            android:background="@drawable/frame_handle" />
 
-        <HorizontalScrollView
+        <!-- 缩略图托盘：左侧横向滚动缩略图，右侧固定添加按钮 -->
+        <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="92dp"
-            android:layout_marginStart="14dp"
-            android:layout_marginTop="12dp"
-            android:layout_marginEnd="14dp"
-            android:background="@drawable/frame_editor_panel"
-            android:fillViewport="false"
-            android:scrollbars="none">
-            <LinearLayout
-                android:id="@+id/thumbnailRow"
-                android:layout_width="wrap_content"
+            android:layout_height="61dp"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:background="@drawable/frame_tray_bg"
+            android:layout_marginStart="10dp"
+            android:layout_marginTop="19dp"
+            android:layout_marginEnd="10dp"
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp">
+
+            <HorizontalScrollView
+                android:layout_width="0dp"
                 android:layout_height="match_parent"
-                android:gravity="center_vertical"
-                android:orientation="horizontal"
-                android:paddingStart="8dp"
-                android:paddingEnd="8dp">
+                android:layout_weight="1"
+                android:scrollbars="none"
+                android:overScrollMode="never">
+                <LinearLayout
+                    android:id="@+id/thumbnailRow"
+                    android:layout_width="wrap_content"
+                    android:layout_height="match_parent"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal" />
+            </HorizontalScrollView>
+
             <TextView
                 android:id="@+id/btnPick"
-                android:layout_width="68dp"
-                    android:layout_height="68dp"
-                    android:background="@drawable/frame_editor_option"
-                    android:gravity="center"
-                    android:text="+"
+                android:layout_width="43dp"
+                android:layout_height="43dp"
+                android:layout_marginStart="12dp"
+                android:background="@drawable/frame_add_button"
+                android:gravity="center"
+                android:text="+"
                 android:textColor="#FFFFFFFF"
-                android:textSize="38sp" />
-            </LinearLayout>
-        </HorizontalScrollView>
+                android:textSize="26sp" />
+        </LinearLayout>
 
+        <!-- 比例/选项面板：灰色圆角卡片 -->
         <HorizontalScrollView
             android:id="@+id/optionScroller"
             android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="1"
+            android:layout_height="120dp"
+            android:layout_marginStart="27dp"
+            android:layout_marginTop="56dp"
+            android:layout_marginEnd="27dp"
+            android:background="@drawable/frame_ratio_panel_bg"
             android:fillViewport="true"
-            android:scrollbars="none">
+            android:scrollbars="none"
+            android:overScrollMode="never">
             <LinearLayout
                 android:id="@+id/optionRow"
-                android:layout_width="wrap_content"
+                android:layout_width="match_parent"
                 android:layout_height="match_parent"
                 android:gravity="center"
-                android:orientation="horizontal"
-                android:paddingStart="18dp"
-                android:paddingEnd="18dp" />
+                android:orientation="horizontal" />
         </HorizontalScrollView>
 
+        <!-- 底部横向滚动标签 -->
         <HorizontalScrollView
             android:layout_width="match_parent"
-            android:layout_height="68dp"
-            android:fillViewport="true"
-            android:scrollbars="none">
+            android:layout_height="56dp"
+            android:layout_marginTop="36dp"
+            android:fillViewport="false"
+            android:scrollbars="none"
+            android:overScrollMode="never">
             <LinearLayout
                 android:id="@+id/tabRow"
                 android:layout_width="wrap_content"
                 android:layout_height="match_parent"
                 android:gravity="center"
                 android:orientation="horizontal"
-                android:paddingStart="8dp"
-                android:paddingEnd="8dp">
+                android:paddingStart="4dp"
+                android:paddingEnd="4dp">
                 <TextView android:id="@+id/tabRatio" style="@style/FrameEditorTab" android:text="@string/pf_tab_ratio" />
                 <TextView android:id="@+id/tabLogo" style="@style/FrameEditorTab" android:text="@string/pf_tab_logo" />
                 <TextView android:id="@+id/tabParams" style="@style/FrameEditorTab" android:text="@string/pf_tab_params" />
