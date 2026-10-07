@@ -5,10 +5,18 @@ import android.content.ContentValues
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Color
+import android.graphics.drawable.ColorDrawable
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.MediaStore
+import android.view.Gravity
+import android.view.View
+import android.widget.FrameLayout
+import android.widget.ImageView
+import android.widget.LinearLayout
+import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
@@ -22,249 +30,299 @@ import kotlinx.coroutines.withContext
 import java.io.OutputStream
 import kotlin.math.max
 
-/**
- * 光影边框工具。
- *
- *  - 从相册选择一张或多张照片（最多 30 张）
- *  - 读取 EXIF：品牌 / 型号 / 焦距 / 光圈 / 快门 / ISO
- *  - 照片放大模糊形成柔和光晕，照片以圆角卡片悬浮
- *  - 底部自动叠加拍摄参数
- *  - 选图后仅生成预览，点击「导出到相册」才保存到 Pictures/PhotoFrame/
- */
+/** Immersive multi-photo frame editor. Selection never writes until Export is pressed. */
 class PhotoFrameActivity : AppCompatActivity() {
-
     private lateinit var binding: ActivityPhotoFrameBinding
-
     private var processing = false
     private var lastResult: Bitmap? = null
     private val preparedUris = mutableListOf<Uri>()
+    private var selectedIndex = -1
+    private var options = FrameOptions()
+    private var renderGeneration = 0
+    private val tabs by lazy { listOf(binding.tabRatio, binding.tabLogo, binding.tabParams,
+        binding.tabTheme, binding.tabShadow, binding.tabMargin) }
 
     private val writePermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
-    ) { granted ->
-        if (granted) doExport()
-        else toast(getString(R.string.pf_save_fail))
-    }
+    ) { granted -> if (granted) doExport() else toast(getString(R.string.pf_save_fail)) }
 
     private val pickImagesLauncher = registerForActivityResult(
         ActivityResultContracts.PickMultipleVisualMedia(MAX_BATCH)
-    ) { uris: List<Uri> ->
-        if (uris.isNotEmpty()) prepare(uris)
-    }
+    ) { uris -> if (uris.isNotEmpty()) addPhotos(uris) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityPhotoFrameBinding.inflate(layoutInflater)
         setContentView(binding.root)
+        window.statusBarColor = Color.TRANSPARENT
+        window.navigationBarColor = Color.rgb(34, 35, 40)
 
-        binding.btnPick.setOnClickListener {
-            if (!processing) launchPicker()
-        }
+        binding.btnBack.setOnClickListener { finish() }
+        binding.btnPick.setOnClickListener { if (!processing) launchPicker() }
         binding.btnExport.setOnClickListener {
             if (!processing && ensureLegacyWritePermission()) doExport()
         }
         binding.btnExport.isEnabled = false
+        binding.tabRatio.setOnClickListener { showPanel(EditorPanel.RATIO) }
+        binding.tabLogo.setOnClickListener { showPanel(EditorPanel.LOGO) }
+        binding.tabParams.setOnClickListener { showPanel(EditorPanel.PARAMS) }
+        binding.tabTheme.setOnClickListener { showPanel(EditorPanel.THEME) }
+        binding.tabShadow.setOnClickListener { showPanel(EditorPanel.SHADOW) }
+        binding.tabMargin.setOnClickListener { showPanel(EditorPanel.MARGIN) }
+        showPanel(EditorPanel.RATIO)
     }
 
     private fun launchPicker() = pickImagesLauncher.launch(
-        androidx.activity.result.PickVisualMediaRequest(
-            ActivityResultContracts.PickVisualMedia.ImageOnly
-        )
+        androidx.activity.result.PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
     )
 
-    /** 选图后：逐张解码 → 合成，仅用于预览，不保存。 */
-    private fun prepare(uris: List<Uri>) {
-        processing = true
-        binding.btnPick.isEnabled = false
-        binding.btnExport.isEnabled = false
-        preparedUris.clear()
-        lastResult?.recycle()
-        lastResult = null
+    private fun addPhotos(uris: List<Uri>) {
+        val room = MAX_BATCH - preparedUris.size
+        preparedUris += uris.filterNot(preparedUris::contains).take(room)
+        if (selectedIndex !in preparedUris.indices) selectedIndex = 0
+        rebuildThumbnails()
+        renderSelected()
+    }
 
+    private fun removePhoto(index: Int) {
+        if (index !in preparedUris.indices || processing) return
+        preparedUris.removeAt(index)
+        selectedIndex = when {
+            preparedUris.isEmpty() -> -1
+            selectedIndex > index -> selectedIndex - 1
+            selectedIndex >= preparedUris.size -> preparedUris.lastIndex
+            else -> selectedIndex
+        }
+        rebuildThumbnails()
+        if (selectedIndex >= 0) renderSelected() else {
+            binding.ivPreview.setImageDrawable(null)
+            lastResult?.recycle(); lastResult = null
+            binding.tvStatus.text = getString(R.string.pf_idle)
+            binding.btnExport.isEnabled = false
+        }
+    }
+
+    private fun selectPhoto(index: Int) {
+        if (index !in preparedUris.indices || index == selectedIndex || processing) return
+        selectedIndex = index
+        rebuildThumbnails()
+        renderSelected()
+    }
+
+    private fun rebuildThumbnails() {
+        binding.thumbnailRow.removeAllViews()
+        preparedUris.forEachIndexed { index, uri ->
+            val box = FrameLayout(this).apply {
+                layoutParams = LinearLayout.LayoutParams(dp(72), dp(72)).also { it.marginEnd = dp(8) }
+                background = ContextCompat.getDrawable(this@PhotoFrameActivity, R.drawable.frame_editor_option)
+                isSelected = index == selectedIndex
+                setOnClickListener { selectPhoto(index) }
+            }
+            val image = ImageView(this).apply {
+                layoutParams = FrameLayout.LayoutParams(dp(62), dp(62), Gravity.BOTTOM or Gravity.START)
+                scaleType = ImageView.ScaleType.CENTER_CROP
+                setPadding(dp(4), dp(4), dp(4), dp(4))
+            }
+            box.addView(image)
+            val close = TextView(this).apply {
+                layoutParams = FrameLayout.LayoutParams(dp(28), dp(28), Gravity.TOP or Gravity.END)
+                gravity = Gravity.CENTER
+                text = "×"
+                textSize = 23f
+                setTextColor(Color.WHITE)
+                background = ColorDrawable(Color.rgb(18, 19, 22))
+                contentDescription = getString(R.string.pf_remove_photo)
+                setOnClickListener { removePhoto(index) }
+            }
+            box.addView(close)
+            binding.thumbnailRow.addView(box)
+            lifecycleScope.launch {
+                val thumb = withContext(Dispatchers.IO) { decodeBitmap(uri, 256) }
+                if (thumb != null && index < preparedUris.size && preparedUris[index] == uri)
+                    image.setImageBitmap(thumb) else thumb?.recycle()
+            }
+        }
+        binding.thumbnailRow.addView(binding.btnPick.apply {
+            (parent as? android.view.ViewGroup)?.removeView(this)
+            layoutParams = LinearLayout.LayoutParams(dp(68), dp(68))
+        })
+    }
+
+    private fun renderSelected() {
+        val uri = preparedUris.getOrNull(selectedIndex) ?: return
+        val generation = ++renderGeneration
+        processing = true
+        setControlsEnabled(false)
+        binding.tvStatus.text = getString(R.string.pf_batch_progress, selectedIndex + 1, preparedUris.size)
         lifecycleScope.launch {
-            var fail = 0
-            uris.forEachIndexed { index, uri ->
-                binding.tvStatus.text =
-                    getString(R.string.pf_batch_progress, index + 1, uris.size)
-                val composed = withContext(Dispatchers.IO) { processOne(uri) }
-                if (composed == null) {
-                    fail++
-                    return@forEachIndexed
-                }
-                preparedUris.add(uri)
-                lastResult?.recycle()
+            val composed = withContext(Dispatchers.IO) { processOne(uri, options) }
+            if (generation != renderGeneration) { composed?.recycle(); return@launch }
+            processing = false
+            setControlsEnabled(true)
+            if (composed == null) {
+                binding.tvStatus.text = getString(R.string.pf_render_fail)
+            } else {
+                val previous = lastResult
                 lastResult = composed
                 binding.ivPreview.setImageBitmap(composed)
-            }
-
-            processing = false
-            binding.btnPick.isEnabled = true
-            if (preparedUris.isNotEmpty()) {
-                binding.tvStatus.text = getString(R.string.pf_ready, preparedUris.size)
-                binding.btnExport.isEnabled = true
-            } else {
-                binding.tvStatus.text = getString(R.string.pf_render_fail)
+                previous?.recycle()
+                binding.tvStatus.text = getString(R.string.pf_selected_photo,
+                    selectedIndex + 1, preparedUris.size)
             }
         }
     }
 
-    /** 点击导出：逐张重新合成 → 保存相册。 */
+    private fun setControlsEnabled(enabled: Boolean) {
+        binding.btnPick.isEnabled = enabled && preparedUris.size < MAX_BATCH
+        binding.btnExport.isEnabled = enabled && preparedUris.isNotEmpty()
+        tabs.forEach { it.isEnabled = enabled }
+    }
+
+    private fun showPanel(panel: EditorPanel) {
+        tabs.forEachIndexed { index, view -> view.isSelected = index == panel.ordinal }
+        binding.optionRow.removeAllViews()
+        when (panel) {
+            EditorPanel.RATIO -> {
+                option(getString(R.string.pf_original_ratio), options.ratio == FrameRatio.ORIGINAL) { updateOptions(options.copy(ratio=FrameRatio.ORIGINAL)) }
+                option(getString(R.string.pf_ratio_16_9), options.ratio == FrameRatio.LANDSCAPE_16_9) { updateOptions(options.copy(ratio=FrameRatio.LANDSCAPE_16_9)) }
+                option(getString(R.string.pf_ratio_3_4), options.ratio == FrameRatio.PORTRAIT_3_4) { updateOptions(options.copy(ratio=FrameRatio.PORTRAIT_3_4)) }
+                option(getString(R.string.pf_ratio_9_16), options.ratio == FrameRatio.PORTRAIT_9_16) { updateOptions(options.copy(ratio=FrameRatio.PORTRAIT_9_16)) }
+            }
+            EditorPanel.LOGO -> {
+                option(getString(R.string.pf_logo_auto), options.showLogo) { updateOptions(options.copy(showLogo=true)) }
+                option(getString(R.string.pf_logo_hide), !options.showLogo) { updateOptions(options.copy(showLogo=false)) }
+            }
+            EditorPanel.PARAMS -> {
+                option(getString(R.string.pf_params_auto), options.showParams) { updateOptions(options.copy(showParams=true)) }
+                option(getString(R.string.pf_params_hide), !options.showParams) { updateOptions(options.copy(showParams=false)) }
+            }
+            EditorPanel.THEME -> {
+                option(getString(R.string.pf_theme_photo), options.theme == FrameTheme.PHOTO) { updateOptions(options.copy(theme=FrameTheme.PHOTO)) }
+                option(getString(R.string.pf_theme_dark), options.theme == FrameTheme.DARK) { updateOptions(options.copy(theme=FrameTheme.DARK)) }
+                option(getString(R.string.pf_theme_light), options.theme == FrameTheme.LIGHT) { updateOptions(options.copy(theme=FrameTheme.LIGHT)) }
+            }
+            EditorPanel.SHADOW -> {
+                option(getString(R.string.pf_shadow_soft), options.shadow == 1f) { updateOptions(options.copy(shadow=1f)) }
+                option(getString(R.string.pf_shadow_light), options.shadow == .55f) { updateOptions(options.copy(shadow=.55f)) }
+                option(getString(R.string.pf_shadow_none), options.shadow == 0f) { updateOptions(options.copy(shadow=0f)) }
+            }
+            EditorPanel.MARGIN -> {
+                option(getString(R.string.pf_margin_compact), options.margin == .7f) { updateOptions(options.copy(margin=.7f)) }
+                option(getString(R.string.pf_margin_standard), options.margin == 1f) { updateOptions(options.copy(margin=1f)) }
+                option(getString(R.string.pf_margin_wide), options.margin == 1.3f) { updateOptions(options.copy(margin=1.3f)) }
+            }
+        }
+    }
+
+    private fun option(label: String, selected: Boolean, action: () -> Unit) {
+        val view = TextView(this).apply {
+            layoutParams = LinearLayout.LayoutParams(dp(96), dp(96)).also { it.marginEnd = dp(12) }
+            gravity = Gravity.CENTER
+            text = label
+            textSize = 15f
+            setTextColor(Color.WHITE)
+            background = ContextCompat.getDrawable(this@PhotoFrameActivity, R.drawable.frame_editor_option)
+            isSelected = selected
+            setPadding(dp(8), dp(8), dp(8), dp(8))
+            setOnClickListener { action() }
+        }
+        binding.optionRow.addView(view)
+    }
+
+    private fun updateOptions(value: FrameOptions) {
+        if (options == value) return
+        options = value
+        val selected = tabs.indexOfFirst { it.isSelected }.coerceAtLeast(0)
+        showPanel(EditorPanel.entries[selected])
+        if (selectedIndex >= 0) renderSelected()
+    }
+
     private fun doExport() {
         val uris = preparedUris.toList()
-        if (uris.isEmpty()) {
-            toast(getString(R.string.pf_no_image)); return
-        }
-        processing = true
-        binding.btnPick.isEnabled = false
-        binding.btnExport.isEnabled = false
-
+        if (uris.isEmpty()) { toast(getString(R.string.pf_no_image)); return }
+        processing = true; setControlsEnabled(false)
         lifecycleScope.launch {
-            var ok = 0
-            var fail = 0
+            var ok = 0; var fail = 0
             uris.forEachIndexed { index, uri ->
-                binding.tvStatus.text =
-                    getString(R.string.pf_batch_progress, index + 1, uris.size)
-                val composed = withContext(Dispatchers.IO) { processOne(uri) }
-                if (composed == null) {
-                    fail++
-                    return@forEachIndexed
+                binding.tvStatus.text = getString(R.string.pf_batch_progress, index + 1, uris.size)
+                val composed = withContext(Dispatchers.IO) { processOne(uri, options) }
+                if (composed == null) fail++ else {
+                    val saved = withContext(Dispatchers.IO) { saveBitmap(composed) }
+                    composed.recycle(); if (saved) ok++ else fail++
                 }
-                val saved = withContext(Dispatchers.IO) { saveBitmap(composed) }
-                composed.recycle()
-                if (saved) ok++ else fail++
             }
-
+            processing = false; setControlsEnabled(true)
             binding.tvStatus.text = getString(R.string.pf_batch_done, ok, fail)
-            binding.btnPick.isEnabled = true
-            // 导出完成后停用导出按钮，避免重复保存；重新选图后才再次可用
-            binding.btnExport.isEnabled = false
-            preparedUris.clear()
-            lastResult?.recycle()
-            lastResult = null
-            processing = false
         }
     }
 
-    /** 解码 → 读 EXIF → 合成，任何一步失败返回 null。 */
-    private fun processOne(uri: Uri): Bitmap? {
-        val bmp = decodeBitmap(uri) ?: return null
+    private fun processOne(uri: Uri, frameOptions: FrameOptions): Bitmap? {
+        val bmp = decodeBitmap(uri, 2000) ?: return null
         val info = readExif(uri)
-        return runCatching { FrameComposer.compose(bmp, info, this) }
-            .getOrNull()
-            .also { if (it !== bmp) bmp.recycle() }
+        return runCatching { FrameComposer.compose(bmp, info, this, frameOptions) }
+            .getOrNull().also { bmp.recycle() }
     }
 
-    /** 降采样解码，长边不超过 2000，避免 OOM。 */
-    private fun decodeBitmap(uri: Uri): Bitmap? {
-        val resolver = contentResolver
+    private fun decodeBitmap(uri: Uri, maxEdge: Int): Bitmap? {
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-        resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) }
+        contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) }
         val longEdge = max(bounds.outWidth, bounds.outHeight)
         if (longEdge <= 0) return null
         var sample = 1
-        while (longEdge / sample > 2000) sample *= 2
-        val opts = BitmapFactory.Options().apply { inSampleSize = sample }
-        return resolver.openInputStream(uri)?.use {
-            BitmapFactory.decodeStream(it, null, opts)
+        while (longEdge / sample > maxEdge) sample *= 2
+        return contentResolver.openInputStream(uri)?.use {
+            BitmapFactory.decodeStream(it, null, BitmapFactory.Options().apply { inSampleSize = sample })
         }
     }
 
-    /** 读取 EXIF 拍摄信息。 */
     private fun readExif(uri: Uri): PhotoInfo {
         return try {
-            val input = contentResolver.openInputStream(uri) ?: return PhotoInfo(
-                null, null, null, null, null, null
-            )
+            val input = contentResolver.openInputStream(uri)
+                ?: return PhotoInfo(null,null,null,null,null,null)
             val exif = input.use { ExifInterface(it) }
-
-            val rawMake = exif.getAttribute(ExifInterface.TAG_MAKE)?.trim()
-            val rawModel = exif.getAttribute(ExifInterface.TAG_MODEL)?.trim()
-
-            val brand = rawMake?.split(" ")?.firstOrNull()?.let { capitalizeWord(it) }
-            // 型号原样展示（参考效果为 "NIKON Z 30"）
-            val model = rawModel?.uppercase()
-
-            val focal35 = exif.getAttribute(ExifInterface.TAG_FOCAL_LENGTH_IN_35MM_FILM)
-                ?.toDoubleOrNull()
+            val make = CameraBrands.clean(exif.getAttribute(ExifInterface.TAG_MAKE))
+            val model = CameraBrands.displayModel(exif.getAttribute(ExifInterface.TAG_MODEL))
+            val focal35 = exif.getAttribute(ExifInterface.TAG_FOCAL_LENGTH_IN_35MM_FILM)?.toDoubleOrNull()
             val focal = parseRational(exif.getAttribute(ExifInterface.TAG_FOCAL_LENGTH))
-            val focalFinal = when {
-                focal35 != null && focal35 > 0 -> focal35
-                else -> focal
-            }
-            val fNumber = parseRational(exif.getAttribute(ExifInterface.TAG_F_NUMBER))
-            val exposure = parseRational(exif.getAttribute(ExifInterface.TAG_EXPOSURE_TIME))
-            val iso = exif.getAttribute(ExifInterface.TAG_PHOTOGRAPHIC_SENSITIVITY)
-                ?.toIntOrNull()
+            PhotoInfo(make, model, if (focal35 != null && focal35 > 0) focal35 else focal,
+                parseRational(exif.getAttribute(ExifInterface.TAG_F_NUMBER)),
+                parseRational(exif.getAttribute(ExifInterface.TAG_EXPOSURE_TIME)),
+                exif.getAttribute(ExifInterface.TAG_PHOTOGRAPHIC_SENSITIVITY)?.toIntOrNull())
+        } catch (_: Exception) { PhotoInfo(null,null,null,null,null,null) }
+    }
 
-            PhotoInfo(brand, model, focalFinal, fNumber, exposure, iso)
-        } catch (e: Exception) {
-            PhotoInfo(null, null, null, null, null, null)
+    private fun parseRational(value: String?): Double? {
+        if (value.isNullOrBlank()) return null
+        val parts=value.split('/')
+        return if (parts.size==1) parts[0].toDoubleOrNull() else {
+            val a=parts[0].toDoubleOrNull(); val b=parts.getOrNull(1)?.toDoubleOrNull()
+            if (a!=null && b!=null && b!=0.0) a/b else null
         }
     }
 
-    private fun parseRational(s: String?): Double? {
-        if (s.isNullOrBlank()) return null
-        val parts = s.split("/")
-        return when (parts.size) {
-            1 -> parts[0].toDoubleOrNull()
-            else -> {
-                val a = parts[0].toDoubleOrNull()
-                val b = parts[1].toDoubleOrNull()
-                if (a != null && b != null && b != 0.0) a / b else null
-            }
-        }
-    }
-
-    private fun capitalizeWord(s: String): String =
-        s.lowercase().replaceFirstChar { it.uppercase() }
-
-    /** 保存到相册 Pictures/PhotoFrame/。 */
     private fun saveBitmap(bmp: Bitmap): Boolean {
-        val name = "photoframe_${System.currentTimeMillis()}.jpg"
-        val cv = ContentValues().apply {
-            put(MediaStore.Images.Media.DISPLAY_NAME, name)
-            put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/PhotoFrame")
-                put(MediaStore.Images.Media.IS_PENDING, 1)
-            }
+        val cv=ContentValues().apply {
+            put(MediaStore.Images.Media.DISPLAY_NAME,"photoframe_${System.currentTimeMillis()}.jpg")
+            put(MediaStore.Images.Media.MIME_TYPE,"image/jpeg")
+            if(Build.VERSION.SDK_INT>=Build.VERSION_CODES.Q){put(MediaStore.Images.Media.RELATIVE_PATH,"Pictures/PhotoFrame");put(MediaStore.Images.Media.IS_PENDING,1)}
         }
-        val collection = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
-        } else {
-            MediaStore.Images.Media.EXTERNAL_CONTENT_URI
-        }
-        val uri = contentResolver.insert(collection, cv) ?: return false
-        var os: OutputStream? = null
-        return try {
-            os = contentResolver.openOutputStream(uri) ?: return false
-            bmp.compress(Bitmap.CompressFormat.JPEG, 95, os)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                cv.clear()
-                cv.put(MediaStore.Images.Media.IS_PENDING, 0)
-                contentResolver.update(uri, cv, null, null)
-            }
-            true
-        } catch (e: Exception) {
-            false
-        } finally {
-            try { os?.close() } catch (_: Exception) {}
-        }
+        val collection=if(Build.VERSION.SDK_INT>=Build.VERSION_CODES.Q) MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY) else MediaStore.Images.Media.EXTERNAL_CONTENT_URI
+        val uri=contentResolver.insert(collection,cv)?:return false
+        var stream:OutputStream?=null
+        return try { stream=contentResolver.openOutputStream(uri)?:return false;bmp.compress(Bitmap.CompressFormat.JPEG,95,stream)
+            if(Build.VERSION.SDK_INT>=Build.VERSION_CODES.Q){cv.clear();cv.put(MediaStore.Images.Media.IS_PENDING,0);contentResolver.update(uri,cv,null,null)};true
+        } catch (_:Exception){contentResolver.delete(uri,null,null);false} finally { try{stream?.close()}catch(_:Exception){} }
     }
 
-    private fun ensureLegacyWritePermission(): Boolean {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) return true
-        val permission = Manifest.permission.WRITE_EXTERNAL_STORAGE
-        if (ContextCompat.checkSelfPermission(this, permission) ==
-            PackageManager.PERMISSION_GRANTED
-        ) return true
-        writePermissionLauncher.launch(permission)
-        return false
+    private fun ensureLegacyWritePermission():Boolean{
+        if(Build.VERSION.SDK_INT>=Build.VERSION_CODES.Q)return true
+        val p=Manifest.permission.WRITE_EXTERNAL_STORAGE
+        if(ContextCompat.checkSelfPermission(this,p)==PackageManager.PERMISSION_GRANTED)return true
+        writePermissionLauncher.launch(p);return false
     }
-
-    private fun toast(s: String) = Toast.makeText(this, s, Toast.LENGTH_SHORT).show()
-
-    private companion object {
-        const val MAX_BATCH = 30
-    }
+    private fun dp(value:Int)=(value*resources.displayMetrics.density).toInt()
+    private fun toast(value:String)=Toast.makeText(this,value,Toast.LENGTH_SHORT).show()
+    override fun onDestroy(){super.onDestroy();lastResult?.recycle();lastResult=null}
+    private enum class EditorPanel { RATIO, LOGO, PARAMS, THEME, SHADOW, MARGIN }
+    private companion object { const val MAX_BATCH=30 }
 }

@@ -10,8 +10,9 @@ internal object FrameStyle {
     const val SHADOW_WIDTH = 480
     const val SHADOW_SIGMA_RATIO = 39.8f / 1440f
     const val SHADOW_OPACITY = 1.02f
-    const val NIKON_HEIGHT_RATIO = 25f / 1442f
+    const val WORDMARK_HEIGHT_RATIO = 25f / 1442f
     const val NIKON_ASPECT = 99f / 25f
+    const val VIVO_ASPECT = 1000f / 262.2471008f
     const val BRAND_MODEL_GAP_RATIO = 25f / 1442f
     const val FOOTER_BOTTOM_RATIO = 24f / 1442f
     const val FOOTER_LINE_GAP_RATIO = 16f / 1442f

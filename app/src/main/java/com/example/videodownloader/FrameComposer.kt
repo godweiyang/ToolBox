@@ -28,8 +28,22 @@ data class PhotoInfo(
     val hasAny: Boolean get() = hasCamera || hasParams
 }
 
+data class FrameOptions(
+    val ratio: FrameRatio = FrameRatio.ORIGINAL,
+    val showLogo: Boolean = true,
+    val showParams: Boolean = true,
+    val theme: FrameTheme = FrameTheme.PHOTO,
+    val shadow: Float = 1f,
+    val margin: Float = 1f
+)
+
+enum class FrameRatio(val value: Float?) {
+    ORIGINAL(null), LANDSCAPE_16_9(16f / 9f), PORTRAIT_3_4(3f / 4f), PORTRAIT_9_16(9f / 16f)
+}
+
+enum class FrameTheme { PHOTO, DARK, LIGHT }
+
 /**
- * 光影边框合成器：
  *  - 黑色画布
  *  - 照片边缘取色，生成大圆角柔和光晕
  *  - 照片以圆角卡片悬浮，卡片周围有柔和阴影
@@ -39,18 +53,28 @@ object FrameComposer {
 
     private const val LONG_EDGE = 1800
 
-    fun compose(src: Bitmap, info: PhotoInfo, context: android.content.Context): Bitmap {
-        // 1) 输出画布（保持原图宽高比，长边 1800）
-        val scale = LONG_EDGE.toFloat() / max(src.width, src.height)
-        val cw = max(2, (src.width * scale).roundToInt())
-        val ch = max(2, (src.height * scale).roundToInt())
+    fun compose(src: Bitmap, info: PhotoInfo, context: android.content.Context,
+                options: FrameOptions = FrameOptions()): Bitmap {
+        // 1) 输出画布（默认保持原图比例，也支持常用平台画幅）
+        val sourceRatio = src.width.toFloat() / src.height
+        val targetRatio = options.ratio.value ?: sourceRatio
+        val cw: Int
+        val ch: Int
+        if (targetRatio >= 1f) {
+            cw = LONG_EDGE
+            ch = max(2, (LONG_EDGE / targetRatio).roundToInt())
+        } else {
+            ch = LONG_EDGE
+            cw = max(2, (LONG_EDGE * targetRatio).roundToInt())
+        }
         val out = Bitmap.createBitmap(cw, ch, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(out)
         canvas.drawColor(Color.BLACK)
 
-        // 2) 版式：边距与底部文字带（按参考成品模板匹配实测）
-        val side = cw * 0.0597f
-        val topInset = ch * 0.0402f
+        // 2) 版式：边距与底部文字带
+        val margin = options.margin.coerceIn(0.55f, 1.45f)
+        val side = cw * 0.0597f * margin
+        val topInset = ch * 0.0402f * margin
         val bandH = ch * 0.0792f
         val contentL = side
         val contentR = cw - side
@@ -67,11 +91,17 @@ object FrameComposer {
         val cardRect = RectF(cardL, cardT, cardL + cardW, cardT + cardH)
         val cardRadius = min(cardW, cardH) * 0.026f
 
-        // 3) 光晕：照片铺满后进行 Gaussian 模糊，保留各侧颜色分布
-        drawGlow(canvas, cw, ch, src)
+        // 3) 背景主题
+        when (options.theme) {
+            FrameTheme.PHOTO -> drawGlow(canvas, cw, ch, src)
+            FrameTheme.DARK -> canvas.drawColor(Color.rgb(29, 31, 35))
+            FrameTheme.LIGHT -> canvas.drawColor(Color.rgb(226, 226, 226))
+        }
 
-        // 4) 实体接触阴影，归一化 Gaussian 连续衰减
-        drawCardShadow(canvas, cw, ch, cardRect, cardRadius)
+        // 4) 实体接触阴影
+        if (options.shadow > 0.01f)
+            drawCardShadow(canvas, cw, ch, cardRect, cardRadius,
+                options.shadow.coerceIn(0.2f, 1.5f))
 
         // 5) 圆角照片卡片
         val scaled = Bitmap.createScaledBitmap(
@@ -80,17 +110,15 @@ object FrameComposer {
         )
         val cardBmp = roundCorners(scaled, cardRadius)
         canvas.drawBitmap(cardBmp, cardRect.left, cardRect.top, null)
+        if (cardBmp !== scaled) scaled.recycle()
+        cardBmp.recycle()
 
-        // 6) 底部文字
-        if (info.hasAny) {
-            val brandTf = androidx.core.content.res.ResourcesCompat
-                .getFont(context, R.font.texgyreheros_bolditalic)
-            val regTf = androidx.core.content.res.ResourcesCompat
-                .getFont(context, R.font.texgyreheros_regular)
-            val nikon = if (info.brand?.equals("Nikon", ignoreCase = true) == true)
-                androidx.core.content.ContextCompat.getDrawable(context, R.drawable.ic_camera_nikon_wordmark)
-            else null
-            drawTexts(canvas, cw, ch, cardRect.bottom, bandH, info, brandTf, regTf, nikon)
+        // 6) 底部文字与字标共用统一布局
+        if (info.hasAny && (options.showLogo || options.showParams)) {
+            val footerColor = if (options.theme == FrameTheme.LIGHT) Color.rgb(35, 35, 38)
+                else Color.WHITE
+            FrameFooterRenderer.draw(canvas, cw, ch, cardRect.bottom, info, context,
+                options.showLogo, options.showParams, footerColor)
         }
         return out
     }
@@ -126,7 +154,8 @@ object FrameComposer {
 
     /** 实体接触阴影：边缘最暗，Gaussian 连续衰减；按画布比例缩放。 */
     private fun drawCardShadow(
-        canvas: Canvas, cw: Int, ch: Int, card: RectF, cardRadius: Float
+        canvas: Canvas, cw: Int, ch: Int, card: RectF, cardRadius: Float,
+        strength: Float
     ) {
         val sw = FrameStyle.SHADOW_WIDTH
         val sh = (ch.toFloat() * sw / cw).roundToInt().coerceAtLeast(2)
@@ -143,7 +172,7 @@ object FrameComposer {
         val alpha = FloatArray(px.size) { (px[it] ushr 24).toFloat() }
         GaussianBlur.blur(alpha, sw, sh, FrameStyle.SHADOW_SIGMA_RATIO * sw)
         for (i in px.indices) {
-            px[i] = (alpha[i] * FrameStyle.SHADOW_OPACITY).roundToInt()
+            px[i] = (alpha[i] * FrameStyle.SHADOW_OPACITY * strength).roundToInt()
                 .coerceIn(0, 255) shl 24
         }
         bmp.setPixels(px, 0, sw, 0, 0, sw, sh)
@@ -164,148 +193,11 @@ object FrameComposer {
         return out
     }
 
-    /**
-     * 底部两行白字：品牌（粗斜体）+ 型号；拍摄参数。
-     * 字体为 TeX Gyre Heros（Helvetica 克隆），字号/间距按参考成品实测。
-     */
-    private fun drawTexts(
-        canvas: Canvas, cw: Int, ch: Int, cardBottom: Float, bandH: Float,
-        info: PhotoInfo,
-        brandTf: android.graphics.Typeface?,
-        regTf: android.graphics.Typeface?,
-        nikonWordmark: android.graphics.drawable.Drawable?
-    ) {
-        val brandEm = ch * 0.0250f
-        val modelEm = ch * 0.0160f
-        val paramEm = ch * if (nikonWordmark != null) (20.5f / 1442f) else 0.0132f
+    fun fmtFocal(v: Double): String = PhotoLabels.focal(v)
 
-        val brandPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.WHITE
-            textSize = brandEm
-            typeface = brandTf
-        }
-        val modelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.WHITE
-            textSize = modelEm
-            typeface = regTf
-        }
-        val paramPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.WHITE
-            textSize = paramEm
-            typeface = regTf
-        }
+    fun trimNumber(v: Double): String = PhotoLabels.number(v)
 
-        // 第一行：品牌 + 型号
-        val brand = info.brand
-        val model = info.model
-        val brandW = if (brand != null) brandPaint.measureText(brand) else 0f
-        val modelW = if (model != null) modelPaint.measureText(model) else 0f
-        val gap1 = if (brand != null && model != null) ch * 0.0180f else 0f
-        val line1W = brandW + gap1 + modelW
-
-        // 第二行：逐 token 绘制，token 间距 = 参数 em × 0.6
-        val parts = buildList {
-            info.focalMm?.let { add(fmtFocal(it)) }
-            info.fNumber?.let { add("F${trimNumber(it)}") }
-            info.exposureSec?.let { add(fmtShutter(it)) }
-            info.iso?.let { add("ISO$it") }
-        }
-        val partWidths = parts.map { paramPaint.measureText(it) }
-        val tokenGap = if (nikonWordmark != null) ch * (7.5f / 1442f) else paramEm * 0.6f
-        val line2W = if (parts.isNotEmpty())
-            partWidths.sum() + tokenGap * (parts.size - 1) else 0f
-
-        // Nikon uses an actual vector wordmark, not an approximation made with a font.
-        // Align visible glyph bounds rather than font ascent/descent (which vary by platform).
-        if (nikonWordmark != null) {
-            val logoH = ch * FrameStyle.NIKON_HEIGHT_RATIO
-            val logoW = logoH * FrameStyle.NIKON_ASPECT
-            val modelBounds = android.graphics.Rect()
-            if (model != null) modelPaint.getTextBounds(model, 0, model.length, modelBounds)
-            val paramBounds = android.graphics.Rect()
-            val parameterText = parts.joinToString(" ")
-            if (parameterText.isNotEmpty())
-                paramPaint.getTextBounds(parameterText, 0, parameterText.length, paramBounds)
-            val paramH = if (parts.isNotEmpty()) ch * (17f / 1442f) else 0f
-            val modelH = if (model != null) ch * (18f / 1442f) else 0f
-            val modelVisibleW = if (model != null) modelBounds.width().toFloat() else 0f
-            val gap = if (model != null) ch * FrameStyle.BRAND_MODEL_GAP_RATIO else 0f
-            val firstW = logoW + gap + modelVisibleW
-            val lineGap = if (parts.isNotEmpty()) ch * FrameStyle.FOOTER_LINE_GAP_RATIO else 0f
-            val footerBottom = ch - ch * FrameStyle.FOOTER_BOTTOM_RATIO
-            val logoTop = footerBottom - paramH - lineGap - logoH
-            val firstX = (cw - firstW) / 2f
-            canvas.save()
-            canvas.translate(firstX, logoTop)
-            canvas.scale(logoW / 990f, logoH / 250f)
-            nikonWordmark.setBounds(0, 0, 990, 250)
-            nikonWordmark.draw(canvas)
-            canvas.restore()
-            if (model != null && modelBounds.height() > 0) {
-                canvas.save()
-                canvas.translate(firstX + logoW + gap, logoTop + (logoH - modelH) / 2f)
-                canvas.scale(1f, modelH / modelBounds.height())
-                canvas.drawText(model, -modelBounds.left.toFloat(), -modelBounds.top.toFloat(), modelPaint)
-                canvas.restore()
-            }
-            if (parts.isNotEmpty() && paramBounds.height() > 0) {
-                canvas.save()
-                canvas.translate(0f, footerBottom - paramH)
-                canvas.scale(1f, paramH / paramBounds.height())
-                var x = (cw - line2W) / 2f
-                for ((i, token) in parts.withIndex()) {
-                    canvas.drawText(token, x, -paramBounds.top.toFloat(), paramPaint)
-                    x += partWidths[i] + tokenGap
-                }
-                canvas.restore()
-            }
-            return
-        }
-
-        // 视觉块垂直居中于底部黑带
-        val l1vis = brandEm * 0.76f
-        val l2vis = paramEm * 0.73f
-        val gap2 = if (line1W > 0f && line2W > 0f) ch * 0.0139f else 0f
-        val block = l1vis + gap2 + l2vis
-        val btop = cardBottom + (bandH - block) / 2f
-
-        if (line1W > 0f) {
-            val baseline = btop + l1vis * 0.80f
-            var x = (cw - line1W) / 2f
-            if (brand != null) {
-                canvas.drawText(brand, x, baseline, brandPaint)
-                x += brandW + gap1
-            }
-            if (model != null) {
-                canvas.drawText(model, x, baseline, modelPaint)
-            }
-        }
-        if (line2W > 0f) {
-            val baseline = btop + l1vis + gap2 + l2vis * 0.82f
-            var x = (cw - line2W) / 2f
-            for ((i, t) in parts.withIndex()) {
-                canvas.drawText(t, x, baseline, paramPaint)
-                x += partWidths[i] + tokenGap
-            }
-        }
-    }
-
-    fun fmtFocal(v: Double): String {
-        val r = v.roundToInt().toDouble()
-        return if (abs(v - r) < 0.05) "${r.roundToInt()}mm"
-        else String.format("%.1fmm", v)
-    }
-
-    fun trimNumber(v: Double): String {
-        if (abs(v - v.roundToInt()) < 0.001) return v.roundToInt().toString()
-        val s = String.format("%.1f", v).trimEnd('0').trimEnd('.')
-        return s
-    }
-
-    fun fmtShutter(sec: Double): String = when {
-        sec >= 1f -> "${trimNumber(sec)}s"
-        else -> "1/${(1.0 / sec).roundToInt()}s"
-    }
+    fun fmtShutter(sec: Double): String = PhotoLabels.shutter(sec)
 }
 
 /**

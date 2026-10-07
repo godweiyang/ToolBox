@@ -1,76 +1,156 @@
 <?xml version="1.0" encoding="utf-8"?>
-<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@drawable/ios_bg_gradient"
-    android:fitsSystemWindows="true"
-    android:fillViewport="true">
+    android:orientation="vertical"
+    android:background="#85584D"
+    android:fitsSystemWindows="true">
 
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:padding="16dp">
-
+        android:layout_height="64dp"
+        android:gravity="center_vertical"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp">
         <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="@string/tool_photoframe_title"
-            android:textAppearance="@style/Text.iOS.LargeTitle"
-            android:paddingTop="8dp"
-            android:paddingBottom="4dp" />
-
+            android:id="@+id/btnBack"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:gravity="center"
+            android:text="‹"
+            android:textColor="#FFFFFFFF"
+            android:textSize="42sp" />
         <TextView
-            android:layout_width="match_parent"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:text="@string/pf_subtitle"
-            android:textAppearance="@style/Text.iOS.Caption"
-            android:paddingBottom="14dp" />
-
-        <!-- 预览玻璃卡 -->
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:background="@drawable/ios_glass_card"
-            android:padding="12dp">
-
-            <ImageView
-                android:id="@+id/ivPreview"
-                android:layout_width="match_parent"
-                android:layout_height="320dp"
-                android:adjustViewBounds="true"
-                android:background="#14000000"
-                android:contentDescription="@string/pf_preview_desc"
-                android:scaleType="fitCenter" />
-
-            <TextView
-                android:id="@+id/tvStatus"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="@string/pf_idle"
-                android:textAppearance="@style/Text.iOS.Caption"
-                android:gravity="center"
-                android:paddingTop="10dp" />
-        </LinearLayout>
-
-        <Button
-            android:id="@+id/btnPick"
-            style="@style/Widget.iOS.Button"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="18dp"
-            android:text="@string/pf_btn_pick" />
-
-        <Button
+            android:layout_weight="1"
+            android:text="@string/pf_editor_title"
+            android:textColor="#FFFFFFFF"
+            android:textSize="24sp"
+            android:textStyle="bold" />
+        <TextView
             android:id="@+id/btnExport"
-            style="@style/Widget.iOS.Button"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="10dp"
-            android:layout_marginBottom="8dp"
+            android:layout_width="wrap_content"
+            android:layout_height="48dp"
+            android:background="@drawable/frame_editor_export"
+            android:gravity="center"
+            android:drawableStart="@android:drawable/stat_sys_download_done"
+            android:drawablePadding="8dp"
             android:enabled="false"
-            android:text="@string/pf_btn_export" />
-
+            android:text="@string/pf_export_picture"
+            android:textColor="#FF514B4B"
+            android:textSize="16sp"
+            android:textStyle="bold" />
     </LinearLayout>
-</ScrollView>
+
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="0.47"
+        android:paddingStart="24dp"
+        android:paddingTop="8dp"
+        android:paddingEnd="24dp"
+        android:paddingBottom="8dp">
+        <ImageView
+            android:id="@+id/ivPreview"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:contentDescription="@string/pf_preview_desc"
+            android:scaleType="fitCenter" />
+        <TextView
+            android:id="@+id/tvStatus"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom|center_horizontal"
+            android:layout_marginBottom="6dp"
+            android:background="@drawable/frame_editor_panel"
+            android:paddingHorizontal="12dp"
+            android:paddingVertical="6dp"
+            android:text="@string/pf_idle"
+            android:textColor="#E8FFFFFF"
+            android:textSize="12sp" />
+    </FrameLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="0.53"
+        android:orientation="vertical"
+        android:background="@drawable/frame_editor_sheet"
+        android:paddingTop="14dp">
+
+        <View
+            android:layout_width="34dp"
+            android:layout_height="5dp"
+            android:layout_gravity="center_horizontal"
+            android:background="@drawable/frame_editor_export" />
+
+        <HorizontalScrollView
+            android:layout_width="match_parent"
+            android:layout_height="92dp"
+            android:layout_marginStart="14dp"
+            android:layout_marginTop="12dp"
+            android:layout_marginEnd="14dp"
+            android:background="@drawable/frame_editor_panel"
+            android:fillViewport="false"
+            android:scrollbars="none">
+            <LinearLayout
+                android:id="@+id/thumbnailRow"
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingStart="8dp"
+                android:paddingEnd="8dp">
+            <TextView
+                android:id="@+id/btnPick"
+                android:layout_width="68dp"
+                    android:layout_height="68dp"
+                    android:background="@drawable/frame_editor_option"
+                    android:gravity="center"
+                    android:text="+"
+                android:textColor="#FFFFFFFF"
+                android:textSize="38sp" />
+            </LinearLayout>
+        </HorizontalScrollView>
+
+        <HorizontalScrollView
+            android:id="@+id/optionScroller"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:fillViewport="true"
+            android:scrollbars="none">
+            <LinearLayout
+                android:id="@+id/optionRow"
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:gravity="center"
+                android:orientation="horizontal"
+                android:paddingStart="18dp"
+                android:paddingEnd="18dp" />
+        </HorizontalScrollView>
+
+        <HorizontalScrollView
+            android:layout_width="match_parent"
+            android:layout_height="68dp"
+            android:fillViewport="true"
+            android:scrollbars="none">
+            <LinearLayout
+                android:id="@+id/tabRow"
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:gravity="center"
+                android:orientation="horizontal"
+                android:paddingStart="8dp"
+                android:paddingEnd="8dp">
+                <TextView android:id="@+id/tabRatio" style="@style/FrameEditorTab" android:text="@string/pf_tab_ratio" />
+                <TextView android:id="@+id/tabLogo" style="@style/FrameEditorTab" android:text="@string/pf_tab_logo" />
+                <TextView android:id="@+id/tabParams" style="@style/FrameEditorTab" android:text="@string/pf_tab_params" />
+                <TextView android:id="@+id/tabTheme" style="@style/FrameEditorTab" android:text="@string/pf_tab_theme" />
+                <TextView android:id="@+id/tabShadow" style="@style/FrameEditorTab" android:text="@string/pf_tab_shadow" />
+                <TextView android:id="@+id/tabMargin" style="@style/FrameEditorTab" android:text="@string/pf_tab_margin" />
+            </LinearLayout>
+        </HorizontalScrollView>
+    </LinearLayout>
+</LinearLayout>
