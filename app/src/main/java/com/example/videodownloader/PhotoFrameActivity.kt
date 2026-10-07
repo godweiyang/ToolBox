@@ -6,6 +6,8 @@ import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Color
+import android.graphics.Matrix
+import android.graphics.drawable.GradientDrawable
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -53,8 +55,9 @@ class PhotoFrameActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         binding = ActivityPhotoFrameBinding.inflate(layoutInflater)
         setContentView(binding.root)
-        window.statusBarColor = Color.TRANSPARENT
-        window.navigationBarColor = Color.rgb(34, 35, 40)
+        window.statusBarColor = ContextCompat.getColor(this, R.color.pf_editor_bg)
+        window.navigationBarColor = ContextCompat.getColor(this, R.color.pf_sheet_bg)
+        binding.root.background = ContextCompat.getDrawable(this, R.drawable.frame_editor_empty_bg)
 
         binding.btnBack.setOnClickListener { finish() }
         binding.btnPick.setOnClickListener { if (!processing) launchPicker() }
@@ -95,6 +98,8 @@ class PhotoFrameActivity : AppCompatActivity() {
         rebuildThumbnails()
         if (selectedIndex >= 0) renderSelected() else {
             binding.ivPreview.setImageDrawable(null)
+            binding.root.background = ContextCompat.getDrawable(this, R.drawable.frame_editor_empty_bg)
+            window.statusBarColor = ContextCompat.getColor(this, R.color.pf_editor_bg)
             lastResult?.recycle(); lastResult = null
             binding.tvStatus.text = getString(R.string.pf_idle)
             binding.btnExport.isEnabled = false
@@ -159,6 +164,7 @@ class PhotoFrameActivity : AppCompatActivity() {
                 val previous = lastResult
                 lastResult = composed
                 binding.ivPreview.setImageBitmap(composed)
+                updateEditorBackground(composed)
                 previous?.recycle()
                 binding.tvStatus.text = getString(R.string.pf_selected_photo,
                     selectedIndex + 1, preparedUris.size)
@@ -285,13 +291,41 @@ class PhotoFrameActivity : AppCompatActivity() {
     private fun decodeBitmap(uri: Uri, maxEdge: Int): Bitmap? {
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) }
-        val longEdge = max(bounds.outWidth, bounds.outHeight)
+        val orientation = readOrientation(uri)
+        val swapAxes = orientation.rotationDegrees == 90f || orientation.rotationDegrees == 270f
+        val orientedWidth = if (swapAxes) bounds.outHeight else bounds.outWidth
+        val orientedHeight = if (swapAxes) bounds.outWidth else bounds.outHeight
+        val longEdge = max(orientedWidth, orientedHeight)
         if (longEdge <= 0) return null
         var sample = 1
         while (longEdge / sample > maxEdge) sample *= 2
-        return contentResolver.openInputStream(uri)?.use {
+        val decoded = contentResolver.openInputStream(uri)?.use {
             BitmapFactory.decodeStream(it, null, BitmapFactory.Options().apply { inSampleSize = sample })
+        } ?: return null
+        if (!orientation.changesPixels) return decoded
+        val matrix = Matrix().apply {
+            if (orientation.mirrorHorizontal || orientation.mirrorVertical) {
+                postScale(if (orientation.mirrorHorizontal) -1f else 1f,
+                    if (orientation.mirrorVertical) -1f else 1f)
+            }
+            if (orientation.rotationDegrees != 0f) postRotate(orientation.rotationDegrees)
         }
+        return runCatching {
+            Bitmap.createBitmap(decoded, 0, 0, decoded.width, decoded.height, matrix, true)
+        }.getOrNull()?.also { transformed ->
+            if (transformed !== decoded) decoded.recycle()
+        } ?: decoded
+    }
+
+    private fun readOrientation(uri: Uri): OrientationTransform = try {
+        val value = contentResolver.openInputStream(uri)?.use { input ->
+            ExifInterface(input).getAttributeInt(
+                ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL
+            )
+        } ?: ExifInterface.ORIENTATION_NORMAL
+        PhotoOrientation.fromExif(value)
+    } catch (_: Exception) {
+        OrientationTransform()
     }
 
     private fun readExif(uri: Uri): PhotoInfo {
@@ -339,6 +373,35 @@ class PhotoFrameActivity : AppCompatActivity() {
         if(ContextCompat.checkSelfPermission(this,p)==PackageManager.PERMISSION_GRANTED)return true
         writePermissionLauncher.launch(p);return false
     }
+    private fun updateEditorBackground(bitmap: Bitmap) {
+        if (bitmap.width <= 0 || bitmap.height <= 0) return
+        val xs = intArrayOf(bitmap.width / 8, bitmap.width / 2, bitmap.width * 7 / 8)
+        val ys = intArrayOf(bitmap.height / 14, bitmap.height / 5)
+        var red = 0L; var green = 0L; var blue = 0L; var count = 0
+        for (y in ys) for (x in xs) {
+            val color = bitmap.getPixel(x.coerceIn(0, bitmap.width - 1),
+                y.coerceIn(0, bitmap.height - 1))
+            red += Color.red(color); green += Color.green(color); blue += Color.blue(color); count++
+        }
+        if (count == 0) return
+        val base = Color.rgb((red / count).toInt(), (green / count).toInt(), (blue / count).toInt())
+        val top = blend(base, Color.WHITE, 0.08f)
+        val bottom = blend(base, ContextCompat.getColor(this, R.color.pf_sheet_bg), 0.48f)
+        binding.root.background = GradientDrawable(
+            GradientDrawable.Orientation.TOP_BOTTOM, intArrayOf(top, base, bottom)
+        )
+        window.statusBarColor = top
+    }
+
+    private fun blend(first: Int, second: Int, amount: Float): Int {
+        val a = amount.coerceIn(0f, 1f)
+        return Color.rgb(
+            (Color.red(first) * (1f - a) + Color.red(second) * a).toInt(),
+            (Color.green(first) * (1f - a) + Color.green(second) * a).toInt(),
+            (Color.blue(first) * (1f - a) + Color.blue(second) * a).toInt()
+        )
+    }
+
     private fun dp(value:Int)=(value*resources.displayMetrics.density).toInt()
     private fun toast(value:String)=Toast.makeText(this,value,Toast.LENGTH_SHORT).show()
     override fun onDestroy(){super.onDestroy();lastResult?.recycle();lastResult=null}

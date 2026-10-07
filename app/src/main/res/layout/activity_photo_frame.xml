@@ -3,7 +3,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:background="@color/pf_orange_bg"
+    android:background="@drawable/frame_editor_empty_bg"
     android:fitsSystemWindows="true">
 
     <!-- 顶部控制行：返回 / 标题 / 导出（橙色背景上，控件垂直居中） -->
@@ -54,7 +54,7 @@
     <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="0.51"
+        android:layout_weight="0.44"
         android:layout_marginStart="31dp"
         android:layout_marginTop="22dp"
         android:layout_marginEnd="31dp">
@@ -82,7 +82,7 @@
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="0.49"
+        android:layout_weight="0.56"
         android:orientation="vertical"
         android:background="@drawable/frame_editor_sheet">
 
@@ -138,7 +138,7 @@
             android:layout_width="match_parent"
             android:layout_height="120dp"
             android:layout_marginStart="27dp"
-            android:layout_marginTop="56dp"
+            android:layout_marginTop="12dp"
             android:layout_marginEnd="27dp"
             android:background="@drawable/frame_ratio_panel_bg"
             android:fillViewport="true"
@@ -156,8 +156,8 @@
         <HorizontalScrollView
             android:layout_width="match_parent"
             android:layout_height="56dp"
-            android:layout_marginTop="36dp"
-            android:fillViewport="false"
+            android:layout_marginTop="8dp"
+            android:layout_marginBottom="8dp"
             android:scrollbars="none"
             android:overScrollMode="never">
             <LinearLayout

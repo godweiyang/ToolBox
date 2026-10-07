@@ -87,7 +87,8 @@
     <color name="grad_gnss_e">#FFB340</color>
 
     <!-- 光影边框编辑器（与参考截图 1260x2800 对齐的 app 区域配色） -->
-    <color name="pf_orange_bg">#FF9241</color>          <!-- 顶部橙色背景/工具栏 (255,146,65) -->
+    <color name="pf_editor_bg">#FF25272C</color>          <!-- 无图片时与底部编辑器协调的默认背景 -->
+    <color name="pf_orange_bg">#FF9241</color>
     <color name="pf_export_pill">#FEB27A</color>       <!-- 导出胶囊按钮底 (254,178,122) -->
     <color name="pf_sheet_bg">#FF181A1E</color>        <!-- 底部深色面板 (24,26,30) -->
     <color name="pf_tray_bg">#FF2D2F33</color>         <!-- 缩略图托盘底 (45,47,51) -->

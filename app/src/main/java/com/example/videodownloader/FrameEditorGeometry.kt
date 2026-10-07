@@ -62,8 +62,8 @@ object FrameEditorGeometry {
     /** 布局中实际采用的 dp 取值（与 activity_photo_frame.xml 对齐）。 */
     object Dp {
         const val CARD_MARGIN = 31          // 108px / 3.5 ≈ 31
-        const val PREVIEW_WEIGHT = 0.51
-        const val SHEET_WEIGHT = 0.49
+        const val PREVIEW_WEIGHT = 0.44
+        const val SHEET_WEIGHT = 0.56
         const val HANDLE_W = 30             // 104px / 3.5 ≈ 30
         const val HANDLE_H = 4              // 14px / 3.5 = 4
         const val TRAY_H = 61               // 215px / 3.5 ≈ 61
