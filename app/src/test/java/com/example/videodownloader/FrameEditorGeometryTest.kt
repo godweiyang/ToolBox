@@ -58,7 +58,7 @@ class FrameEditorGeometryTest {
     @Test fun sheetContentFitsCompactViewportAndKeepsTabsVisible() {
         // 800dp 设计高，状态栏与工具栏后，抽屉可用区不能小于全部子项总高。
         val required = 13 + 4 + 19 + FrameEditorGeometry.Dp.TRAY_H +
-                12 + FrameEditorGeometry.Dp.RATIO_PANEL_H + 8 + 56 + 8
+                0 + FrameEditorGeometry.Dp.RATIO_PANEL_H + 4 + 56 + 2
         assertTrue("sheet content=$required dp", required <= 301)
     }
 

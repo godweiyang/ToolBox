@@ -61,6 +61,10 @@ class PhotoFrameActivity : AppCompatActivity() {
 
         binding.btnBack.setOnClickListener { finish() }
         binding.btnPick.setOnClickListener { if (!processing) launchPicker() }
+        binding.tvStatus.setOnClickListener {
+            if (preparedUris.isEmpty() && !processing) launchPicker()
+        }
+        updateStatusPlacement(empty = true)
         binding.btnExport.setOnClickListener {
             if (!processing && ensureLegacyWritePermission()) doExport()
         }
@@ -102,6 +106,7 @@ class PhotoFrameActivity : AppCompatActivity() {
             window.statusBarColor = ContextCompat.getColor(this, R.color.pf_editor_bg)
             lastResult?.recycle(); lastResult = null
             binding.tvStatus.text = getString(R.string.pf_idle)
+            updateStatusPlacement(empty = true)
             binding.btnExport.isEnabled = false
         }
     }
@@ -168,6 +173,7 @@ class PhotoFrameActivity : AppCompatActivity() {
                 previous?.recycle()
                 binding.tvStatus.text = getString(R.string.pf_selected_photo,
                     selectedIndex + 1, preparedUris.size)
+                updateStatusPlacement(empty = false)
             }
         }
     }
@@ -373,6 +379,18 @@ class PhotoFrameActivity : AppCompatActivity() {
         if(ContextCompat.checkSelfPermission(this,p)==PackageManager.PERMISSION_GRANTED)return true
         writePermissionLauncher.launch(p);return false
     }
+    private fun updateStatusPlacement(empty: Boolean) {
+        val params = binding.tvStatus.layoutParams as FrameLayout.LayoutParams
+        params.gravity = if (empty) Gravity.BOTTOM or Gravity.END
+            else Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
+        params.marginEnd = if (empty) dp(2) else 0
+        params.bottomMargin = if (empty) dp(12) else dp(4)
+        binding.tvStatus.layoutParams = params
+        binding.tvStatus.textSize = if (empty) 12f else 11f
+        binding.tvStatus.alpha = if (empty) 0.92f else 0.82f
+        binding.tvStatus.isClickable = empty
+    }
+
     private fun updateEditorBackground(bitmap: Bitmap) {
         if (bitmap.width <= 0 || bitmap.height <= 0) return
         val xs = intArrayOf(bitmap.width / 8, bitmap.width / 2, bitmap.width * 7 / 8)

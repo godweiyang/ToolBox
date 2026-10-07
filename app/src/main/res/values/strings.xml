@@ -214,7 +214,7 @@
     <string name="tool_photoframe_title">光影边框</string>
     <string name="tool_photoframe_desc">照片自动加光影边框，读取 EXIF 叠加相机型号与拍摄参数</string>
     <string name="pf_subtitle">选择照片，自动生成光晕边框与拍摄信息</string>
-    <string name="pf_idle">点击下方按钮选择照片</string>
+    <string name="pf_idle">点击右下角“+”添加照片</string>
     <string name="pf_preview_desc">边框效果预览</string>
     <string name="pf_btn_pick">选择照片（可多选）</string>
     <string name="pf_btn_export">导出到相册</string>
