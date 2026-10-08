@@ -1,13 +1,22 @@
 ﻿package com.example.videodownloader
 
+import android.app.AlertDialog
 import android.content.Intent
+import android.net.Uri
+import android.os.Build
 import android.os.Bundle
-import android.view.View
+import android.provider.Settings
+import android.widget.Toast
+import androidx.lifecycle.lifecycleScope
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.ItemTouchHelper
 import androidx.recyclerview.widget.RecyclerView
 import com.example.videodownloader.databinding.ActivityMainBinding
+import com.example.videodownloader.databinding.DialogAppUpdateBinding
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * 工具百宝箱入口：展示所有可用工具的卡片列表。
@@ -44,6 +53,114 @@ class MainActivity : AppCompatActivity() {
 
         // 底部显示版本号，方便用户确认当前安装的版本
         binding.tvVersion.text = "v${getVersionName()}"
+        binding.btnCheckUpdate.setOnClickListener { checkForUpdates(manual = true) }
+        checkForUpdates(manual = false)
+    }
+
+    private fun checkForUpdates(manual: Boolean) {
+        binding.btnCheckUpdate.isEnabled = false
+        binding.btnCheckUpdate.text = getString(R.string.update_checking)
+        lifecycleScope.launch {
+            val result = withContext(Dispatchers.IO) { runCatching { AppUpdater.fetchLatest() } }
+            binding.btnCheckUpdate.isEnabled = true
+            binding.btnCheckUpdate.text = getString(R.string.update_check)
+            result.onSuccess { info ->
+                getSharedPreferences("updates", MODE_PRIVATE).edit()
+                    .putLong("last_check", System.currentTimeMillis()).apply()
+                if (AppVersions.isNewer(info.tag, getVersionName())) {
+                    binding.btnCheckUpdate.text = info.tag
+                    showUpdateDialog(info)
+                } else {
+                    binding.btnCheckUpdate.text = getString(R.string.update_latest)
+                    if (manual) showLatestDialog(info)
+                }
+            }.onFailure {
+                if (manual) Toast.makeText(this@MainActivity,
+                    R.string.update_failed, Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    private fun showUpdateDialog(info: ReleaseInfo) {
+        val content = DialogAppUpdateBinding.inflate(layoutInflater)
+        content.tvUpdateTitle.text = getString(R.string.update_available, info.tag)
+        content.tvUpdateSubtitle.text = getString(R.string.update_current, "v${getVersionName()}")
+        content.tvUpdateNotes.text = info.notes.ifBlank { getString(R.string.update_notes_empty) }
+        val dialog = AlertDialog.Builder(this).setView(content.root)
+            .setNegativeButton(R.string.update_later, null)
+            .setNeutralButton(R.string.update_open_browser) { _, _ -> AppUpdater.openBrowser(this, info.pageUrl) }
+            .setPositiveButton(R.string.update_download_install, null)
+            .create()
+        dialog.setOnShowListener {
+            dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                if (!canRequestPackageInstalls()) {
+                    requestInstallPermission()
+                    Toast.makeText(this, R.string.update_install_permission, Toast.LENGTH_LONG).show()
+                } else downloadAndInstall(info, dialog, content)
+            }
+        }
+        dialog.show()
+    }
+
+    private fun showLatestDialog(info: ReleaseInfo) {
+        val content = DialogAppUpdateBinding.inflate(layoutInflater)
+        content.tvUpdateIcon.text = "✓"
+        content.tvUpdateTitle.text = getString(R.string.update_latest)
+        content.tvUpdateSubtitle.text = getString(R.string.update_latest_detail, "v${getVersionName()}")
+        content.tvUpdateNotes.text = info.notes.ifBlank { getString(R.string.update_notes_empty) }
+        val dialog = AlertDialog.Builder(this).setView(content.root)
+            .setPositiveButton(R.string.update_close, null).create()
+        dialog.setOnShowListener {
+            dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
+        }
+        dialog.show()
+    }
+
+    private fun downloadAndInstall(info: ReleaseInfo, dialog: AlertDialog,
+                                   content: DialogAppUpdateBinding) {
+        val button = dialog.getButton(AlertDialog.BUTTON_POSITIVE)
+        button.isEnabled = false
+        lifecycleScope.launch {
+            val result = withContext(Dispatchers.IO) {
+                runCatching { AppUpdater.downloadApk(this@MainActivity, info) { progress ->
+                    runOnUiThread {
+                        button.text = getString(R.string.update_downloading, progress)
+                        content.tvUpdateSubtitle.text = getString(R.string.update_downloading, progress)
+                    }
+                } }
+            }
+            result.onSuccess { apk ->
+                val archive = runCatching { packageManager.getPackageArchiveInfo(apk.absolutePath, 0) }.getOrNull()
+                if (archive?.packageName != packageName) {
+                    apk.delete()
+                    Toast.makeText(this@MainActivity, R.string.update_download_failed, Toast.LENGTH_LONG).show()
+                    AppUpdater.openBrowser(this@MainActivity, info.pageUrl)
+                    button.isEnabled = true
+                    button.text = getString(R.string.update_download_install)
+                    return@onSuccess
+                }
+                runCatching { AppUpdater.install(this@MainActivity, apk) }.onFailure {
+                    AppUpdater.openBrowser(this@MainActivity, info.pageUrl)
+                }
+                dialog.dismiss()
+            }.onFailure {
+                button.isEnabled = true
+                button.text = getString(R.string.update_download_install)
+                Toast.makeText(this@MainActivity, R.string.update_download_failed, Toast.LENGTH_LONG).show()
+                AppUpdater.openBrowser(this@MainActivity, info.pageUrl)
+            }
+        }
+    }
+
+    private fun canRequestPackageInstalls(): Boolean =
+        Build.VERSION.SDK_INT < Build.VERSION_CODES.O || packageManager.canRequestPackageInstalls()
+
+    private fun requestInstallPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            startActivity(Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                Uri.parse("package:$packageName")))
+        }
     }
 
     /**
