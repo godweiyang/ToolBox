@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!-- ===== 间距刻度（4dp 基准） ===== -->
+    <dimen name="space_1">4dp</dimen>
+    <dimen name="space_2">8dp</dimen>
+    <dimen name="space_3">12dp</dimen>
+    <dimen name="space_4">16dp</dimen>
+    <dimen name="space_5">20dp</dimen>
+    <dimen name="space_6">24dp</dimen>
+
+    <!-- ===== 页面 / 容器 ===== -->
+    <dimen name="screen_side">20dp</dimen>
+    <dimen name="screen_side_compact">16dp</dimen>
+    <dimen name="card_corner">22dp</dimen>
+    <dimen name="control_corner">16dp</dimen>
+    <dimen name="pill_corner">18dp</dimen>
+    <dimen name="glass_padding">16dp</dimen>
+
+    <!-- ===== 触摸目标：所有关键控件 >=48dp（硬下限 44dp） ===== -->
+    <dimen name="touch_target_min">48dp</dimen>
+
+    <!-- ===== 主页 ===== -->
+    <dimen name="home_icon_size">60dp</dimen>
+    <dimen name="home_icon_padding">15dp</dimen>
+    <dimen name="home_card_spacing">6dp</dimen>
+
+    <!-- ===== 图表容器 ===== -->
+    <dimen name="chart_height">160dp</dimen>
+
+    <!-- ===== 字体刻度（sp） ===== -->
+    <dimen name="type_large_title">34sp</dimen>
+    <dimen name="type_headline">22sp</dimen>
+    <dimen name="type_card_title">16sp</dimen>
+    <dimen name="type_body">15sp</dimen>
+    <dimen name="type_caption">13sp</dimen>
+    <dimen name="type_footnote">12sp</dimen>
+
+</resources>

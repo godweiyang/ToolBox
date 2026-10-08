@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 光影边框编辑器专属字符串（独立文件，避免改动共享 strings.xml）。 -->
+<resources>
+    <!-- 顶部返回按钮无障碍描述 -->
+    <string name="pf_back">返回</string>
+</resources>

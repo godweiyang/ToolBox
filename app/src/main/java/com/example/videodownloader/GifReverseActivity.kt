@@ -88,6 +88,9 @@ class GifReverseActivity : AppCompatActivity() {
         binding = ActivityGifReverseBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
+        binding.grHeader.pageTitle.text = getString(R.string.tool_gifreverse_title)
+        binding.grHeader.pageSubtitle.text = getString(R.string.tool_gifreverse_desc)
+
         binding.btnPick.setOnClickListener { pickGifLauncher.launch("image/gif") }
 
         binding.btnClear.setOnClickListener {

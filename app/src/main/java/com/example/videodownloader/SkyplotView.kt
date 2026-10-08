@@ -7,18 +7,18 @@ import android.graphics.Typeface
 import android.util.AttributeSet
 import android.view.MotionEvent
 import android.view.View
-import kotlin.math.cos
-import kotlin.math.hypot
-import kotlin.math.sin
+import com.example.videodownloader.chart.SkyGeometry
 
 /**
  * 卫星天空图（Skyplot）：以观察者头顶为中心的俯视图。
  *
- * 圆心 = 天顶（仰角 90°，正头顶），外圈 = 地平线（仰角 0°）。
+ * 圆心 = 天顶（仰角 90°），外圈 = 地平线（仰角 0°）。
  * 方位角 0°=北（上）、90°=东（右）、180°=南（下）、270°=西（左）。
  *
  * 每颗卫星按 (azimuth, elevation) 定位，颜色区分星座，大小反映信号强度（C/N0）。
  * 点击某颗卫星可选中并高亮，回调 [onSatelliteSelected]。
+ *
+ * 极坐标/命中几何下沉到 [SkyGeometry]（框架无关，可被 JUnit 覆盖）。
  */
 class SkyplotView @JvmOverloads constructor(
     context: Context,
@@ -44,35 +44,50 @@ class SkyplotView @JvmOverloads constructor(
     private var touchX = -1f
     private var touchY = -1f
 
-    private val ringPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+    private val density = resources.displayMetrics.density
+    private val scaledDensity = resources.displayMetrics.scaledDensity
+    private fun Float.dp() = this * density
+    private fun Float.sp() = this * scaledDensity
+
+    // ---- Modern light palette ----
+    private val surfaceColor = 0xFFFFFFFF.toInt()
+    private val ringOuterColor = 0xFF9AA0A6.toInt()
+    private val ringInnerColor = 0xFFD8DAE0.toInt()
+    private val spokeColor = 0x1F000000
+    private val compassColor = 0xFF5F6368.toInt()
+    private val elevLabelColor = 0xFF9AA0A6.toInt()
+    private val satLabelColor = 0xFF3C4043.toInt()
+    private val selectionColor = 0xFF007AFF.toInt()
+
+    private val ringOuterPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
-        strokeWidth = 1.5f
-        color = 0xFFBDBDBD.toInt()
+        strokeWidth = 1.5f.dp()
+        color = ringOuterColor
     }
-    private val ringPaintOuter = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+    private val ringInnerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
-        strokeWidth = 2f
-        color = 0xFF9E9E9E.toInt()
+        strokeWidth = 1f.dp()
+        color = ringInnerColor
     }
     private val spokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
-        strokeWidth = 1f
-        color = 0x33000000
-        pathEffect = android.graphics.DashPathEffect(floatArrayOf(4f, 6f), 0f)
+        strokeWidth = 1f.dp()
+        color = spokeColor
+        pathEffect = android.graphics.DashPathEffect(floatArrayOf(4f.dp(), 6f.dp()), 0f)
     }
     private val centerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.FILL
-        color = 0xFF9E9E9E.toInt()
+        color = ringInnerColor
     }
     private val compassPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        textSize = 32f
+        textSize = 13f.sp()
         typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-        color = 0xFF616161.toInt()
+        color = compassColor
         textAlign = Paint.Align.CENTER
     }
     private val elevationLabelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        textSize = 22f
-        color = 0xFFBDBDBD.toInt()
+        textSize = 10f.sp()
+        color = elevLabelColor
         textAlign = Paint.Align.CENTER
     }
     private val satPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -80,19 +95,24 @@ class SkyplotView @JvmOverloads constructor(
     }
     private val satStrokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
-        strokeWidth = 2f
+        strokeWidth = 1.5f.dp()
         color = 0xFFFFFFFF.toInt()
     }
     private val satLabelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        textSize = 20f
+        textSize = 10f.sp()
         typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-        color = 0xFF424242.toInt()
+        color = satLabelColor
         textAlign = Paint.Align.CENTER
     }
     private val selectedRingPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
-        strokeWidth = 3f
-        color = 0xFF6750A4.toInt()
+        strokeWidth = 2.5f.dp()
+        color = selectionColor
+    }
+
+    init {
+        importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_YES
+        contentDescription = "卫星天空图，双击或点击卫星查看详情"
     }
 
     /** 更新卫星列表并重绘 */
@@ -108,6 +128,14 @@ class SkyplotView @JvmOverloads constructor(
         invalidate()
     }
 
+    private fun buildGeometry(): SkyGeometry? {
+        val cx = width / 2f
+        val cy = height / 2f
+        val maxR = minOf(cx, cy) - 16f.dp()
+        if (maxR <= 0f) return null
+        return SkyGeometry(cx, cy, maxR)
+    }
+
     override fun onTouchEvent(event: MotionEvent): Boolean {
         if (event.action == MotionEvent.ACTION_DOWN || event.action == MotionEvent.ACTION_UP) {
             touchX = event.x
@@ -119,27 +147,18 @@ class SkyplotView @JvmOverloads constructor(
     }
 
     private fun findNearestSatellite() {
-        val cx = width / 2f
-        val cy = height / 2f
-        val maxR = minOf(cx, cy) - 16f
-        if (maxR <= 0f) return
-
-        var bestIdx = -1
-        var bestDist = Float.MAX_VALUE
-        for (i in satellites.indices) {
-            val s = satellites[i]
-            val r = (1f - s.elevation / 90f) * maxR
-            val angle = Math.toRadians(s.azimuth.toDouble())
-            val sx = cx + (r * sin(angle)).toFloat()
-            val sy = cy - (r * cos(angle)).toFloat()
-            val d = hypot(touchX - sx, touchY - sy)
-            if (d < bestDist && d < 48f) {
-                bestDist = d
-                bestIdx = i
-            }
+        val g = buildGeometry() ?: return
+        val points = satellites.map { g.position(it.azimuth, it.elevation) }
+        val best = g.nearest(points, touchX, touchY, 48f.dp())
+        selectedIndex = best
+        onSatelliteSelected?.invoke(if (best >= 0) satellites[best] else null)
+        if (best >= 0) {
+            val s = satellites[best]
+            announceForAccessibility(
+                "已选择 ${constellationName(s.constellation)} 卫星 ${s.svid}，" +
+                        "仰角 ${s.elevation.toInt()} 度，方位 ${s.azimuth.toInt()} 度"
+            )
         }
-        selectedIndex = bestIdx
-        onSatelliteSelected?.invoke(if (selectedIndex >= 0) satellites[selectedIndex] else null)
         invalidate()
     }
 
@@ -150,58 +169,54 @@ class SkyplotView @JvmOverloads constructor(
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
-        val cx = width / 2f
-        val cy = height / 2f
-        val maxR = minOf(cx, cy) - 16f
-        if (maxR <= 0f) return
+        canvas.drawColor(surfaceColor)
+        val g = buildGeometry() ?: return
+        val cx = g.cx
+        val cy = g.cy
+        val maxR = g.maxR
+        val rings = g.ringRadii()
 
         // 1. 仰角同心圆：0°(外圈) / 30° / 60° / 90°(圆心)
-        canvas.drawCircle(cx, cy, maxR, ringPaintOuter)
-        canvas.drawCircle(cx, cy, maxR * 2f / 3f, ringPaint)
-        canvas.drawCircle(cx, cy, maxR / 3f, ringPaint)
-        canvas.drawCircle(cx, cy, 3f, centerPaint)
+        canvas.drawCircle(cx, cy, rings[0], ringOuterPaint)
+        canvas.drawCircle(cx, cy, rings[1], ringInnerPaint)
+        canvas.drawCircle(cx, cy, rings[2], ringInnerPaint)
+        canvas.drawCircle(cx, cy, 3f.dp(), centerPaint)
 
         // 2. 方位辐条
         canvas.drawLine(cx, cy - maxR, cx, cy + maxR, spokePaint)
         canvas.drawLine(cx - maxR, cy, cx + maxR, cy, spokePaint)
 
         // 3. 方位字母
-        canvas.drawText("N", cx, cy - maxR - 6f, compassPaint)
-        canvas.drawText("S", cx, cy + maxR + 30f, compassPaint)
-        canvas.drawText("E", cx + maxR + 18f, cy + 10f, compassPaint)
-        canvas.drawText("W", cx - maxR - 18f, cy + 10f, compassPaint)
+        canvas.drawText("N", cx, cy - maxR - 6f.dp(), compassPaint)
+        canvas.drawText("S", cx, cy + maxR + 22f.sp(), compassPaint)
+        canvas.drawText("E", cx + maxR + 14f.dp(), cy + 4f.sp(), compassPaint)
+        canvas.drawText("W", cx - maxR - 14f.dp(), cy + 4f.sp(), compassPaint)
 
         // 4. 仰角刻度
-        canvas.drawText("60°", cx + 8f, cy - maxR / 3f + 6f, elevationLabelPaint)
-        canvas.drawText("30°", cx + 8f, cy - maxR * 2f / 3f + 6f, elevationLabelPaint)
+        canvas.drawText("60°", cx + 6f.dp(), cy - rings[2] + 4f.sp(), elevationLabelPaint)
+        canvas.drawText("30°", cx + 6f.dp(), cy - rings[1] + 4f.sp(), elevationLabelPaint)
 
         // 5. 卫星点
         for (i in satellites.indices) {
             val s = satellites[i]
-            val r = (1f - s.elevation / 90f) * maxR
-            val angle = Math.toRadians(s.azimuth.toDouble())
-            val sx = cx + (r * sin(angle)).toFloat()
-            val sy = cy - (r * cos(angle)).toFloat()
+            val p = g.position(s.azimuth, s.elevation)
+            val radius = g.satRadius(s.cn0)
 
-            val color = constellationColorValue(s.constellation)
-            val cn0Clamped = s.cn0.coerceIn(15f, 50f)
-            val radius = 5f + (cn0Clamped - 15f) / 35f * 7f
-
-            satPaint.color = color
+            satPaint.color = constellationColorValue(s.constellation)
             satPaint.alpha = if (s.usedInFix) 255 else 90
 
-            canvas.drawCircle(sx, sy, radius, satPaint)
-            canvas.drawCircle(sx, sy, radius, satStrokePaint)
+            canvas.drawCircle(p.sx, p.sy, radius, satPaint)
+            canvas.drawCircle(p.sx, p.sy, radius, satStrokePaint)
 
             if (s.cn0 >= 35f && s.usedInFix) {
                 canvas.drawText(
                     constellationPrefix(s.constellation) + s.svid,
-                    sx, sy - radius - 4f, satLabelPaint
+                    p.sx, p.sy - radius - 4f.dp(), satLabelPaint
                 )
             }
 
             if (i == selectedIndex) {
-                canvas.drawCircle(sx, sy, radius + 6f, selectedRingPaint)
+                canvas.drawCircle(p.sx, p.sy, radius + 6f.dp(), selectedRingPaint)
             }
         }
     }
@@ -235,6 +250,7 @@ class SkyplotView @JvmOverloads constructor(
             else -> "未知"
         }
 
+        // 星座色保留原值（卫星列表 UI 也依赖，改动会与列表不一致）。
         fun constellationColorValue(c: Int): Int = when (c) {
             CONSTELLATION_GPS -> 0xFF1E88E5.toInt()
             CONSTELLATION_GLONASS -> 0xFFE53935.toInt()

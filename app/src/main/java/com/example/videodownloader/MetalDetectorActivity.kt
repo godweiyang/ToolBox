@@ -52,6 +52,10 @@ class MetalDetectorActivity : AppCompatActivity(), SensorEventListener {
         binding = ActivityMetalDetectorBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
+        // 共享页面头标题
+        binding.metalHeader.pageTitle.text = getString(R.string.tool_metal_title)
+        binding.metalHeader.pageSubtitle.visibility = android.view.View.GONE
+
         sensorManager = getSystemService(SENSOR_SERVICE) as SensorManager
         magnetometer = sensorManager?.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD)
         vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {

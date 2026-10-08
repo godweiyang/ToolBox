@@ -1,83 +1,101 @@
 <?xml version="1.0" encoding="utf-8"?>
-<ScrollView
-    android:fitsSystemWindows="true" xmlns:android="http://schemas.android.com/apk/res/android"
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:fillViewport="true">
+    android:background="@drawable/ios_bg_gradient"
+    android:fitsSystemWindows="true"
+    android:fillViewport="true"
+    android:scrollbars="none">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:padding="16dp">
+        android:orientation="vertical">
 
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="@string/tool_ninegrid_title"
-            android:textSize="22sp"
-            android:textStyle="bold"
-            android:gravity="center"
-            android:paddingBottom="16dp" />
-
-        <TextView
-            android:id="@+id/tvImageInfo"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="@string/ng_input_label"
-            android:textStyle="bold"
-            android:paddingBottom="6dp" />
+        <!-- 共享页面头 -->
+        <include
+            android:id="@+id/ngHeader"
+            layout="@layout/view_page_header" />
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:layout_marginTop="8dp">
+            android:orientation="vertical"
+            android:paddingStart="@dimen/screen_side"
+            android:paddingEnd="@dimen/screen_side"
+            android:paddingBottom="@dimen/space_6">
 
-            <Button
-                android:id="@+id/btnPick"
-                android:layout_width="0dp"
-                android:layout_weight="1"
+            <!-- 选择与预览卡片 -->
+            <LinearLayout
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="@string/ng_btn_pick" />
+                android:background="@drawable/ios_glass_card"
+                android:orientation="vertical"
+                android:padding="@dimen/glass_padding">
 
-            <Button
-                android:id="@+id/btnClear"
-                android:layout_width="0dp"
-                android:layout_weight="1"
+                <TextView
+                    android:id="@+id/tvImageInfo"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    style="@style/Text.iOS.CardTitle"
+                    android:text="@string/ng_input_label" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:layout_marginTop="@dimen/space_3">
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnPick"
+                        style="@style/Widget.iOS.Button.Secondary"
+                        android:layout_width="0dp"
+                        android:layout_weight="1"
+                        android:layout_height="wrap_content"
+                        android:text="@string/ng_btn_pick" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnClear"
+                        style="@style/Widget.iOS.Button.Secondary"
+                        android:layout_width="0dp"
+                        android:layout_weight="1"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="@dimen/space_2"
+                        android:text="@string/ng_btn_clear" />
+                </LinearLayout>
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/ng_preview_hint"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="13sp"
+                    android:layout_marginTop="@dimen/space_3"
+                    android:paddingBottom="@dimen/space_2" />
+
+                <!-- 九宫格预览 -->
+                <GridLayout
+                    android:id="@+id/gridPreview"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:columnCount="3"
+                    android:rowCount="3"
+                    android:useDefaultMargins="true"
+                    android:layout_marginTop="@dimen/space_1" />
+            </LinearLayout>
+
+            <!-- 保存按钮 -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnSaveAll"
+                style="@style/Widget.iOS.Button"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="@string/ng_btn_clear"
-                android:layout_marginStart="8dp" />
+                android:layout_marginTop="@dimen/space_4"
+                android:text="@string/ng_btn_save_all"
+                android:enabled="false"
+                app:backgroundTint="@color/douyin_red" />
+
         </LinearLayout>
-
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="@string/ng_preview_hint"
-            android:textColor="#666666"
-            android:textSize="13sp"
-            android:layout_marginTop="12dp"
-            android:paddingBottom="6dp" />
-
-        <!-- 九宫格预览 -->
-        <GridLayout
-            android:id="@+id/gridPreview"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:columnCount="3"
-            android:rowCount="3"
-            android:useDefaultMargins="true"
-            android:layout_marginTop="4dp" />
-
-        <Button
-            android:id="@+id/btnSaveAll"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="@string/ng_btn_save_all"
-            android:layout_marginTop="16dp"
-            android:enabled="false"
-            android:backgroundTint="@color/douyin_red"
-            android:textColor="@android:color/white" />
-
     </LinearLayout>
 </ScrollView>

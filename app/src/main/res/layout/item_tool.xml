@@ -4,16 +4,16 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_margin="6dp"
+    android:layout_margin="@dimen/home_card_spacing"
     android:clickable="true"
     android:focusable="true"
     android:foreground="?attr/selectableItemBackground"
     app:cardBackgroundColor="@android:color/transparent"
-    app:cardCornerRadius="22dp"
+    app:cardCornerRadius="@dimen/card_corner"
     app:cardElevation="0dp"
     app:cardPreventCornerOverlap="false"
     app:cardUseCompatPadding="false"
-    app:rippleColor="#22007AFF"
+    app:rippleColor="@color/ds_ripple_primary"
     app:strokeWidth="0dp">
 
     <LinearLayout
@@ -29,10 +29,11 @@
 
         <ImageView
             android:id="@+id/ivToolIcon"
-            android:layout_width="60dp"
-            android:layout_height="60dp"
+            android:layout_width="@dimen/home_icon_size"
+            android:layout_height="@dimen/home_icon_size"
             android:background="@android:color/transparent"
-            android:padding="15dp"
+            android:importantForAccessibility="no"
+            android:padding="@dimen/home_icon_padding"
             android:scaleType="fitCenter"
             tools:src="@android:drawable/ic_media_play" />
 

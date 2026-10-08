@@ -68,10 +68,26 @@ class GnssSkyActivity : AppCompatActivity() {
         binding = ActivityGnssSkyBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
+        // 共享页面头标题
+        binding.gnssHeader.pageTitle.text = getString(R.string.tool_gnss_title)
+        binding.gnssHeader.pageSubtitle.visibility = View.GONE
+
+        // 共享指标卡：标签 / 单位
+        binding.cardVisible.metricLabel.text = "可见卫星"
+        binding.cardVisible.metricUnit.text = "颗"
+        binding.cardUsed.metricLabel.text = "用于定位"
+        binding.cardUsed.metricUnit.text = "颗"
+        binding.cardAvgCn0.metricLabel.text = "平均 C/N0"
+        binding.cardAvgCn0.metricUnit.text = "dB-Hz"
+        binding.cardAccuracy.metricLabel.text = "定位精度"
+        binding.cardAccuracy.metricUnit.text = "米"
+        // 首次定位前给可读占位
+        binding.cardAccuracy.metricValue.text = "--"
+
         locationManager = getSystemService(Context.LOCATION_SERVICE) as LocationManager
 
         binding.chartCn0.configure(
-            color = 0xFF6750A4.toInt(), showThreshold = false, initMax = 50f, initMin = 0f
+            color = 0xFF1E88E5.toInt(), showThreshold = false, initMax = 50f, initMin = 0f
         )
 
         binding.skyplot.onSatelliteSelected = { sat ->
@@ -183,9 +199,9 @@ class GnssSkyActivity : AppCompatActivity() {
         val status = lastStatus ?: return
         val satCount = status.satelliteCount
         if (satCount == 0) {
-            binding.tvVisibleCount.text = "0"
-            binding.tvUsedCount.text = "0"
-            binding.tvAvgCn0.text = "--"
+            binding.cardVisible.metricValue.text = "0"
+            binding.cardUsed.metricValue.text = "0"
+            binding.cardAvgCn0.metricValue.text = "--"
             binding.skyplot.updateSatellites(emptyList())
             binding.satListContainer.removeAllViews()
             val emptyTv = TextView(this).apply {
@@ -225,10 +241,10 @@ class GnssSkyActivity : AppCompatActivity() {
         }
 
         // 统计卡片
-        binding.tvVisibleCount.text = satList.size.toString()
-        binding.tvUsedCount.text = usedCount.toString()
+        binding.cardVisible.metricValue.text = satList.size.toString()
+        binding.cardUsed.metricValue.text = usedCount.toString()
         val avgCn0 = if (cn0Count > 0) totalCn0 / cn0Count else 0f
-        binding.tvAvgCn0.text = if (cn0Count > 0) "%.1f".format(avgCn0) else "--"
+        binding.cardAvgCn0.metricValue.text = if (cn0Count > 0) "%.1f".format(avgCn0) else "--"
 
         // 信号曲线
         if (cn0Count > 0) {
@@ -319,7 +335,7 @@ class GnssSkyActivity : AppCompatActivity() {
         val loc = currentLocation ?: return
         binding.tvLat.text = "%.6f".format(loc.latitude)
         binding.tvLon.text = "%.6f".format(loc.longitude)
-        binding.tvAccuracy.text = if (loc.hasAccuracy()) "±%.0f".format(loc.accuracy) else "--"
+        binding.cardAccuracy.metricValue.text = if (loc.hasAccuracy()) "±%.0f".format(loc.accuracy) else "--"
         if (loc.hasSpeed() && loc.speed > 0f) {
             binding.tvSpeed.text = "%.1f m/s".format(loc.speed)
         }

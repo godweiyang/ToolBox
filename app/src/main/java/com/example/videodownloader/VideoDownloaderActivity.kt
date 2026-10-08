@@ -58,6 +58,8 @@ class VideoDownloaderActivity : AppCompatActivity() {
         binding = ActivityVideoDownloaderBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
+        binding.downloaderHeader.pageTitle.text = getString(R.string.tool_video_downloader_title)
+        binding.downloaderHeader.pageSubtitle.text = getString(R.string.tool_video_downloader_desc)
         binding.tvLog.movementMethod = ScrollingMovementMethod()
 
         binding.btnPaste.setOnClickListener {

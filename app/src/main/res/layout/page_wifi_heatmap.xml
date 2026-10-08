@@ -3,82 +3,99 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:padding="16dp">
+    android:paddingStart="@dimen/screen_side"
+    android:paddingEnd="@dimen/screen_side"
+    android:paddingTop="@dimen/space_2"
+    android:paddingBottom="@dimen/space_4">
 
     <TextView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="@string/wifi_heatmap_label"
-        android:textStyle="bold"
-        android:paddingBottom="8dp" />
+        style="@style/Text.iOS.CardTitle"
+        android:paddingBottom="@dimen/space_2"
+        android:text="@string/wifi_heatmap_label" />
 
     <TextView
         android:id="@+id/tvHeatmapEmpty"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="@string/wifi_heatmap_empty"
-        android:textSize="13sp"
-        android:textColor="#999999"
         android:gravity="center"
-        android:paddingBottom="8dp"
+        android:padding="@dimen/space_4"
+        android:text="@string/wifi_heatmap_empty"
+        android:textColor="@color/text_tertiary"
+        android:textSize="@dimen/type_caption"
         android:visibility="gone" />
 
-    <com.example.videodownloader.HeatMapView
-        android:id="@+id/heatMap"
+    <!-- 热力图画布 -->
+    <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
-        android:background="#FAFAFA" />
+        android:background="@drawable/ios_glass_field"
+        android:padding="@dimen/space_2">
+
+        <com.example.videodownloader.HeatMapView
+            android:id="@+id/heatMap"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="#FAFAFA"
+            android:contentDescription="@string/wifi_tab_heatmap" />
+    </FrameLayout>
 
     <TextView
         android:id="@+id/tvSteps"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:layout_marginTop="@dimen/space_2"
         android:gravity="center"
-        android:textSize="13sp"
-        android:textColor="#666666"
-        android:paddingTop="8dp"
-        android:paddingBottom="4dp" />
+        android:textColor="@color/text_secondary"
+        android:textSize="@dimen/type_caption" />
 
     <TextView
         android:id="@+id/tvWalkHint"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:gravity="center"
+        android:paddingTop="@dimen/space_1"
         android:text="@string/wifi_heatmap_auto_hint"
-        android:textSize="12sp"
-        android:textColor="#999999"
-        android:paddingBottom="8dp" />
+        android:textColor="@color/text_tertiary"
+        android:textSize="@dimen/type_footnote" />
 
+    <!-- 操作按钮：开始 / 重置视图 / 清空 -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:layout_marginTop="@dimen/space_3"
         android:orientation="horizontal">
 
-        <Button
+        <com.google.android.material.button.MaterialButton
             android:id="@+id/btnToggleHeat"
+            style="@style/Widget.iOS.Button"
             android:layout_width="0dp"
-            android:layout_weight="1"
             android:layout_height="wrap_content"
-            android:text="@string/wifi_btn_start"
-            android:backgroundTint="@color/tool_wifi_bg"
-            android:textColor="@android:color/white" />
+            android:layout_weight="1"
+            android:minHeight="@dimen/touch_target_min"
+            android:text="@string/wifi_btn_start" />
 
-        <Button
+        <com.google.android.material.button.MaterialButton
             android:id="@+id/btnResetView"
+            style="@style/Widget.iOS.Button.Secondary"
             android:layout_width="0dp"
-            android:layout_weight="1"
             android:layout_height="wrap_content"
-            android:text="@string/wifi_heatmap_reset_view"
-            android:layout_marginStart="8dp" />
+            android:layout_marginStart="@dimen/space_2"
+            android:layout_weight="1"
+            android:minHeight="@dimen/touch_target_min"
+            android:text="@string/wifi_heatmap_reset_view" />
 
-        <Button
+        <com.google.android.material.button.MaterialButton
             android:id="@+id/btnClear"
+            style="@style/Widget.iOS.Button.Danger"
             android:layout_width="0dp"
-            android:layout_weight="1"
             android:layout_height="wrap_content"
-            android:text="@string/wifi_heatmap_clear"
-            android:layout_marginStart="8dp" />
+            android:layout_marginStart="@dimen/space_2"
+            android:layout_weight="1"
+            android:minHeight="@dimen/touch_target_min"
+            android:text="@string/wifi_heatmap_clear" />
     </LinearLayout>
 
 </LinearLayout>

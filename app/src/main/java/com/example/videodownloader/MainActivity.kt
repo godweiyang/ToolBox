@@ -45,7 +45,10 @@ class MainActivity : AppCompatActivity() {
         adapter = ToolAdapter(orderedTools) { tool ->
             startActivity(tool.launcher(this))
         }
-        binding.rvTools.layoutManager = GridLayoutManager(this, 2)
+        binding.homeHeader.pageTitle.text = getString(R.string.app_name)
+        binding.homeHeader.pageSubtitle.text = getString(R.string.subtitle_hint)
+        val columns = GridMetrics.spanCountForWidth(resources.configuration.screenWidthDp)
+        binding.rvTools.layoutManager = GridLayoutManager(this, columns)
         binding.rvTools.adapter = adapter
 
         // 3. 配置长按拖拽
@@ -229,15 +232,10 @@ class MainActivity : AppCompatActivity() {
         val savedIds = saved.split(",").filter { it.isNotBlank() }
         if (savedIds.isEmpty()) return defaultTools
 
-        // 按 savedIds 顺序排，未在列表中的工具追加到末尾
-        val byId = defaultTools.associateBy { it.id }.toMutableMap()
-        val result = mutableListOf<Tool>()
-        for (id in savedIds) {
-            byId.remove(id)?.let { result.add(it) }
-        }
-        // 新增的工具（用户更新 App 后可能多出来）追加到末尾
-        result.addAll(byId.values)
-        return result
+        // 顺序合并抽成纯逻辑（ToolOrder.reconcile，有单测），再映射回 Tool 对象
+        val orderedIds = ToolOrder.reconcile(defaultTools.map { it.id }, savedIds)
+        val byId = defaultTools.associateBy { it.id }
+        return orderedIds.mapNotNull { byId[it] }.toMutableList()
     }
 
     /** 保存工具顺序到 SharedPreferences */

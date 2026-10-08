@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 共享指标卡：label（小）/ 大数值 / 单位。替代 battery/gnss 里重复的内联卡片。
+     值颜色由宿主页面通过 metricValue 的 textColor 覆盖。 -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@drawable/ios_glass_card"
+    android:gravity="center"
+    android:orientation="vertical"
+    android:padding="@dimen/glass_padding">
+
+    <TextView
+        android:id="@+id/metricLabel"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textColor="@color/text_secondary"
+        android:textSize="@dimen/type_caption"
+        tools:text="电流" />
+
+    <TextView
+        android:id="@+id/metricValue"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="@dimen/space_1"
+        android:textColor="@color/text_primary"
+        android:textSize="30sp"
+        android:textStyle="bold"
+        tools:text="--" />
+
+    <TextView
+        android:id="@+id/metricUnit"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textColor="@color/text_tertiary"
+        android:textSize="@dimen/type_footnote"
+        tools:text="mA" />
+</LinearLayout>

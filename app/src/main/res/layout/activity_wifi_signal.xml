@@ -1,25 +1,22 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@drawable/ios_bg_gradient"
     android:fitsSystemWindows="true"
     android:orientation="vertical">
 
+    <!-- 分段控件：实时信号 / 信号热力图（共享磨砂玻璃分段样式） -->
     <com.google.android.material.tabs.TabLayout
         android:id="@+id/tabLayout"
+        style="@style/Widget.iOS.SegmentedControl"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginStart="16dp"
-        android:layout_marginTop="10dp"
-        android:layout_marginEnd="16dp"
-        android:background="@drawable/ios_glass_field"
-        app:tabIndicatorColor="@color/ios_blue"
-        app:tabIndicatorFullWidth="false"
-        app:tabMode="fixed"
-        app:tabSelectedTextColor="@color/ios_blue"
-        app:tabTextColor="@color/text_secondary"
-        xmlns:app="http://schemas.android.com/apk/res-auto" />
+        android:layout_marginStart="@dimen/screen_side"
+        android:layout_marginTop="@dimen/space_4"
+        android:layout_marginEnd="@dimen/screen_side"
+        android:minHeight="@dimen/touch_target_min" />
 
     <androidx.viewpager2.widget.ViewPager2
         android:id="@+id/viewPager"

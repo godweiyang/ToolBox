@@ -12,13 +12,13 @@ import android.os.Looper
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.TextView
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.example.videodownloader.databinding.ActivityFileShareBinding
+import com.example.videodownloader.databinding.ViewListRowBinding
 import com.google.zxing.BarcodeFormat
 import com.google.zxing.EncodeHintType
 import com.google.zxing.qrcode.QRCodeWriter
@@ -188,24 +188,22 @@ class FileShareActivity : AppCompatActivity() {
         return false
     }
 
-    /** 接收文件列表适配器 */
+    /** 接收文件列表适配器（复用共享列表行：标题=文件名，副标题=大小） */
     private class ReceivedFileAdapter(
         private val items: List<FileShareServer.SharedFile>
     ) : RecyclerView.Adapter<ReceivedFileAdapter.VH>() {
 
-        class VH(val tv: TextView) : RecyclerView.ViewHolder(tv)
+        class VH(val binding: ViewListRowBinding) : RecyclerView.ViewHolder(binding.root)
 
         override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): VH {
-            val tv = TextView(parent.context).apply {
-                setPadding(12, 12, 12, 12)
-                textSize = 13f
-            }
-            return VH(tv)
+            val binding = ViewListRowBinding.inflate(LayoutInflater.from(parent.context), parent, false)
+            return VH(binding)
         }
 
         override fun onBindViewHolder(holder: VH, position: Int) {
             val f = items[position]
-            holder.tv.text = "${f.name}  (${formatSize(f.size)})"
+            holder.binding.rowTitle.text = f.name
+            holder.binding.rowSubtitle.text = formatSize(f.size)
         }
 
         override fun getItemCount(): Int = items.size

@@ -1,164 +1,197 @@
 <?xml version="1.0" encoding="utf-8"?>
-<ScrollView
-    android:fitsSystemWindows="true" xmlns:android="http://schemas.android.com/apk/res/android"
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:fillViewport="true">
+    android:background="@drawable/ios_bg_gradient"
+    android:fitsSystemWindows="true"
+    android:fillViewport="true"
+    android:scrollbars="none">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:padding="16dp">
+        android:orientation="vertical">
 
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="@string/tool_gifreverse_title"
-            android:textSize="22sp"
-            android:textStyle="bold"
-            android:gravity="center"
-            android:paddingBottom="16dp" />
-
-        <TextView
-            android:id="@+id/tvGifInfo"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="@string/gr_input_label"
-            android:textStyle="bold"
-            android:paddingBottom="6dp" />
+        <!-- 共享页面头 -->
+        <include
+            android:id="@+id/grHeader"
+            layout="@layout/view_page_header" />
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:layout_marginTop="8dp">
+            android:orientation="vertical"
+            android:paddingStart="@dimen/screen_side"
+            android:paddingEnd="@dimen/screen_side"
+            android:paddingBottom="@dimen/space_6">
 
-            <Button
-                android:id="@+id/btnPick"
-                android:layout_width="0dp"
-                android:layout_weight="1"
-                android:layout_height="wrap_content"
-                android:text="@string/gr_btn_pick" />
-
-            <Button
-                android:id="@+id/btnClear"
-                android:layout_width="0dp"
-                android:layout_weight="1"
-                android:layout_height="wrap_content"
-                android:text="@string/gr_btn_clear"
-                android:layout_marginStart="8dp" />
-        </LinearLayout>
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:layout_marginTop="12dp"
-            android:baselineAligned="false">
-
+            <!-- 导入与预览卡片 -->
             <LinearLayout
-                android:layout_width="0dp"
-                android:layout_weight="1"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:background="@drawable/ios_glass_card"
                 android:orientation="vertical"
-                android:gravity="center">
+                android:padding="@dimen/glass_padding">
 
                 <TextView
-                    android:layout_width="wrap_content"
+                    android:id="@+id/tvGifInfo"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="@string/gr_original"
-                    android:textStyle="bold"
-                    android:paddingBottom="4dp" />
+                    style="@style/Text.iOS.CardTitle"
+                    android:text="@string/gr_input_label" />
 
-                <ImageView
-                    android:id="@+id/ivOriginal"
-                    android:layout_width="120dp"
-                    android:layout_height="120dp"
-                    android:background="#EEEEEE"
-                    android:scaleType="fitCenter" />
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:layout_marginTop="@dimen/space_3">
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnPick"
+                        style="@style/Widget.iOS.Button.Secondary"
+                        android:layout_width="0dp"
+                        android:layout_weight="1"
+                        android:layout_height="wrap_content"
+                        android:text="@string/gr_btn_pick" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnClear"
+                        style="@style/Widget.iOS.Button.Secondary"
+                        android:layout_width="0dp"
+                        android:layout_weight="1"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="@dimen/space_2"
+                        android:text="@string/gr_btn_clear" />
+                </LinearLayout>
+
+                <!-- 原图 / 倒放预览并排 -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:layout_marginTop="@dimen/space_4"
+                    android:baselineAligned="false">
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_weight="1"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:gravity="center">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            style="@style/Text.iOS.Caption"
+                            android:text="@string/gr_original"
+                            android:paddingBottom="@dimen/space_1" />
+
+                        <ImageView
+                            android:id="@+id/ivOriginal"
+                            android:layout_width="120dp"
+                            android:layout_height="120dp"
+                            android:background="#EEEEEE"
+                            android:scaleType="fitCenter" />
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_weight="1"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:gravity="center">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            style="@style/Text.iOS.Caption"
+                            android:text="@string/gr_reversed"
+                            android:paddingBottom="@dimen/space_1" />
+
+                        <ImageView
+                            android:id="@+id/ivReversed"
+                            android:layout_width="120dp"
+                            android:layout_height="120dp"
+                            android:background="#EEEEEE"
+                            android:scaleType="fitCenter" />
+                    </LinearLayout>
+                </LinearLayout>
             </LinearLayout>
 
+            <!-- 输出选项卡片 -->
             <LinearLayout
-                android:layout_width="0dp"
-                android:layout_weight="1"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/space_4"
+                android:background="@drawable/ios_glass_card"
                 android:orientation="vertical"
-                android:gravity="center">
+                android:padding="@dimen/glass_padding">
 
                 <TextView
-                    android:layout_width="wrap_content"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="@string/gr_reversed"
-                    android:textStyle="bold"
-                    android:paddingBottom="4dp" />
+                    style="@style/Text.iOS.CardTitle"
+                    android:text="@string/gr_section_options" />
 
-                <ImageView
-                    android:id="@+id/ivReversed"
-                    android:layout_width="120dp"
-                    android:layout_height="120dp"
-                    android:background="#EEEEEE"
-                    android:scaleType="fitCenter" />
+                <SeekBar
+                    android:id="@+id/sbFrames"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/space_2"
+                    android:minHeight="@dimen/touch_target_min"
+                    android:max="48"
+                    android:progress="20" />
+
+                <TextView
+                    android:id="@+id/tvFrames"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="13sp" />
             </LinearLayout>
+
+            <!-- 进度 -->
+            <ProgressBar
+                android:id="@+id/progressBar"
+                style="?android:attr/progressBarStyleHorizontal"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/space_4"
+                android:visibility="gone"
+                android:progressTint="@color/douyin_red"
+                android:max="100" />
+
+            <TextView
+                android:id="@+id/tvProgress"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                android:visibility="gone"
+                android:textColor="@color/text_secondary"
+                android:textSize="13sp"
+                android:paddingTop="@dimen/space_1" />
+
+            <!-- 生成按钮 -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnGenerate"
+                style="@style/Widget.iOS.Button"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/space_4"
+                android:text="@string/gr_btn_generate"
+                android:enabled="false"
+                app:backgroundTint="@color/douyin_red" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnSave"
+                style="@style/Widget.iOS.Button.Secondary"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/space_2"
+                android:text="@string/gr_btn_save"
+                android:enabled="false" />
+
         </LinearLayout>
-
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="@string/gr_section_options"
-            android:textStyle="bold"
-            android:textSize="16sp"
-            android:layout_marginTop="16dp"
-            android:paddingBottom="4dp" />
-
-        <SeekBar
-            android:id="@+id/sbFrames"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:max="48"
-            android:progress="20" />
-
-        <TextView
-            android:id="@+id/tvFrames"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:textColor="#666666"
-            android:textSize="13sp" />
-
-        <ProgressBar
-            android:id="@+id/progressBar"
-            style="?android:attr/progressBarStyleHorizontal"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:visibility="gone"
-            android:max="100" />
-
-        <TextView
-            android:id="@+id/tvProgress"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="center"
-            android:visibility="gone"
-            android:paddingTop="2dp" />
-
-        <Button
-            android:id="@+id/btnGenerate"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="@string/gr_btn_generate"
-            android:layout_marginTop="12dp"
-            android:enabled="false"
-            android:backgroundTint="@color/douyin_red"
-            android:textColor="@android:color/white" />
-
-        <Button
-            android:id="@+id/btnSave"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="@string/gr_btn_save"
-            android:layout_marginTop="8dp"
-            android:enabled="false" />
-
     </LinearLayout>
 </ScrollView>

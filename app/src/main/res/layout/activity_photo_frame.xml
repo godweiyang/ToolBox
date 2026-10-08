@@ -1,24 +1,29 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
     android:background="@drawable/frame_editor_empty_bg"
     android:fitsSystemWindows="true">
 
-    <!-- 顶部控制行：返回 / 标题 / 导出（橙色背景上，控件垂直居中） -->
+    <!-- 顶部控制行：返回 / 标题 / 导出（控件垂直居中，关键触摸目标 >=48dp） -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:gravity="center_vertical"
-        android:paddingStart="20dp"
-        android:paddingEnd="20dp"
+        android:paddingStart="@dimen/screen_side"
+        android:paddingEnd="@dimen/screen_side"
         android:paddingTop="18dp">
 
         <TextView
             android:id="@+id/btnBack"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
+            android:layout_width="@dimen/touch_target_min"
+            android:layout_height="@dimen/touch_target_min"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:clickable="true"
+            android:focusable="true"
+            android:contentDescription="@string/pf_back"
             android:gravity="center"
             android:text="‹"
             android:textColor="#FFFFFFFF"
@@ -38,8 +43,11 @@
         <TextView
             android:id="@+id/btnExport"
             android:layout_width="wrap_content"
-            android:layout_height="32dp"
+            android:layout_height="wrap_content"
             android:background="@drawable/frame_editor_export"
+            android:clickable="true"
+            android:focusable="true"
+            android:minHeight="@dimen/touch_target_min"
             android:gravity="center"
             android:drawableStart="@android:drawable/stat_sys_download_done"
             android:drawablePadding="8dp"
@@ -78,7 +86,7 @@
             android:textSize="11sp" />
     </FrameLayout>
 
-    <!-- 底部深色面板 -->
+    <!-- 底部深色面板（保留工作台深色） -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"
@@ -122,10 +130,13 @@
 
             <TextView
                 android:id="@+id/btnPick"
-                android:layout_width="43dp"
-                android:layout_height="43dp"
+                android:layout_width="@dimen/touch_target_min"
+                android:layout_height="@dimen/touch_target_min"
                 android:layout_marginStart="12dp"
                 android:background="@drawable/frame_add_button"
+                android:clickable="true"
+                android:focusable="true"
+                android:contentDescription="@string/pf_btn_pick"
                 android:gravity="center"
                 android:text="+"
                 android:textColor="#FFFFFFFF"
@@ -143,7 +154,6 @@
             android:layout_width="match_parent"
             android:layout_height="120dp"
             android:layout_marginStart="27dp"
-            android:layout_marginTop="0dp"
             android:layout_marginEnd="27dp"
             android:background="@drawable/frame_ratio_panel_bg"
             android:fillViewport="true"

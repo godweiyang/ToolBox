@@ -67,6 +67,8 @@ class VideoToGifActivity : AppCompatActivity() {
         binding = ActivityVideoToGifBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
+        binding.vgfHeader.pageTitle.text = getString(R.string.tool_video_to_gif_title)
+        binding.vgfHeader.pageSubtitle.text = getString(R.string.tool_video_to_gif_desc)
         setupListeners()
         refreshOptionLabels()
     }

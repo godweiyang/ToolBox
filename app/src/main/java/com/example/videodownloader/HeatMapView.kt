@@ -2,7 +2,6 @@ package com.example.videodownloader
 
 import android.content.Context
 import android.graphics.Canvas
-import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.RadialGradient
 import android.graphics.Shader
@@ -11,9 +10,8 @@ import android.view.GestureDetector
 import android.view.MotionEvent
 import android.view.ScaleGestureDetector
 import android.view.View
-import android.view.ViewParent
-import kotlin.math.max
-import kotlin.math.min
+import com.example.videodownloader.chart.HeatMapTransform
+import com.example.videodownloader.chart.RssiScale
 
 /**
  * WiFi 信号热力图（点状云风格，支持双指缩放和拖动）。
@@ -25,11 +23,12 @@ import kotlin.math.min
  * 渲染策略：
  * 1. 自动 fit 所有点到视图（保持长宽比），用户可通过双指缩放放大查看
  * 2. 每个采样点画径向渐变色块，多个色块叠加形成"信号云"
- * 3. 中心画小圆点+信号等级文字
  *
  * 手势：
- * - 双指捏合缩放（0.3x ~ 8x）
+ * - 双指捏合缩放（0.3x ~ 8x，以捏合中心为支点）
  * - 单指拖动平移（缩放后查看不同区域）
+ *
+ * 世界<->屏幕变换 / RSSI 配色下沉到 [HeatMapTransform] / [RssiScale]（框架无关）。
  */
 class HeatMapView @JvmOverloads constructor(
     context: Context,
@@ -64,25 +63,10 @@ class HeatMapView @JvmOverloads constructor(
         style = Paint.Style.FILL
     }
 
-    private val dotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        style = Paint.Style.FILL
-    }
-
-    private val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.WHITE
-        textSize = 26f
-        textAlign = Paint.Align.CENTER
-        isFakeBoldText = true
-    }
-
-    private val textBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        style = Paint.Style.FILL
-    }
-
     private val gridPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
         strokeWidth = 1f
-        color = 0x15000000
+        color = 0x1A000000   // subtle ~10% black
     }
 
     /** 云块半径（世界坐标单位，约对应 0.5m） */
@@ -92,7 +76,7 @@ class HeatMapView @JvmOverloads constructor(
     private val scaleDetector = ScaleGestureDetector(context, object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
         override fun onScale(detector: ScaleGestureDetector): Boolean {
             val factor = detector.scaleFactor
-            userScale = (userScale * factor).coerceIn(0.3f, 8f)
+            userScale = HeatMapTransform.clampUserScale(userScale * factor)
             // 以捏合中心为缩放支点
             val focusWorldX = screenToWorldX(detector.focusX)
             val focusWorldY = screenToWorldY(detector.focusY)
@@ -123,8 +107,8 @@ class HeatMapView @JvmOverloads constructor(
     })
 
     init {
-        // 让父 View 不要拦截触摸事件，确保手势能传到本 View
-        // （在 Fragment 里 setOnTouchListener 会拦截，这里改用 onTouchEvent）
+        importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_YES
+        contentDescription = "WiFi 信号热力图，可双指缩放与拖动"
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
@@ -132,7 +116,6 @@ class HeatMapView @JvmOverloads constructor(
         gestureDetector.onTouchEvent(event)
 
         // 双指缩放中，或已放大后的单指拖动，都要阻止父级（ViewPager2）拦截触摸事件
-        // 否则左右滑动会被 ViewPager2 当作切 Tab
         val pointerCount = event.pointerCount
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN,
@@ -211,71 +194,24 @@ class HeatMapView @JvmOverloads constructor(
             if (s.y > maxY) maxY = s.y
         }
 
-        // 至少给 1 单位范围，避免单点时除零
-        val worldW = max(maxX - minX, 1f)
-        val worldH = max(maxY - minY, 1f)
+        baseScale = HeatMapTransform.baseScale(minX, minY, maxX, maxY, width.toFloat(), height.toFloat())
 
-        val padding = 80f
-        val availW = width - padding * 2
-        val availH = height - padding * 2
-        if (availW <= 0 || availH <= 0) return
-
-        // 保持长宽比，按较小的缩放
-        baseScale = min(availW / worldW, availH / worldH)
-
-        // 把世界中心映射到视图中心
-        val worldCenterX = (minX + maxX) / 2f
-        val worldCenterY = (minY + maxY) / 2f
-        autoOffsetX = width / 2f - worldCenterX * totalScale
-        autoOffsetY = height / 2f - worldCenterY * totalScale
-        // 用户未拖动时，offset 跟随 autoOffset
-        // 仅在 userScale == 1f 时重置 offset（避免覆盖用户的拖动）
+        val (ax, ay) = HeatMapTransform.autoOffset(
+            minX, minY, maxX, maxY, width.toFloat(), height.toFloat(), totalScale
+        )
+        autoOffsetX = ax
+        autoOffsetY = ay
+        // 用户未拖动时，offset 跟随 autoOffset（仅 userScale == 1 时重置，避免覆盖用户拖动）
         if (userScale == 1f) {
             offsetX = autoOffsetX
             offsetY = autoOffsetY
         }
     }
 
-    private fun worldToScreenX(x: Float) = offsetX + x * totalScale
-    private fun worldToScreenY(y: Float) = offsetY + y * totalScale
-    private fun screenToWorldX(x: Float) = (x - offsetX) / totalScale
-    private fun screenToWorldY(y: Float) = (y - offsetY) / totalScale
-
-    /** 根据 RSSI 返回颜色 */
-    private fun rssiToColor(rssi: Int): Int {
-        val t = ((rssi + 90) / 60f).coerceIn(0f, 1f)
-        return when {
-            t < 0.5f -> {
-                val k = t * 2f
-                lerpColor(0xE53935, 0xFDD835, k)
-            }
-            else -> {
-                val k = (t - 0.5f) * 2f
-                lerpColor(0xFDD835, 0x43A047, k)
-            }
-        }
-    }
-
-    private fun lerpColor(c1: Int, c2: Int, t: Float): Int {
-        val r1 = c1 shr 16 and 0xFF
-        val g1 = c1 shr 8 and 0xFF
-        val b1 = c1 and 0xFF
-        val r2 = c2 shr 16 and 0xFF
-        val g2 = c2 shr 8 and 0xFF
-        val b2 = c2 and 0xFF
-        val r = (r1 + (r2 - r1) * t).toInt()
-        val g = (g1 + (g2 - g1) * t).toInt()
-        val b = (b1 + (b2 - b1) * t).toInt()
-        return Color.argb(255, r, g, b)
-    }
-
-    private fun rssiToLevel(rssi: Int): String = when {
-        rssi >= -55 -> "极佳"
-        rssi >= -65 -> "良好"
-        rssi >= -75 -> "一般"
-        rssi >= -85 -> "较弱"
-        else -> "很差"
-    }
+    private fun worldToScreenX(x: Float) = HeatMapTransform.screenX(x, offsetX, totalScale)
+    private fun worldToScreenY(y: Float) = HeatMapTransform.screenY(y, offsetY, totalScale)
+    private fun screenToWorldX(x: Float) = HeatMapTransform.worldX(x, offsetX, totalScale)
+    private fun screenToWorldY(y: Float) = HeatMapTransform.worldY(y, offsetY, totalScale)
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
@@ -301,7 +237,7 @@ class HeatMapView @JvmOverloads constructor(
                 cy < -cloudRadiusScreen || cy > height + cloudRadiusScreen
             ) continue
 
-            val color = rssiToColor(s.rssi)
+            val color = RssiScale.color(s.rssi)
             val radius = cloudRadiusScreen.coerceAtLeast(20f)  // 缩太小也至少 20px
             val shader = RadialGradient(
                 cx, cy, radius,
@@ -314,7 +250,6 @@ class HeatMapView @JvmOverloads constructor(
             canvas.drawCircle(cx, cy, radius, cloudPaint)
         }
         cloudPaint.shader = null
-        // 不再画中心标记和文字标签，只保留色块
     }
 
     private fun drawGrid(canvas: Canvas) {
@@ -322,7 +257,7 @@ class HeatMapView @JvmOverloads constructor(
         if (totalScale <= 0f) return
         val stepWorld = 1f
         val stepPx = stepWorld * totalScale
-        if (stepPx < 20f) return  // 太密就不画
+        if (stepPx < HeatMapTransform.GRID_MIN_PX) return  // 太密就不画
 
         // 找到视图范围对应的世界坐标范围
         val worldLeft = screenToWorldX(0f)

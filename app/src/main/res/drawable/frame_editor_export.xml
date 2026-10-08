@@ -1,9 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- 导出胶囊：禁用=半透明；按压=提亮；可用=浅色实心。保留深色文字与图标。 -->
 <selector xmlns:android="http://schemas.android.com/apk/res/android">
     <item android:state_enabled="false">
         <shape android:shape="rectangle">
             <solid android:color="#38FFFFFF" />
             <stroke android:width="1dp" android:color="#20FFFFFF" />
+            <corners android:radius="100dp" />
+            <padding android:left="18dp" android:top="0dp" android:right="18dp" android:bottom="0dp" />
+        </shape>
+    </item>
+    <item android:state_pressed="true">
+        <shape android:shape="rectangle">
+            <solid android:color="#FFFFFFFF" />
+            <stroke android:width="1dp" android:color="#FFFFFFFF" />
             <corners android:radius="100dp" />
             <padding android:left="18dp" android:top="0dp" android:right="18dp" android:bottom="0dp" />
         </shape>

@@ -98,4 +98,30 @@
     <color name="pf_tab_unselected">#FF96969B</color>   <!-- 未选中底部标签 (150,150,155) -->
     <color name="pf_thumb_border_off">#FFC8C8C8</color><!-- 未选中缩略图边框 -->
     <color name="pf_radio_off">#FF141618</color>        <!-- 未选中单选圈描边 -->
+
+    <!-- ============================================================ -->
+    <!-- Phase 0 设计系统：语义别名（feature 页统一引用，避免散落的 hex） -->
+    <!-- ============================================================ -->
+    <!-- 状态语义（无重紫/靛蓝，沿用 iOS 系统色） -->
+    <color name="ds_primary">@color/ios_blue</color>
+    <color name="ds_primary_pressed">#FF0062C4</color>
+    <color name="ds_on_primary">@color/white</color>
+    <color name="ds_success">@color/ios_green</color>
+    <color name="ds_warning">@color/ios_orange</color>
+    <color name="ds_danger">@color/ios_red</color>
+    <color name="ds_on_danger">@color/white</color>
+
+    <!-- 容器/表面（浅色磨砂玻璃，统一取代 #0F000000/#1A000000 等旧写法） -->
+    <color name="ds_card_bg">@color/glass_fill</color>
+    <color name="ds_field_bg">@color/glass_fill_strong</color>
+    <color name="ds_stroke">@color/glass_stroke</color>
+    <color name="ds_chart_bg">#141C1C1E</color>     <!-- 图表容器浅灰底，替代旧 #1A000000 -->
+    <color name="ds_log_bg">@color/fill_subtle</color>
+
+    <!-- 徽标/胶囊 -->
+    <color name="ds_badge_bg">#E8FFFFFF</color>
+    <color name="ds_badge_stroke">#66FFFFFF</color>
+
+    <!-- 按压涟漪 -->
+    <color name="ds_ripple_primary">#33007AFF</color>
 </resources>

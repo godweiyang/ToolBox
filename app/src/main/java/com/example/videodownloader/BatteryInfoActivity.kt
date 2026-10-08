@@ -79,6 +79,22 @@ class BatteryInfoActivity : AppCompatActivity() {
         setContentView(binding.root)
         batteryManager = getSystemService(BatteryManager::class.java)
 
+        // 共享页面头标题
+        binding.batteryHeader.pageTitle.text = getString(R.string.tool_battery_title)
+        binding.batteryHeader.pageSubtitle.visibility = View.GONE
+
+        // 共享指标卡：标签 / 固定单位（数值与动态单位在 updateUi() 写入）
+        binding.cardCurrent.metricLabel.text = "电流"
+        binding.cardVoltage.metricLabel.text = "电压"
+        binding.cardPower.metricLabel.text = "功率"
+        binding.cardTemp.metricLabel.text = "电池温度"
+        binding.cardVoltage.metricUnit.text = "V"
+        binding.cardPower.metricUnit.text = "W · 电压×电流估算"
+        binding.cardTemp.metricUnit.text = "°C"
+        // 首条广播到达前，电流单位/数值先给可读占位，避免空白
+        binding.cardCurrent.metricUnit.text = "mA · 等待数据"
+        binding.cardCurrent.metricValue.text = "--"
+
         binding.chartCurrent.configure(
             color = 0xFFFB8C00.toInt(), showThreshold = false, initMax = 3000f, initMin = 0f
         )
@@ -191,16 +207,16 @@ class BatteryInfoActivity : AppCompatActivity() {
             .joinToString(" · ")
 
         // 4 大指标卡片
-        binding.tvCurrent.text = currentMa?.let { "%.0f".format(it) } ?: "--"
-        binding.tvCurrentCaption.text = when {
+        binding.cardCurrent.metricValue.text = currentMa?.let { "%.0f".format(it) } ?: "--"
+        binding.cardCurrent.metricUnit.text = when {
             currentNowUa == null -> "mA · 机型不支持读取"
             charging -> "mA · 流入电池"
             status == BatteryManager.BATTERY_STATUS_FULL -> "mA · 已充满"
             else -> "mA · 流出电池"
         }
-        binding.tvVoltage.text = voltageV?.let { "%.3f".format(it) } ?: "--"
-        binding.tvPower.text = powerW?.let { "%.2f".format(it) } ?: "--"
-        binding.tvTemp.text = tempC?.let { "%.1f".format(it) } ?: "--"
+        binding.cardVoltage.metricValue.text = voltageV?.let { "%.3f".format(it) } ?: "--"
+        binding.cardPower.metricValue.text = powerW?.let { "%.2f".format(it) } ?: "--"
+        binding.cardTemp.metricValue.text = tempC?.let { "%.1f".format(it) } ?: "--"
 
         // 实时曲线
         currentMa?.let { binding.chartCurrent.addPoint(it.toFloat()) }

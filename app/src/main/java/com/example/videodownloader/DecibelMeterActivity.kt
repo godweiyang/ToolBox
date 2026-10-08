@@ -59,6 +59,10 @@ class DecibelMeterActivity : AppCompatActivity() {
         binding = ActivityDecibelMeterBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
+        // 共享页面头标题
+        binding.decibelHeader.pageTitle.text = getString(R.string.tool_decibel_title)
+        binding.decibelHeader.pageSubtitle.visibility = android.view.View.GONE
+
         binding.btnToggle.setOnClickListener {
             if (isRecording) stopRecording()
             else {

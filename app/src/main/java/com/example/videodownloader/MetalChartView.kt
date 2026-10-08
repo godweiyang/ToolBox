@@ -2,20 +2,24 @@ package com.example.videodownloader
 
 import android.content.Context
 import android.graphics.Canvas
-import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Path
+import android.graphics.RectF
 import android.util.AttributeSet
 import android.view.View
+import com.example.videodownloader.chart.Argb
+import com.example.videodownloader.chart.LineChartGeometry
 
 /**
- * 实时波形图（通用）：磁场、分贝、加速度等均可复用。
+ * 实时波形图（通用）：磁场、分贝、电流/电压/功率/温度、RSSI、载噪比等均可复用。
  *
- * 横轴：时间（最近的样本画在右边，更早的画在左边，自动滚动）
- * 纵轴：自动按 [maxValue] 缩放到画布高度
+ * 横轴：时间（最新样本在右侧，更早的在左侧，自动滚动）
+ * 纵轴：按 [maxValue]/[minValue] 自动缩放到画布高度
  *
- * 数据通过 [addPoint] 追加，超出 [MAX_POINTS] 时丢弃最旧的。
- * 可选阈值线：超过阈值的点用红色高亮（[showThreshold] = true 时启用）。
+ * 数据通过 [addPoint] 追加，超出 [LineChartGeometry.MAX_POINTS] 时丢弃最旧的。
+ * 可选阈值线：超过阈值的整条曲线高亮为警示色（[showThreshold] = true）。
+ *
+ * 纯几何计算下沉到 [LineChartGeometry]（框架无关，可被 JUnit 覆盖）。
  */
 class MetalChartView @JvmOverloads constructor(
     context: Context,
@@ -23,44 +27,62 @@ class MetalChartView @JvmOverloads constructor(
     defStyle: Int = 0
 ) : View(context, attrs, defStyle) {
 
-    companion object {
-        /** 最多保留多少个采样点（约对应 20 秒，50ms 一个点） */
-        private const val MAX_POINTS = 400
-    }
-
-    private val points = ArrayList<Float>(MAX_POINTS)
+    private val points = ArrayList<Float>(LineChartGeometry.MAX_POINTS)
     private var maxValue = 100f
     private var minValue = 0f
     private var threshold = 60f
-    /** 是否绘制阈值线 + 超阈值变红（分贝仪等不需要阈值时设为 false） */
+
+    /** 是否绘制阈值线 + 超阈值变色（分贝仪等不需要阈值时设为 false） */
     private var showThreshold = true
-    /** 主色（默认磁场蓝），分贝仪可设为紫色 */
+
+    private val density = resources.displayMetrics.density
+    private val scaledDensity = resources.displayMetrics.scaledDensity
+    private fun Float.dp() = this * density
+    private fun Float.sp() = this * scaledDensity
+
+    // ---- Modern high-contrast light palette ----
+    private val surfaceColor = 0xFFFFFFFF.toInt()
+    private val gridColor = 0x14000000          // ~8% black, subtle
+    private val alertColor = 0xFFE53935.toInt() // over-threshold / threshold line
+    private val alertChipColor = 0x22E53935     // light red label chip
+
     private var mainColor = 0xFF0288D1.toInt()
-    private var fillColor = 0x330288D1
+    private var fillColor = Argb.withAlpha(mainColor, 0x24) // ~14% area fill
 
     private val linePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = mainColor
         style = Paint.Style.STROKE
-        strokeWidth = 3f
+        strokeWidth = 2.5f.dp()
     }
     private val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = fillColor
         style = Paint.Style.FILL
     }
     private val thresholdPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = 0xFFF44336.toInt()
+        color = alertColor
         style = Paint.Style.STROKE
-        strokeWidth = 1.5f
-        pathEffect = android.graphics.DashPathEffect(floatArrayOf(10f, 8f), 0f)
+        strokeWidth = 1.2f.dp()
+        pathEffect = android.graphics.DashPathEffect(floatArrayOf(8f.dp(), 6f.dp()), 0f)
     }
     private val gridPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = 0x33000000
+        color = gridColor
         style = Paint.Style.STROKE
-        strokeWidth = 1f
+        strokeWidth = 1f.dp()
     }
-    private val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = 0xFF888888.toInt()
-        textSize = 24f
+    private val chipPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = alertChipColor
+        style = Paint.Style.FILL
+    }
+    private val chipTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = alertColor
+        textSize = 11f.sp()
+        isFakeBoldText = true
+    }
+    private val chipRect = RectF()
+
+    init {
+        importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_YES
+        contentDescription = "实时数据曲线图"
     }
 
     /** 配置外观：主色 / 是否显示阈值线 / 初始纵轴上下限 */
@@ -71,7 +93,7 @@ class MetalChartView @JvmOverloads constructor(
         initMin: Float = 0f
     ) {
         mainColor = color
-        fillColor = (color and 0x00FFFFFF) or 0x33000000.toInt()
+        fillColor = Argb.withAlpha(color, 0x24)
         this.showThreshold = showThreshold
         maxValue = initMax
         minValue = initMin
@@ -83,14 +105,10 @@ class MetalChartView @JvmOverloads constructor(
     /** 追加一个采样点 */
     fun addPoint(value: Float) {
         points.add(value)
-        while (points.size > MAX_POINTS) points.removeAt(0)
+        while (points.size > LineChartGeometry.MAX_POINTS) points.removeAt(0)
         // 自动放大纵轴范围
-        if (value > maxValue) {
-            maxValue = value * 1.2f
-        }
-        if (value < minValue) {
-            minValue = value * 0.8f
-        }
+        maxValue = LineChartGeometry.zoomMax(maxValue, value)
+        minValue = LineChartGeometry.zoomMin(minValue, value)
         invalidate()
     }
 
@@ -112,33 +130,34 @@ class MetalChartView @JvmOverloads constructor(
         val h = height.toFloat()
         if (w <= 0 || h <= 0) return
 
-        // 1. 网格：横向 4 条
+        // Light card surface (covers any translucent XML background).
+        canvas.drawColor(surfaceColor)
+
+        val geo = LineChartGeometry(w, h, points.size, minValue, maxValue)
+
+        // 1. 网格：横向 3 条
         for (i in 1 until 4) {
             val y = h * i / 4f
             canvas.drawLine(0f, y, w, y, gridPaint)
         }
 
-        // 2. 阈值线（按 maxValue/minValue 缩放）
-        val range = maxValue - minValue
-        if (range > 0f && showThreshold && threshold in minValue..maxValue) {
-            val ty = h - ((threshold - minValue) / range) * h
+        // 2. 阈值线 + 圆角标签
+        if (geo.range > 0f && showThreshold && threshold in minValue..maxValue) {
+            val ty = geo.thresholdY(threshold)
             canvas.drawLine(0f, ty, w, ty, thresholdPaint)
-            canvas.drawText("%.0f".format(threshold), 8f, ty - 4f, textPaint)
+            drawThresholdChip(canvas, ty, "%.0f".format(threshold))
         }
 
         // 3. 数据曲线
-        if (points.size < 2) return
-        if (range <= 0f) return
-        val stepX = w / (MAX_POINTS - 1)
+        if (points.size < 2 || geo.range <= 0f) return
+
         val linePath = Path()
         val fillPath = Path()
-        val startIdx = MAX_POINTS - points.size  // 让最新点贴近右边
         var first = true
         fillPath.moveTo(0f, h)
         for (i in points.indices) {
-            val x = (startIdx + i) * stepX
-            val v = points[i].coerceIn(minValue, maxValue)
-            val y = h - ((v - minValue) / range) * h
+            val x = geo.xAt(i)
+            val y = geo.yAt(points[i])
             if (first) {
                 linePath.moveTo(x, y)
                 fillPath.lineTo(x, y)
@@ -148,16 +167,28 @@ class MetalChartView @JvmOverloads constructor(
                 fillPath.lineTo(x, y)
             }
         }
-        // 闭合填充路径
-        val lastX = (startIdx + points.size - 1) * stepX
+        val lastX = geo.xAt(points.size - 1)
         fillPath.lineTo(lastX, h)
         fillPath.lineTo(0f, h)
         fillPath.close()
 
         canvas.drawPath(fillPath, fillPaint)
-        // 超阈值部分用红色画（仅在 showThreshold 模式下）
-        val overThreshold = showThreshold && (points.maxOrNull()?.let { it > threshold } ?: false)
-        linePaint.color = if (overThreshold) 0xFFF44336.toInt() else mainColor
+        // 超阈值时整条曲线变为警示色（仅 showThreshold 模式）
+        val overThreshold = showThreshold &&
+                (points.maxOrNull() ?: Float.NEGATIVE_INFINITY) > threshold
+        linePaint.color = if (overThreshold) alertColor else mainColor
         canvas.drawPath(linePath, linePaint)
+    }
+
+    private fun drawThresholdChip(canvas: Canvas, ty: Float, label: String) {
+        val pad = 6f.dp()
+        val textW = chipTextPaint.measureText(label)
+        val chipH = chipTextPaint.textSize + 4f.dp()
+        val left = 8f.dp()
+        val top = ty - chipH - 3f.dp()
+        chipRect.set(left, top, left + textW + pad * 2, top + chipH)
+        canvas.drawRoundRect(chipRect, 6f.dp(), 6f.dp(), chipPaint)
+        val baseline = top + (chipH + chipTextPaint.textSize) / 2f - chipTextPaint.descent()
+        canvas.drawText(label, left + pad, baseline, chipTextPaint)
     }
 }

@@ -122,9 +122,9 @@ class QrCodeActivity : AppCompatActivity() {
         binding.llBackColors.getChildAt(0).isSelected = true
     }
 
-    /** 创建一个圆形色块 */
+    /** 创建一个圆形色块（48dp 触摸目标，选中描边用主色蓝） */
     private fun createColorSwatch(color: Int, label: String, isFore: Boolean): View {
-        val size = dp(40)
+        val size = dp(48)
         val view = View(this).apply {
             layoutParams = android.widget.LinearLayout.LayoutParams(size, size).apply {
                 marginEnd = dp(12)
@@ -147,8 +147,8 @@ class QrCodeActivity : AppCompatActivity() {
                 parent.getChildAt(i).isSelected = false
             }
             view.isSelected = true
-            // 选中描边
-            (view.background as? GradientDrawable)?.setStroke(dp(3), 0xFF3F51B5.toInt())
+            // 选中描边（主色蓝，避免重紫/靛蓝）
+            (view.background as? GradientDrawable)?.setStroke(dp(3), 0xFF007AFF.toInt())
 
             // 清除其他色块的描边
             for (i in 0 until parent.childCount) {

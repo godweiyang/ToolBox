@@ -66,6 +66,9 @@ class NineGridActivity : AppCompatActivity() {
         binding = ActivityNineGridBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
+        binding.ngHeader.pageTitle.text = getString(R.string.tool_ninegrid_title)
+        binding.ngHeader.pageSubtitle.text = getString(R.string.tool_ninegrid_desc)
+
         binding.btnPick.setOnClickListener { pickImageLauncher.launch("image/*") }
 
         binding.btnClear.setOnClickListener {

@@ -2,9 +2,8 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:orientation="vertical"
     android:background="@drawable/update_dialog_bg"
-    android:padding="22dp">
+    android:orientation="vertical">
 
     <TextView
         android:id="@+id/tvUpdateIcon"
@@ -12,9 +11,10 @@
         android:layout_height="52dp"
         android:layout_gravity="center_horizontal"
         android:background="@drawable/icon_grad_share"
+        android:contentDescription="@string/update_check"
         android:gravity="center"
         android:text="↑"
-        android:textColor="#FFFFFFFF"
+        android:textColor="@color/white"
         android:textSize="28sp"
         android:textStyle="bold" />
 
@@ -22,34 +22,34 @@
         android:id="@+id/tvUpdateTitle"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="14dp"
+        android:layout_marginTop="@dimen/space_4"
         android:gravity="center"
-        android:textColor="@color/text_primary"
-        android:textSize="22sp"
-        android:textStyle="bold" />
+        style="@style/Text.iOS.Headline" />
 
     <TextView
         android:id="@+id/tvUpdateSubtitle"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="6dp"
+        android:layout_marginTop="@dimen/space_1"
         android:gravity="center"
         android:textColor="@color/text_secondary"
-        android:textSize="13sp" />
+        android:textSize="@dimen/type_caption" />
 
     <ScrollView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="16dp"
+        android:layout_marginTop="@dimen/space_4"
         android:maxHeight="220dp">
+
         <TextView
             android:id="@+id/tvUpdateNotes"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:background="@drawable/ios_glass_field"
             android:lineSpacingExtra="3dp"
-            android:padding="14dp"
+            android:padding="@dimen/glass_padding"
             android:textColor="@color/text_primary"
-            android:textSize="14sp" />
+            android:textSize="@dimen/type_body" />
     </ScrollView>
+
 </LinearLayout>

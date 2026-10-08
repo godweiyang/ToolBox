@@ -7,6 +7,7 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Color
 import android.graphics.Matrix
+import android.graphics.drawable.Drawable
 import android.graphics.drawable.GradientDrawable
 import android.net.Uri
 import android.os.Build
@@ -42,6 +43,12 @@ class PhotoFrameActivity : AppCompatActivity() {
     private var renderGeneration = 0
     private val tabs by lazy { listOf(binding.tabRatio, binding.tabLogo, binding.tabParams,
         binding.tabTheme, binding.tabShadow, binding.tabMargin) }
+
+    /** 共享主题提供的涟漪按压反馈（selectableItemBackground），用于可点容器。 */
+    private val touchRipple: Drawable? by lazy {
+        val ta = obtainStyledAttributes(intArrayOf(android.R.attr.selectableItemBackground))
+        val d = ta.getDrawable(0); ta.recycle(); d
+    }
 
     private val writePermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -124,7 +131,9 @@ class PhotoFrameActivity : AppCompatActivity() {
             val box = FrameLayout(this).apply {
                 layoutParams = LinearLayout.LayoutParams(dp(46), dp(46)).also { it.marginEnd = dp(5) }
                 background = ContextCompat.getDrawable(this@PhotoFrameActivity, R.drawable.frame_editor_option)
+                foreground = touchRipple
                 isSelected = index == selectedIndex
+                isFocusable = true
                 setOnClickListener { selectPhoto(index) }
             }
             val image = ImageView(this).apply {
@@ -222,11 +231,14 @@ class PhotoFrameActivity : AppCompatActivity() {
 
     private fun option(label: String, selected: Boolean, action: () -> Unit) {
         val view = TextView(this).apply {
-            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+            layoutParams = LinearLayout.LayoutParams(0, dp(48), 1f)
             gravity = Gravity.CENTER
             text = label
             textSize = 14f
             setTextColor(if (selected) Color.WHITE else Color.rgb(205, 205, 210))
+            background = ContextCompat.getDrawable(this@PhotoFrameActivity, R.drawable.frame_option_chip)
+            isSelected = selected
+            isFocusable = true
             setOnClickListener { action() }
         }
         binding.optionRow.addView(view)
@@ -240,6 +252,8 @@ class PhotoFrameActivity : AppCompatActivity() {
             gravity = Gravity.CENTER
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f)
             isClickable = true
+            foreground = touchRipple
+            isFocusable = true
             setOnClickListener { action() }
         }
         val radio = View(this).apply {
