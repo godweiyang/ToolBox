@@ -6,4 +6,8 @@
     <cache-path
         name="updates"
         path="updates/" />
+    <!-- Web 外壳生成的 Excel / 图片等下载文件（getExternalFilesDir/Downloads） -->
+    <external-files-path
+        name="downloads"
+        path="Downloads/" />
 </paths>

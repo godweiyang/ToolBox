@@ -108,6 +108,12 @@
             android:name=".PhotoFrameActivity"
             android:exported="false" />
 
+        <!-- 三个离线 Web 工具（lol / pubg / fangdai）共用的 WebView 外壳 -->
+        <activity
+            android:name=".web.WebViewShellActivity"
+            android:exported="false"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
+
         <!-- 分享成品图 -->
         <provider
             android:name="androidx.core.content.FileProvider"

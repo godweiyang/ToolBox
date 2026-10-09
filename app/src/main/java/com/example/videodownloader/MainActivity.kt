@@ -14,6 +14,8 @@ import androidx.recyclerview.widget.ItemTouchHelper
 import androidx.recyclerview.widget.RecyclerView
 import com.example.videodownloader.databinding.ActivityMainBinding
 import com.example.videodownloader.databinding.DialogAppUpdateBinding
+import com.example.videodownloader.web.WebToolRegistry
+import com.example.videodownloader.web.WebViewShellActivity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -392,7 +394,19 @@ class MainActivity : AppCompatActivity() {
             iconBgRes = R.drawable.icon_grad_frame,
             launcher = { ctx -> Intent(ctx, PhotoFrameActivity::class.java) }
         )
-    )
+    ).let { base ->
+        // 三个离线 Web 工具（lol / pubg / fangdai），共用 WebView 外壳
+        base + WebToolRegistry.tools.map { spec ->
+            Tool(
+                id = spec.id,
+                title = getString(spec.titleRes),
+                desc = getString(spec.descRes),
+                iconRes = spec.iconRes,
+                iconBgRes = spec.iconBgRes,
+                launcher = { ctx -> WebViewShellActivity.newIntent(ctx, spec.id) }
+            )
+        }
+    }
 
     private companion object {
         const val HOME_PREFS = "home_preferences"

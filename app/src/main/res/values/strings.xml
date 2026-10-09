@@ -275,4 +275,22 @@
     <string name="home_layout_density">首页布局</string>
     <string name="home_layout_density_hint">每行显示几个工具</string>
     <string name="home_layout_columns">每行 %1$d 个工具</string>
+
+    <!-- 离线 Web 工具（共用 WebViewShellActivity） -->
+    <string name="tool_lol_title">LOL 工具箱</string>
+    <string name="tool_lol_desc">LOL 战绩 / 出装查询（本地离线页）</string>
+    <string name="tool_pubg_title">PUBG 工具箱</string>
+    <string name="tool_pubg_desc">PUBG 战绩 / 数据查询（本地离线页）</string>
+    <string name="tool_fangdai_title">房贷计算器</string>
+    <string name="tool_fangdai_desc">等额本息 / 等额本金月供与利息计算</string>
+
+    <!-- Web 外壳通用文案 -->
+    <string name="web_shell_back">返回</string>
+    <string name="web_shell_share">分享</string>
+    <string name="web_shell_copied">已复制到剪贴板</string>
+    <string name="web_shell_download_saved">已保存：%1$s</string>
+    <string name="web_shell_download_failed">下载失败</string>
+    <string name="web_shell_download_via_page">正在由页面处理下载…</string>
+    <string name="web_shell_blocked">该链接已被安全策略拦截</string>
+    <string name="web_shell_no_handler">没有可打开该链接的应用（本地服务可能未安装）</string>
 </resources>
