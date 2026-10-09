@@ -16,6 +16,31 @@
             android:id="@+id/homeHeader"
             layout="@layout/view_page_header" />
 
+        <LinearLayout
+            android:id="@+id/layoutDensityBar"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingStart="20dp"
+            android:paddingEnd="20dp"
+            android:paddingBottom="8dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/home_layout_density"
+                android:textColor="@color/text_secondary"
+                android:textSize="13sp"
+                android:textStyle="bold" />
+
+            <TextView android:id="@+id/chipColumns2" style="@style/Widget.Home.DensityChip" android:text="2" />
+            <TextView android:id="@+id/chipColumns3" style="@style/Widget.Home.DensityChip" android:text="3" />
+            <TextView android:id="@+id/chipColumns4" style="@style/Widget.Home.DensityChip" android:text="4" />
+            <TextView android:id="@+id/chipColumns5" style="@style/Widget.Home.DensityChip" android:text="5" />
+        </LinearLayout>
+
         <androidx.recyclerview.widget.RecyclerView
             android:id="@+id/rvTools"
             android:layout_width="match_parent"

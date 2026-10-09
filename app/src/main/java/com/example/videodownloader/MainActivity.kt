@@ -31,6 +31,8 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
     private lateinit var adapter: ToolAdapter
+    private lateinit var gridLayoutManager: GridLayoutManager
+    private var gridColumns: Int = GridMetrics.DEFAULT_COLUMNS
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -47,9 +49,15 @@ class MainActivity : AppCompatActivity() {
         }
         binding.homeHeader.pageTitle.text = getString(R.string.app_name)
         binding.homeHeader.pageSubtitle.text = getString(R.string.subtitle_hint)
-        val columns = GridMetrics.spanCountForWidth(resources.configuration.screenWidthDp)
-        binding.rvTools.layoutManager = GridLayoutManager(this, columns)
+        val prefs = getSharedPreferences(HOME_PREFS, MODE_PRIVATE)
+        gridColumns = if (prefs.contains(KEY_GRID_COLUMNS))
+            GridMetrics.normalizeColumns(prefs.getInt(KEY_GRID_COLUMNS, GridMetrics.DEFAULT_COLUMNS))
+        else GridMetrics.defaultColumnsForWidth(resources.configuration.screenWidthDp)
+        gridLayoutManager = GridLayoutManager(this, gridColumns)
+        binding.rvTools.layoutManager = gridLayoutManager
         binding.rvTools.adapter = adapter
+        adapter.setPresentation(GridMetrics.presentation(gridColumns))
+        setupDensityChooser()
 
         // 3. 配置长按拖拽
         setupDragSort()
@@ -60,13 +68,40 @@ class MainActivity : AppCompatActivity() {
         checkForUpdates(manual = false)
     }
 
+    private fun setupDensityChooser() {
+        val chips = mapOf(
+            2 to binding.chipColumns2,
+            3 to binding.chipColumns3,
+            4 to binding.chipColumns4,
+            5 to binding.chipColumns5
+        )
+        chips.forEach { (columns, view) ->
+            view.contentDescription = getString(R.string.home_layout_columns, columns)
+            view.setOnClickListener { applyGridColumns(columns, persist = true) }
+        }
+        applyGridColumns(gridColumns, persist = false)
+    }
+
+    private fun applyGridColumns(columnsInput: Int, persist: Boolean) {
+        val columns = GridMetrics.normalizeColumns(columnsInput)
+        gridColumns = columns
+        gridLayoutManager.spanCount = columns
+        adapter.setPresentation(GridMetrics.presentation(columns))
+        listOf(binding.chipColumns2, binding.chipColumns3,
+            binding.chipColumns4, binding.chipColumns5).forEachIndexed { index, chip ->
+            chip.isSelected = index + 2 == columns
+        }
+        binding.rvTools.itemAnimator = null
+        if (persist) getSharedPreferences(HOME_PREFS, MODE_PRIVATE).edit()
+            .putInt(KEY_GRID_COLUMNS, columns).apply()
+    }
+
     private fun checkForUpdates(manual: Boolean) {
         binding.btnCheckUpdate.isEnabled = false
         binding.btnCheckUpdate.text = getString(R.string.update_checking)
         lifecycleScope.launch {
             val result = withContext(Dispatchers.IO) { runCatching { AppUpdater.fetchLatest() } }
             binding.btnCheckUpdate.isEnabled = true
-            binding.btnCheckUpdate.text = getString(R.string.update_check)
             result.onSuccess { info ->
                 getSharedPreferences("updates", MODE_PRIVATE).edit()
                     .putLong("last_check", System.currentTimeMillis()).apply()
@@ -78,6 +113,7 @@ class MainActivity : AppCompatActivity() {
                     if (manual) showLatestDialog(info)
                 }
             }.onFailure {
+                binding.btnCheckUpdate.text = getString(R.string.update_check)
                 if (manual) Toast.makeText(this@MainActivity,
                     R.string.update_failed, Toast.LENGTH_SHORT).show()
             }
@@ -354,4 +390,9 @@ class MainActivity : AppCompatActivity() {
             launcher = { ctx -> Intent(ctx, PhotoFrameActivity::class.java) }
         )
     )
+
+    private companion object {
+        const val HOME_PREFS = "home_preferences"
+        const val KEY_GRID_COLUMNS = "grid_columns"
+    }
 }

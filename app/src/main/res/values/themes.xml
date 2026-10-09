@@ -160,4 +160,18 @@
         <item name="rippleColor">@color/ds_ripple_primary</item>
     </style>
 
+    <style name="Widget.Home.DensityChip" parent="@android:style/Widget.TextView">
+        <item name="android:layout_width">44dp</item>
+        <item name="android:layout_height">44dp</item>
+        <item name="android:layout_marginStart">6dp</item>
+        <item name="android:background">@drawable/home_density_chip</item>
+        <item name="android:gravity">center</item>
+        <item name="android:textColor">@color/text_primary</item>
+        <item name="android:textSize">13sp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:clickable">true</item>
+        <item name="android:focusable">true</item>
+        <item name="android:foreground">?attr/selectableItemBackground</item>
+    </style>
+
 </resources>
