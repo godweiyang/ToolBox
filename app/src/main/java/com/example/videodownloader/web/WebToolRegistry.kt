@@ -3,11 +3,11 @@ package com.example.videodownloader.web
 import com.example.videodownloader.R
 
 /**
- * 三个离线 Web 工具的统一注册信息。
+ * 两个离线 Web 工具的统一注册信息。
  * 首页卡片（MainActivity）与 WebView 外壳（WebViewShellActivity）共用同一份配置，
  * 避免两处 id / 标题漂移。
  *
- * 页面资产本身（assets/lol、assets/pubg、assets/fangdai 下的 HTML）由业务侧维护，
+ * 页面资产本身（assets/lol、assets/pubg 下的 HTML）由业务侧维护，
  * 本外壳只负责通过 appassets 源加载，不复制也不修改这些页面。
  */
 object WebToolRegistry {
@@ -37,13 +37,6 @@ object WebToolRegistry {
             descRes = R.string.tool_pubg_desc,
             iconRes = android.R.drawable.ic_menu_compass,
             iconBgRes = R.drawable.icon_grad_pubg
-        ),
-        Spec(
-            id = "fangdai",
-            titleRes = R.string.tool_fangdai_title,
-            descRes = R.string.tool_fangdai_desc,
-            iconRes = android.R.drawable.ic_menu_info_details,
-            iconBgRes = R.drawable.icon_grad_fangdai
         )
     )
 

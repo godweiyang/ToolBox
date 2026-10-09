@@ -283,15 +283,15 @@
     <string name="drawer_status_latest">已是最新版本</string>
     <string name="drawer_status_failed">检查失败，点击重试</string>
 
-    <!-- 原生房贷计算器 -->
+    <!-- 房贷计算器 -->
     <string name="mortgage_loan_info">贷款信息</string>
     <string name="mortgage_start_year">起始年份</string>
     <string name="mortgage_start_month">起始月份</string>
     <string name="mortgage_loan_type">贷款类型</string>
     <string name="mortgage_type_commercial">商业贷款</string>
-    <string name="mortgage_type_fund">公积金</string>
+    <string name="mortgage_type_fund">公积金贷款</string>
     <string name="mortgage_type_combo">组合贷款</string>
-    <string name="mortgage_amount">贷款金额（万元）</string>
+    <string name="mortgage_amount">贷款金额（元）</string>
     <string name="mortgage_rate">年利率（%）</string>
     <string name="mortgage_years">年限（年）</string>
     <string name="mortgage_method">还款方式</string>
@@ -324,13 +324,7 @@
 
     <!-- 重构版（v1.9.45） -->
     <string name="mortgage_loan_settings">贷款设置</string>
-    <string name="mortgage_amount_wan">金额（万元）</string>
     <string name="mortgage_rate_percent">年利率（%）</string>
-    <string name="mortgage_prepay_amount_wan">金额（万元）</string>
-    <string name="mortgage_savings_wan">存款（万元）</string>
-    <string name="mortgage_annual_income_wan">年收入（万元）</string>
-    <string name="mortgage_annual_living_wan">年支出（万元）</string>
-    <string name="mortgage_monthly_fund_wan">月公积金（万元）</string>
     <string name="mortgage_total_payment">还款总额</string>
     <string name="mortgage_total_interest">累计利息</string>
     <string name="mortgage_total_prepay">提前还款总额</string>
@@ -348,8 +342,8 @@
     <string name="mortgage_balance">期末余额</string>
     <string name="mortgage_per_loan">分笔明细</string>
     <string name="mortgage_no_payoff">无法结清</string>
-    <string name="tool_mortgage_native_title">房贷计算器（原生版）</string>
-    <string name="tool_mortgage_native_desc">原生页面离线测算月供、提前还款与结清时点</string>
+    <string name="tool_mortgage_native_title">房贷计算器</string>
+    <string name="tool_mortgage_native_desc">商贷 / 公积金 / 组合贷，提前还款与结清测算</string>
     <string name="home_layout_density">首页布局</string>
     <string name="home_layout_density_hint">每行显示几个工具</string>
     <string name="home_layout_columns">每行 %1$d 个工具</string>
@@ -359,8 +353,6 @@
     <string name="tool_lol_desc">LOL 战绩 / 出装查询（本地离线页）</string>
     <string name="tool_pubg_title">PUBG 工具箱</string>
     <string name="tool_pubg_desc">PUBG 战绩 / 数据查询（本地离线页）</string>
-    <string name="tool_fangdai_title">房贷计算器</string>
-    <string name="tool_fangdai_desc">等额本息 / 等额本金月供与利息计算</string>
 
     <!-- Web 外壳通用文案 -->
     <string name="web_shell_back">返回</string>

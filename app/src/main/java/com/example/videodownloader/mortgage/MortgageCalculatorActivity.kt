@@ -1,5 +1,6 @@
 package com.example.videodownloader.mortgage
 
+import android.content.Context
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
@@ -19,9 +20,10 @@ import com.example.videodownloader.databinding.ViewMortgageLoanBinding
 import java.util.Calendar
 
 /**
- * 原生房贷计算器（重构版）：
- * - 卡片化表单，年限/方式/目标等用 ExposedDropdown 下拉
+ * 房贷计算器：
+ * - 卡片化表单，贷款类型 / 年限 / 方式 / 目标等用 ExposedDropdown 下拉
  * - 逐月明细分页展示（每页 24 期），点击行用 BottomSheet 展示整洁详情
+ * - 表单数据缓存到 SharedPreferences，下次打开自动恢复
  */
 class MortgageCalculatorActivity : AppCompatActivity() {
 
@@ -33,6 +35,7 @@ class MortgageCalculatorActivity : AppCompatActivity() {
     private var currentPage = 0
     private var filterMode = FILTER_ALL
     private val rowAdapter = RowAdapter()
+    private val monthChips = mutableListOf<TextView>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -43,9 +46,7 @@ class MortgageCalculatorActivity : AppCompatActivity() {
         header.pageTitle.setText(R.string.tool_mortgage_native_title)
         header.pageSubtitle.setText(R.string.tool_mortgage_native_desc)
 
-        setupDefaults()
         setupDropdowns()
-        setupSegments()
         setupMonthChips()
         setupResults()
 
@@ -62,33 +63,30 @@ class MortgageCalculatorActivity : AppCompatActivity() {
         binding.btnNextPage.setOnClickListener {
             if (currentPage < totalPages() - 1) { currentPage++; renderPage() }
         }
+
+        setupFilterSegment()
+        restorePrefs()
     }
 
     // ===== 初始化 =====
 
-    private fun setupDefaults() {
+    private fun setupDropdowns() {
         val now = Calendar.getInstance()
         binding.etStartYear.setText(now.get(Calendar.YEAR).toString())
-    }
 
-    private fun setupDropdowns() {
         bindDropdown(binding.ddStartMonth,
             (1..12).map { "${it}月" },
-            "${Calendar.getInstance().get(Calendar.MONTH) + 1}月")
+            "${now.get(Calendar.MONTH) + 1}月")
 
-        bindDropdown(binding.sectionCommercial.ddYears,
-            (5..30).map { "${it}年" }, "30年")
-        bindDropdown(binding.sectionCommercial.ddMethod,
-            listOf(getString(R.string.mortgage_method_equal_payment),
-                getString(R.string.mortgage_method_equal_principal)),
-            getString(R.string.mortgage_method_equal_payment))
+        bindDropdown(binding.ddLoanType,
+            listOf(getString(R.string.mortgage_type_commercial),
+                getString(R.string.mortgage_type_fund),
+                getString(R.string.mortgage_type_combo)),
+            getString(R.string.mortgage_type_commercial))
+        binding.ddLoanType.setOnItemClickListener { _, _, position, _ -> applyLoanType(position) }
 
-        bindDropdown(binding.sectionFund.ddYears,
-            (5..30).map { "${it}年" }, "30年")
-        bindDropdown(binding.sectionFund.ddMethod,
-            listOf(getString(R.string.mortgage_method_equal_payment),
-                getString(R.string.mortgage_method_equal_principal)),
-            getString(R.string.mortgage_method_equal_payment))
+        bindLoanSection(binding.sectionCommercial, "3.5")
+        bindLoanSection(binding.sectionFund, "2.85")
 
         bindDropdown(binding.ddPrepayTarget,
             listOf(getString(R.string.mortgage_type_commercial),
@@ -101,6 +99,16 @@ class MortgageCalculatorActivity : AppCompatActivity() {
             getString(R.string.mortgage_mode_shorten))
     }
 
+    private fun bindLoanSection(section: ViewMortgageLoanBinding, defaultRate: String) {
+        bindDropdown(section.ddYears,
+            (5..30).map { "${it}年" }, "30年")
+        bindDropdown(section.ddMethod,
+            listOf(getString(R.string.mortgage_method_equal_payment),
+                getString(R.string.mortgage_method_equal_principal)),
+            getString(R.string.mortgage_method_equal_payment))
+        section.etRate.setText(defaultRate)
+    }
+
     private fun bindDropdown(
         actv: AutoCompleteTextView, items: List<String>, initial: String
     ) {
@@ -108,31 +116,28 @@ class MortgageCalculatorActivity : AppCompatActivity() {
         actv.setText(initial, false)
     }
 
-    private fun setupSegments() {
-        bindSegment(listOf(binding.segCommercial, binding.segFund, binding.segCombo), 0) { idx ->
-            binding.sectionCommercial.root.visibility =
-                if (idx == 1) View.GONE else View.VISIBLE
-            binding.sectionFund.root.visibility =
-                if (idx == 0) View.GONE else View.VISIBLE
-        }
-        bindSegment(listOf(binding.filterAll, binding.filterPrepay, binding.filterDecember), 0) { idx ->
-            filterMode = idx
-            currentPage = 0
-            applyFilter()
-        }
+    private fun applyLoanType(typeIdx: Int) {
+        binding.sectionCommercial.root.visibility =
+            if (typeIdx == 1) View.GONE else View.VISIBLE
+        binding.sectionFund.root.visibility =
+            if (typeIdx == 0) View.GONE else View.VISIBLE
     }
 
-    private fun bindSegment(views: List<TextView>, selected: Int, onSelect: (Int) -> Unit) {
+    private fun setupFilterSegment() {
+        val views = listOf(binding.filterAll, binding.filterPrepay, binding.filterDecember)
         fun render(idx: Int) {
             views.forEachIndexed { i, v -> v.isSelected = i == idx }
         }
         views.forEachIndexed { i, v ->
-            v.setOnClickListener { render(i); onSelect(i) }
+            v.setOnClickListener {
+                render(i)
+                filterMode = i
+                currentPage = 0
+                applyFilter()
+            }
         }
-        render(selected)
+        render(0)
     }
-
-    private val monthChips = mutableListOf<TextView>()
 
     private fun setupMonthChips() {
         val container = binding.monthChipContainer
@@ -179,6 +184,12 @@ class MortgageCalculatorActivity : AppCompatActivity() {
 
     // ===== 测算 =====
 
+    private fun currentLoanType(): Int = listOf(
+        getString(R.string.mortgage_type_commercial),
+        getString(R.string.mortgage_type_fund),
+        getString(R.string.mortgage_type_combo)
+    ).indexOf(binding.ddLoanType.text.toString()).coerceAtLeast(0)
+
     private fun calculate() {
         val startYear = binding.etStartYear.text.toString().toIntOrNull()
         val startMonth = binding.ddStartMonth.text.toString().trimEnd('月').toIntOrNull()?.minus(1)
@@ -186,9 +197,7 @@ class MortgageCalculatorActivity : AppCompatActivity() {
             invalid(); return
         }
 
-        val typeIdx = listOf(
-            binding.segCommercial, binding.segFund, binding.segCombo
-        ).indexOfFirst { it.isSelected }
+        val typeIdx = currentLoanType()
 
         val loans = mutableListOf<LoanInput>()
         if (typeIdx != 1) {
@@ -201,8 +210,8 @@ class MortgageCalculatorActivity : AppCompatActivity() {
         }
 
         val prepay = if (binding.swPrepay.isChecked) {
-            val amountWan = binding.etPrepayAmount.text.toString().toDoubleOrNull()
-            if (amountWan == null || amountWan <= 0) { invalid(); return }
+            val amount = binding.etPrepayAmount.text.toString().toDoubleOrNull()
+            if (amount == null || amount <= 0) { invalid(); return }
             val months = monthChips.filter { it.isSelected }
                 .map { it.text.toString().trimEnd('月').toInt() }
             if (months.isEmpty()) { invalid(); return }
@@ -215,27 +224,25 @@ class MortgageCalculatorActivity : AppCompatActivity() {
             val mode = if (binding.ddPrepayMode.text.toString() ==
                 getString(R.string.mortgage_mode_reduce)
             ) PrepayMode.REDUCE else PrepayMode.SHORTEN
-            PrepayConfig(true, amountWan * 10000, months, target, mode)
+            PrepayConfig(true, amount, months, target, mode)
         } else PrepayConfig()
 
         val income = if (binding.swIncome.isChecked) {
-            fun wanOf(id: TextView): Double? = id.text.toString().toDoubleOrNull()
-            val savings = wanOf(binding.etSavings)
-            val annualIncome = wanOf(binding.etAnnualIncome)
-            val annualLiving = wanOf(binding.etAnnualLiving)
-            val monthlyFund = wanOf(binding.etMonthlyFund)
+            fun numOf(id: TextView): Double? = id.text.toString().toDoubleOrNull()
+            val savings = numOf(binding.etSavings)
+            val annualIncome = numOf(binding.etAnnualIncome)
+            val annualLiving = numOf(binding.etAnnualLiving)
+            val monthlyFund = numOf(binding.etMonthlyFund)
             if (savings == null || annualIncome == null || annualLiving == null ||
                 monthlyFund == null
             ) { invalid(); return }
-            IncomeConfig(
-                true, savings * 10000, annualIncome * 10000,
-                annualLiving * 10000, monthlyFund * 10000
-            )
+            IncomeConfig(true, savings, annualIncome, annualLiving, monthlyFund)
         } else IncomeConfig()
 
         result = MortgageEngine.buildSchedule(
             ScheduleConfig(startYear, startMonth, loans, prepay, income)
         )
+        savePrefs(typeIdx)
         renderResults(result!!)
         binding.resultsContainer.visibility = View.VISIBLE
         currentPage = 0
@@ -246,20 +253,95 @@ class MortgageCalculatorActivity : AppCompatActivity() {
     }
 
     private fun collectLoan(section: ViewMortgageLoanBinding, name: String): LoanInput? {
-        val amountWan = section.etAmount.text.toString().toDoubleOrNull()
+        val amount = section.etAmount.text.toString().toDoubleOrNull()
         val rate = section.etRate.text.toString().toDoubleOrNull()
         val years = section.ddYears.text.toString().trimEnd('年').toIntOrNull()
-        if (amountWan == null || rate == null || years == null ||
-            amountWan <= 0 || rate < 0 || years <= 0
+        if (amount == null || rate == null || years == null ||
+            amount <= 0 || rate < 0 || years <= 0
         ) return null
         val method = if (section.ddMethod.text.toString() ==
             getString(R.string.mortgage_method_equal_principal)
         ) LoanMethod.EQUAL_PRINCIPAL else LoanMethod.EQUAL_PAYMENT
-        return LoanInput(name, amountWan * 10000, rate!!, years * 12, method)
+        return LoanInput(name, amount, rate, years * 12, method)
     }
 
     private fun invalid() {
         Toast.makeText(this, R.string.mortgage_input_invalid, Toast.LENGTH_SHORT).show()
+    }
+
+    // ===== 表单缓存 =====
+
+    private fun prefs() = getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+
+    private fun savePrefs(typeIdx: Int) {
+        fun AutoCompleteTextView.v(): String = text.toString()
+        val p = prefs().edit()
+        p.putBoolean(K_HAS, true)
+        p.putString(K_YEAR, binding.etStartYear.text.toString())
+        p.putString(K_MONTH, binding.ddStartMonth.v())
+        p.putInt(K_TYPE, typeIdx)
+
+        fun saveSection(prefix: String, s: ViewMortgageLoanBinding) {
+            p.putString("${prefix}amount", s.etAmount.text.toString())
+            p.putString("${prefix}rate", s.etRate.text.toString())
+            p.putString("${prefix}years", s.ddYears.v())
+            p.putString("${prefix}method", s.ddMethod.v())
+        }
+        saveSection("c", binding.sectionCommercial)
+        saveSection("f", binding.sectionFund)
+
+        p.putBoolean(K_PP_ON, binding.swPrepay.isChecked)
+        p.putString(K_PP_AMOUNT, binding.etPrepayAmount.text.toString())
+        p.putString(K_PP_TARGET, binding.ddPrepayTarget.v())
+        p.putString(K_PP_MODE, binding.ddPrepayMode.v())
+        p.putString(K_PP_MONTHS, monthChips.filter { it.isSelected }
+            .joinToString(",") { it.text.toString().trimEnd('月') })
+
+        p.putBoolean(K_IN_ON, binding.swIncome.isChecked)
+        p.putString(K_SAVINGS, binding.etSavings.text.toString())
+        p.putString(K_INCOME, binding.etAnnualIncome.text.toString())
+        p.putString(K_LIVING, binding.etAnnualLiving.text.toString())
+        p.putString(K_FUND, binding.etMonthlyFund.text.toString())
+        p.apply()
+    }
+
+    private fun restorePrefs() {
+        val p = prefs()
+        if (!p.getBoolean(K_HAS, false)) return
+
+        p.getString(K_YEAR, null)?.let { binding.etStartYear.setText(it) }
+        p.getString(K_MONTH, null)?.let { binding.ddStartMonth.setText(it, false) }
+        val typeIdx = p.getInt(K_TYPE, 0)
+        binding.ddLoanType.setText(
+            binding.ddLoanType.adapter.getItem(typeIdx).toString(), false
+        )
+        applyLoanType(typeIdx)
+
+        fun restoreSection(prefix: String, s: ViewMortgageLoanBinding) {
+            p.getString("${prefix}amount", null)?.let { s.etAmount.setText(it) }
+            p.getString("${prefix}rate", null)?.let { s.etRate.setText(it) }
+            p.getString("${prefix}years", null)?.let { s.ddYears.setText(it, false) }
+            p.getString("${prefix}method", null)?.let { s.ddMethod.setText(it, false) }
+        }
+        restoreSection("c", binding.sectionCommercial)
+        restoreSection("f", binding.sectionFund)
+
+        binding.swPrepay.isChecked = p.getBoolean(K_PP_ON, false)
+        p.getString(K_PP_AMOUNT, null)?.let { binding.etPrepayAmount.setText(it) }
+        p.getString(K_PP_TARGET, null)?.let { binding.ddPrepayTarget.setText(it, false) }
+        p.getString(K_PP_MODE, null)?.let { binding.ddPrepayMode.setText(it, false) }
+        val savedMonths = p.getString(K_PP_MONTHS, null)
+            ?.split(",")?.mapNotNull { it.toIntOrNull() } ?: emptyList()
+        monthChips.forEach { chip ->
+            val m = chip.text.toString().trimEnd('月').toInt()
+            chip.isSelected = m in savedMonths
+        }
+
+        binding.swIncome.isChecked = p.getBoolean(K_IN_ON, false)
+        p.getString(K_SAVINGS, null)?.let { binding.etSavings.setText(it) }
+        p.getString(K_INCOME, null)?.let { binding.etAnnualIncome.setText(it) }
+        p.getString(K_LIVING, null)?.let { binding.etAnnualLiving.setText(it) }
+        p.getString(K_FUND, null)?.let { binding.etMonthlyFund.setText(it) }
     }
 
     // ===== 结果渲染 =====
@@ -499,5 +581,21 @@ class MortgageCalculatorActivity : AppCompatActivity() {
         private const val FILTER_ALL = 0
         private const val FILTER_PREPAY = 1
         private const val FILTER_DECEMBER = 2
+
+        private const val PREFS = "mortgage_form"
+        private const val K_HAS = "has"
+        private const val K_YEAR = "startYear"
+        private const val K_MONTH = "startMonth"
+        private const val K_TYPE = "loanType"
+        private const val K_PP_ON = "prepayOn"
+        private const val K_PP_AMOUNT = "prepayAmount"
+        private const val K_PP_TARGET = "prepayTarget"
+        private const val K_PP_MODE = "prepayMode"
+        private const val K_PP_MONTHS = "prepayMonths"
+        private const val K_IN_ON = "incomeOn"
+        private const val K_SAVINGS = "savings"
+        private const val K_INCOME = "annualIncome"
+        private const val K_LIVING = "annualLiving"
+        private const val K_FUND = "monthlyFund"
     }
 }

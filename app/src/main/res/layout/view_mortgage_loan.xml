@@ -27,14 +27,14 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:hint="@string/mortgage_amount_wan">
+            android:hint="@string/mortgage_amount">
 
             <com.google.android.material.textfield.TextInputEditText
                 android:id="@+id/etAmount"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:inputType="numberDecimal"
-                android:maxLength="7"
+                android:inputType="number"
+                android:maxLength="9"
                 android:textSize="14sp" />
         </com.google.android.material.textfield.TextInputLayout>
 

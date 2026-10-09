@@ -81,48 +81,24 @@
                     </com.google.android.material.textfield.TextInputLayout>
                 </LinearLayout>
 
-                <LinearLayout
-                    android:id="@+id/loanTypeSegment"
+                <com.google.android.material.textfield.TextInputLayout
+                    android:id="@+id/tilLoanType"
+                    style="@style/Mortgage.DropdownField"
                     android:layout_width="match_parent"
-                    android:layout_height="42dp"
+                    android:layout_height="wrap_content"
                     android:layout_marginTop="14dp"
-                    android:orientation="horizontal">
+                    android:hint="@string/mortgage_loan_type">
 
-                    <TextView
-                        android:id="@+id/segCommercial"
-                        android:layout_width="0dp"
-                        android:layout_height="match_parent"
-                        android:layout_weight="1"
-                        android:background="@drawable/mortgage_seg_bg"
-                        android:gravity="center"
-                        android:text="@string/mortgage_type_commercial"
-                        android:textColor="@color/mortgage_seg_text"
-                        android:textSize="13sp" />
-
-                    <TextView
-                        android:id="@+id/segFund"
-                        android:layout_width="0dp"
-                        android:layout_height="match_parent"
-                        android:layout_marginStart="8dp"
-                        android:layout_weight="1"
-                        android:background="@drawable/mortgage_seg_bg"
-                        android:gravity="center"
-                        android:text="@string/mortgage_type_fund"
-                        android:textColor="@color/mortgage_seg_text"
-                        android:textSize="13sp" />
-
-                    <TextView
-                        android:id="@+id/segCombo"
-                        android:layout_width="0dp"
-                        android:layout_height="match_parent"
-                        android:layout_marginStart="8dp"
-                        android:layout_weight="1"
-                        android:background="@drawable/mortgage_seg_bg"
-                        android:gravity="center"
-                        android:text="@string/mortgage_type_combo"
-                        android:textColor="@color/mortgage_seg_text"
-                        android:textSize="13sp" />
-                </LinearLayout>
+                    <AutoCompleteTextView
+                        android:id="@+id/ddLoanType"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:clickable="true"
+                        android:cursorVisible="false"
+                        android:focusable="false"
+                        android:inputType="none"
+                        android:textSize="14sp" />
+                </com.google.android.material.textfield.TextInputLayout>
 
                 <include
                     android:id="@+id/sectionCommercial"
@@ -196,14 +172,14 @@
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
                             android:layout_weight="1"
-                            android:hint="@string/mortgage_prepay_amount_wan">
+                            android:hint="@string/mortgage_prepay_amount">
 
                             <com.google.android.material.textfield.TextInputEditText
                                 android:id="@+id/etPrepayAmount"
                                 android:layout_width="match_parent"
                                 android:layout_height="wrap_content"
-                                android:inputType="numberDecimal"
-                                android:maxLength="7"
+                                android:inputType="number"
+                                android:maxLength="9"
                                 android:textSize="14sp" />
                         </com.google.android.material.textfield.TextInputLayout>
 
@@ -320,14 +296,14 @@
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
                             android:layout_weight="1"
-                            android:hint="@string/mortgage_savings_wan">
+                            android:hint="@string/mortgage_savings">
 
                             <com.google.android.material.textfield.TextInputEditText
                                 android:id="@+id/etSavings"
                                 android:layout_width="match_parent"
                                 android:layout_height="wrap_content"
-                                android:inputType="numberDecimal"
-                                android:maxLength="7"
+                                android:inputType="number"
+                                android:maxLength="9"
                                 android:textSize="14sp" />
                         </com.google.android.material.textfield.TextInputLayout>
 
@@ -338,14 +314,14 @@
                             android:layout_height="wrap_content"
                             android:layout_marginStart="10dp"
                             android:layout_weight="1"
-                            android:hint="@string/mortgage_annual_income_wan">
+                            android:hint="@string/mortgage_annual_income">
 
                             <com.google.android.material.textfield.TextInputEditText
                                 android:id="@+id/etAnnualIncome"
                                 android:layout_width="match_parent"
                                 android:layout_height="wrap_content"
-                                android:inputType="numberDecimal"
-                                android:maxLength="7"
+                                android:inputType="number"
+                                android:maxLength="9"
                                 android:textSize="14sp" />
                         </com.google.android.material.textfield.TextInputLayout>
                     </LinearLayout>
@@ -362,14 +338,14 @@
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
                             android:layout_weight="1"
-                            android:hint="@string/mortgage_annual_living_wan">
+                            android:hint="@string/mortgage_annual_living">
 
                             <com.google.android.material.textfield.TextInputEditText
                                 android:id="@+id/etAnnualLiving"
                                 android:layout_width="match_parent"
                                 android:layout_height="wrap_content"
-                                android:inputType="numberDecimal"
-                                android:maxLength="7"
+                                android:inputType="number"
+                                android:maxLength="9"
                                 android:textSize="14sp" />
                         </com.google.android.material.textfield.TextInputLayout>
 
@@ -380,14 +356,14 @@
                             android:layout_height="wrap_content"
                             android:layout_marginStart="10dp"
                             android:layout_weight="1"
-                            android:hint="@string/mortgage_monthly_fund_wan">
+                            android:hint="@string/mortgage_monthly_fund">
 
                             <com.google.android.material.textfield.TextInputEditText
                                 android:id="@+id/etMonthlyFund"
                                 android:layout_width="match_parent"
                                 android:layout_height="wrap_content"
-                                android:inputType="numberDecimal"
-                                android:maxLength="7"
+                                android:inputType="number"
+                                android:maxLength="9"
                                 android:textSize="14sp" />
                         </com.google.android.material.textfield.TextInputLayout>
                     </LinearLayout>
