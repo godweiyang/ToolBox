@@ -1,11 +1,14 @@
 package com.example.videodownloader.web
 
+import android.Manifest
 import android.annotation.SuppressLint
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.webkit.MimeTypeMap
 import android.webkit.WebResourceRequest
@@ -16,18 +19,22 @@ import android.webkit.WebViewClient
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.activity.OnBackPressedCallback
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import androidx.lifecycle.lifecycleScope
 import com.example.videodownloader.R
 import com.example.videodownloader.databinding.ActivityWebShellBinding
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.util.concurrent.TimeUnit
+import kotlin.coroutines.resume
 
 /**
  * 可复用的离线 Web 工具外壳。
@@ -40,6 +47,14 @@ class WebViewShellActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityWebShellBinding
     private var toolId: String = "lol"
+
+    // API 26–28 写公共相册需要运行时申请 WRITE_EXTERNAL_STORAGE
+    private var storagePermissionContinuation: ((Boolean) -> Unit)? = null
+    private val storagePermissionLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            storagePermissionContinuation?.invoke(granted)
+            storagePermissionContinuation = null
+        }
 
     private val httpClient: OkHttpClient by lazy {
         OkHttpClient.Builder()
@@ -245,21 +260,42 @@ class WebViewShellActivity : AppCompatActivity() {
             toast(R.string.web_shell_blocked); return
         }
         val name = DownloadNaming.resolve(url, contentDisposition, mimeType)
+        val isImage = mimeType?.startsWith("image/") == true
         lifecycleScope.launch {
-            val ok = withContext(Dispatchers.IO) {
+            val bytes = withContext(Dispatchers.IO) {
                 runCatching {
                     val body = httpClient.newCall(Request.Builder().url(url).build()).execute().body
-                    val bytes = body?.bytes() ?: ByteArray(0)
-                    val out = File(downloadsDir(), name)
-                    out.outputStream().use { it.write(bytes) }
-                    out
+                    body?.bytes() ?: ByteArray(0)
                 }.getOrNull()
             }
-            if (ok != null) {
-                toast(getString(R.string.web_shell_download_saved, ok.name))
-                offerShare(ok)
+            if (bytes == null) { toast(R.string.web_shell_download_failed); return@launch }
+            if (isImage) {
+                if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q &&
+                    ContextCompat.checkSelfPermission(
+                        this@WebViewShellActivity, Manifest.permission.WRITE_EXTERNAL_STORAGE
+                    ) != PackageManager.PERMISSION_GRANTED
+                ) {
+                    if (!requestStoragePermission()) {
+                        toast(R.string.web_shell_download_failed); return@launch
+                    }
+                }
+                val uri = withContext(Dispatchers.IO) {
+                    runCatching {
+                        GallerySaver.save(this@WebViewShellActivity, name, bytes, mimeType!!)
+                    }.getOrNull()
+                }
+                if (uri != null) { toast("已保存到手机相册"); offerShare(uri, mimeType!!) }
+                else toast(R.string.web_shell_download_failed)
             } else {
-                toast(R.string.web_shell_download_failed)
+                val out = withContext(Dispatchers.IO) {
+                    runCatching {
+                        File(downloadsDir(), name).apply { outputStream().use { it.write(bytes) } }
+                    }.getOrNull()
+                }
+                if (out != null) {
+                    toast(getString(R.string.web_shell_download_saved, out.name))
+                    offerShare(Uri.fromFile(out), mimeType ?: "*/*")
+                } else toast(R.string.web_shell_download_failed)
             }
         }
     }
@@ -292,29 +328,88 @@ class WebViewShellActivity : AppCompatActivity() {
 
     /** NativeBridge.saveFile / shareImage 的统一入口。 */
     private fun onNativeSave(fileName: String, data: String, mimeType: String?, shareAfter: Boolean) {
+        val isImage = mimeType?.startsWith("image/") == true
         lifecycleScope.launch {
-            val file = saveBase64ToFile(fileName, data, mimeType)
-            runOnUiThread {
-                if (file != null) {
-                    toast(getString(R.string.web_shell_download_saved, file.name))
-                    // 复制图片/表格绝对路径，页面「复制路径」按钮直接可用
-                    copyToClipboard(file.absolutePath)
-                    if (shareAfter) offerShare(file)
-                } else {
-                    toast(R.string.web_shell_download_failed)
+            if (isImage) {
+                // 图片直接进系统相册，图库立即可见
+                val uri = saveImageToGallery(fileName, data, mimeType!!)
+                runOnUiThread {
+                    if (uri != null) {
+                        toast("已保存到手机相册")
+                        if (shareAfter) offerShare(uri, mimeType)
+                    } else toast(R.string.web_shell_download_failed)
+                }
+            } else {
+                val file = saveBase64ToFile(fileName, data, mimeType)
+                runOnUiThread {
+                    if (file != null) {
+                        toast(getString(R.string.web_shell_download_saved, file.name))
+                        // 复制文件绝对路径，页面「复制路径」按钮直接可用
+                        copyToClipboard(file.absolutePath)
+                        if (shareAfter) offerShare(Uri.fromFile(file), mimeType ?: "*/*")
+                    } else {
+                        toast(R.string.web_shell_download_failed)
+                    }
                 }
             }
         }
     }
 
-    private fun offerShare(file: File) {
-        val mime = mimeFor(file.name).let { if (it == "application/octet-stream") "application/*" else it }
-        val uri: Uri = runCatching {
-            FileProvider.getUriForFile(this, "${packageName}.fileprovider", file)
+    /** 解码 base64 图片并保存进相册；API 26–28 必要时先申请存储权限。 */
+    private suspend fun saveImageToGallery(fileName: String, data: String, mime: String): Uri? {
+        val decoded = withContext(Dispatchers.IO) {
+            runCatching {
+                var payload = data.trim()
+                if (payload.startsWith("data:")) {
+                    val comma = payload.indexOf(',')
+                    if (comma > 0) payload = payload.substring(comma + 1)
+                }
+                android.util.Base64.decode(payload, android.util.Base64.DEFAULT)
+            }.getOrNull()
+        } ?: return null
+
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q &&
+            ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE)
+            != PackageManager.PERMISSION_GRANTED
+        ) {
+            val granted = requestStoragePermission()
+            if (!granted) return null
+        }
+        return withContext(Dispatchers.IO) {
+            runCatching { GallerySaver.save(this@WebViewShellActivity, fileName, decoded, mime) }
+                .getOrNull()
+        }
+    }
+
+    private suspend fun requestStoragePermission(): Boolean = suspendCancellableCoroutine { cont ->
+        storagePermissionContinuation = { granted -> if (cont.isActive) cont.resume(granted) }
+        storagePermissionLauncher.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+    }
+
+    /** 复制图片到系统剪贴板（相册 content uri），聊天/文档可直接粘贴。 */
+    private fun onCopyImage(fileName: String, data: String) {
+        lifecycleScope.launch {
+            val uri = saveImageToGallery(fileName, data, "image/png")
+            runOnUiThread {
+                if (uri != null) {
+                    val cm = getSystemService(ClipboardManager::class.java)
+                    cm.setPrimaryClip(ClipData.newUri(contentResolver, "image", uri))
+                    toast("图片已复制，可直接粘贴")
+                } else toast(R.string.web_shell_download_failed)
+            }
+        }
+    }
+
+    private fun offerShare(uri: Uri, mime: String) {
+        val shareMime = mime.let { if (it.isBlank() || it == "application/octet-stream") "application/*" else it }
+        // FileProvider 的私有文件 uri 与 MediaStore 的相册 content uri 都可直接分享
+        val shareable: Uri = if (uri.scheme == "content") uri
+        else runCatching {
+            FileProvider.getUriForFile(this, "${packageName}.fileprovider", File(uri.path!!))
         }.getOrNull() ?: return
         val intent = Intent(Intent.ACTION_SEND).apply {
-            type = mime
-            putExtra(Intent.EXTRA_STREAM, uri)
+            type = shareMime
+            putExtra(Intent.EXTRA_STREAM, shareable)
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
         runCatching { startActivity(Intent.createChooser(intent, getString(R.string.web_shell_share))) }
@@ -400,8 +495,8 @@ class WebViewShellActivity : AppCompatActivity() {
 
         @android.webkit.JavascriptInterface
         fun copyImage(base64: String): Boolean {
-            // 保存为 PNG 并复制路径到剪贴板（移动端剪贴板不直接放位图）
-            onNativeSave("longshot.png", base64, "image/png", shareAfter = false)
+            // 保存进相册并把图片本身复制到剪贴板，聊天/文档可直接粘贴
+            onCopyImage("pubgzjcx-长图", base64)
             return true
         }
     }
