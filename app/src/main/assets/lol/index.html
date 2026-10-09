@@ -275,7 +275,17 @@ button:not(:disabled):active,.pager .pg:not(.dis):not(.cur):active,.tabs button:
   #keyPoolRoot .kpmask,#lolpoolRoot .mask,#posterRoot .pomask{animation-duration:.01ms!important}
   .mrow .mdetail,.match .m-detail{transition:none}
 }
+/* ToolBox app 内嵌环境：独立服务相关的一切入口永久隐藏（含服务状态指示灯） */
+html.embedded #svcPill,html.embedded #launchBtn,html.embedded #dlBtn,html.embedded #stopSvc,
+html.embedded #autoStopWrap,html.embedded #svcTip,html.embedded #svcPath,
+html.embedded #macShWrap,html.embedded #winShWrap{display:none!important}
 </style>
+<script>
+/* 尽早标记内嵌环境（WebViewAssetLoader 提供的页面源），避免独立服务按钮闪现 */
+if (location.hostname === 'appassets.androidplatform.net') {
+  document.documentElement.classList.add('embedded');
+}
+</script>
 </head>
 <body>
 <div class="wrap" id="viewMulti">
@@ -481,7 +491,7 @@ button:not(:disabled):active,.pager .pg:not(.dis):not(.cur):active,.tabs button:
     root.classList.add('show')
     load().catch((e) => {
       sumEl.innerHTML = ''
-      tbEl.innerHTML = `<div class="empty">读取失败：${esc(e.message)}<br>请确认右上角为「服务已运行」。</div>`
+      tbEl.innerHTML = `<div class="empty">读取失败：${esc(e.message)}<br>${EMBEDDED?'请稍后重试。':'请确认右上角为「服务已运行」。'}</div>`
     })
   }
   function close() {
@@ -617,7 +627,7 @@ async function rawFetch(path,opt,timeout=20000){
 async function api(name,body,timeout=30000){
   let resp;
   try{resp=await rawFetch('/api/'+name,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body||{})},timeout);}
-  catch(e){setConnected(false);throw new Error('本地服务未连接，请先启动本地服务');}
+  catch(e){setConnected(false);throw new Error(EMBEDDED?'正在初始化，请稍后再试':'本地服务未连接，请先启动本地服务');}
   if(!resp.ok)throw new Error('本地服务返回 '+resp.status);
   const r=await resp.json();setConnected(true);
   if(!r.ok)throw new Error(r.error||'操作失败');
@@ -628,6 +638,8 @@ const LATEST_VERSION='1.5.1';
 const UA=(navigator.userAgent||'')+' '+(navigator.platform||'');
 const IS_MAC=/macintosh|mac os x|iphone|ipad|ipod/i.test(UA);
 const IS_ANDROID=/android/i.test(UA);
+/* ToolBox app 内嵌：本地服务随页面在 app 进程内自动启动，不存在“下载/启动/停止服务”这些操作 */
+const EMBEDDED=location.hostname==='appassets.androidplatform.net';
 const DL_URL=IS_MAC?'https://godweiyang.com/medias/files/lolzjcx_service_mac.zip':(IS_ANDROID?'https://godweiyang.com/medias/files/lolzjcx_service_android.apk':'https://godweiyang.com/medias/files/lolzjcx_service.exe');
 const PTAG=IS_MAC?'Mac':(IS_ANDROID?'安卓':'Windows');
 const L_DL=`下载本地服务（${PTAG}）`,L_FIRST=`下载本地服务（${PTAG}·首次使用）`,L_REDL=`重新下载本地服务（${PTAG}）`;
@@ -652,7 +664,9 @@ function cmpVer(a,b){const pa=String(a||'0').split('.').map(x=>parseInt(x)||0),p
   for(let i=0;i<Math.max(pa.length,pb.length);i++){const x=pa[i]||0,y=pb[i]||0;if(x!==y)return x<y?-1:1;}return 0;}
 function setSvcVersion(v,path){svcVer=v||'';if(path)svcPath=path;
   if(online&&path){try{localStorage.setItem('lolzjcx_last_svc',JSON.stringify({path,ts:Date.now()}));}catch(e){}}renderSvc();}
+/* 内嵌环境：后端是 app 自身能力，没有服务状态概念；相关元素已由 CSS 隐藏，无需渲染 */
 function renderSvc(){
+  if(EMBEDDED)return;
   const pill=$('svcPill'),txt=$('svcText'),launch=$('launchBtn'),stop=$('stopSvc'),
         dl=$('dlBtn'),aw=$('autoStopWrap'),tip=$('svcTip'),pathEl=$('svcPath'),macSh=$('macShWrap'),winSh=$('winShWrap');
   const macCmd=show=>{macSh.style.display=(IS_MAC&&show)?'flex':'none';winSh.style.display=(!IS_MAC&&!IS_ANDROID&&show)?'flex':'none';};
@@ -697,6 +711,15 @@ async function probe(force){
     else failCount++;
   }catch(e){failCount++;}
   probing=false;if(failCount>=grace)setConnected(false);
+}
+/* 内嵌环境：等待 app 自身后端就绪（首次打开需数秒初始化），期间用户点查询会自动等待而非报错 */
+function waitReady(timeout=25000){
+  if(online===true)return Promise.resolve(true);
+  return new Promise(res=>{
+    const t=setInterval(()=>probe(true),500);
+    const give=setTimeout(()=>{clearInterval(t);clearTimeout(wait);res(false);},timeout);
+    const wait=setInterval(()=>{if(online===true){clearInterval(t);clearInterval(wait);clearTimeout(give);res(true);}},300);
+  });
 }
 setInterval(()=>probe(false),2000);probe(true);
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')probe(true);});
@@ -897,7 +920,10 @@ function setQueueOptions(){
 function setBtn(){const b=$('qBtn');if(state.running){b.textContent='停止';b.style.background='var(--red)';}else{b.textContent='查询';b.style.background='';}}
 async function toggleQuery(){
   if(state.running){try{await api('stop_job',{});}catch(e){}return;}
-  if(online!==true){await probe(true);if(online!==true){toast('本地服务未运行，请先点右上角「启动服务」或下载本地服务','e');return;}}
+  if(online!==true){
+    if(EMBEDDED){ if(!(await waitReady())){toast('正在初始化，请稍后再试','w');return;} }
+    else { await probe(true); if(online!==true){toast('本地服务未运行，请先点右上角「启动服务」或下载本地服务','e');return;} }
+  }
   const text=$('qInput').value;
   const parsed=parseSummoners(text);
   if(!parsed.length){toast('没有识别到“名字#尾标”，请每行一个或直接粘贴队伍聊天','e');return;}

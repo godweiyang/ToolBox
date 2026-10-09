@@ -23,7 +23,8 @@ VERSION = "1.5.1"   # 本机服务版本号；发布新包时与前端 LATEST_VE
 
 # 允许调用本服务的页面来源（浏览器跨域校验）
 ALLOW_ORIGIN_SUFFIX = ("godweiyang.com",)
-ALLOW_ORIGIN_HOST = ("127.0.0.1", "localhost")
+ALLOW_ORIGIN_HOST = ("127.0.0.1", "localhost",
+                     "appassets.androidplatform.net")  # ToolBox app 内 WebViewAssetLoader 页面源
 
 
 IS_WIN = sys.platform.startswith("win")
