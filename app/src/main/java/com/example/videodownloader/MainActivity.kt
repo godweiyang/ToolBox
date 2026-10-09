@@ -17,6 +17,7 @@ import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.ItemTouchHelper
 import androidx.recyclerview.widget.RecyclerView
 import com.example.videodownloader.databinding.ActivityMainBinding
+import com.example.videodownloader.mortgage.MortgageCalculatorActivity
 import com.example.videodownloader.databinding.DialogAppUpdateBinding
 import com.example.videodownloader.web.WebToolRegistry
 import com.example.videodownloader.web.WebViewShellActivity
@@ -472,6 +473,14 @@ class MainActivity : AppCompatActivity() {
             iconRes = android.R.drawable.ic_menu_gallery,
             iconBgRes = R.drawable.icon_grad_frame,
             launcher = { ctx -> Intent(ctx, PhotoFrameActivity::class.java) }
+        ),
+        Tool(
+            id = "fangdai_native",
+            title = getString(R.string.tool_mortgage_native_title),
+            desc = getString(R.string.tool_mortgage_native_desc),
+            iconRes = android.R.drawable.ic_menu_agenda,
+            iconBgRes = R.drawable.icon_grad_fangdai,
+            launcher = { ctx -> Intent(ctx, MortgageCalculatorActivity::class.java) }
         )
     ).let { base ->
         // 三个离线 Web 工具（lol / pubg / fangdai），共用 WebView 外壳

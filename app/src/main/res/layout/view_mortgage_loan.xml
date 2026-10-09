@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="#FCFDFE"
+    android:orientation="vertical"
+    android:padding="14dp">
+
+    <TextView
+        android:id="@+id/tvLoanSectionTitle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textColor="#0F3B5D"
+        android:textSize="15sp"
+        android:textStyle="bold" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:orientation="horizontal">
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1.15"
+            android:orientation="vertical">
+
+            <TextView style="@style/Mortgage.FieldLabel" android:text="@string/mortgage_amount" />
+
+            <EditText
+                android:id="@+id/etLoanAmount"
+                android:layout_width="match_parent"
+                android:layout_height="44dp"
+                android:background="@drawable/mortgage_input_bg"
+                android:gravity="center"
+                android:inputType="numberDecimal"
+                android:maxLines="1"
+                android:textSize="14sp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:layout_weight="0.85"
+            android:orientation="vertical">
+
+            <TextView style="@style/Mortgage.FieldLabel" android:text="@string/mortgage_rate" />
+
+            <EditText
+                android:id="@+id/etLoanRate"
+                android:layout_width="match_parent"
+                android:layout_height="44dp"
+                android:background="@drawable/mortgage_input_bg"
+                android:gravity="center"
+                android:inputType="numberDecimal"
+                android:maxLines="1"
+                android:textSize="14sp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:layout_weight="0.85"
+            android:orientation="vertical">
+
+            <TextView style="@style/Mortgage.FieldLabel" android:text="@string/mortgage_years" />
+
+            <EditText
+                android:id="@+id/etLoanYears"
+                android:layout_width="match_parent"
+                android:layout_height="44dp"
+                android:background="@drawable/mortgage_input_bg"
+                android:gravity="center"
+                android:inputType="number"
+                android:maxLines="1"
+                android:textSize="14sp" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <TextView
+        style="@style/Mortgage.FieldLabel"
+        android:layout_marginTop="10dp"
+        android:text="@string/mortgage_method" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal">
+
+        <TextView
+            android:id="@+id/tvMethodEqualPayment"
+            android:layout_width="0dp"
+            android:layout_height="42dp"
+            android:layout_weight="1"
+            android:background="@drawable/mortgage_seg_bg"
+            android:gravity="center"
+            android:text="@string/mortgage_method_equal_payment"
+            android:textColor="@color/mortgage_seg_text"
+            android:textSize="13.5sp" />
+
+        <TextView
+            android:id="@+id/tvMethodEqualPrincipal"
+            android:layout_width="0dp"
+            android:layout_height="42dp"
+            android:layout_marginStart="8dp"
+            android:layout_weight="1"
+            android:background="@drawable/mortgage_seg_bg"
+            android:gravity="center"
+            android:text="@string/mortgage_method_equal_principal"
+            android:textColor="@color/mortgage_seg_text"
+            android:textSize="13.5sp" />
+    </LinearLayout>
+</LinearLayout>

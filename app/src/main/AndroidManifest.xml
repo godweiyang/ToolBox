@@ -109,6 +109,10 @@
             android:name=".PhotoFrameActivity"
             android:exported="false" />
 
+        <activity
+            android:name=".mortgage.MortgageCalculatorActivity"
+            android:exported="false" />
+
         <!-- 三个离线 Web 工具（lol / pubg / fangdai）共用的 WebView 外壳 -->
         <activity
             android:name=".web.WebViewShellActivity"

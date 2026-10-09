@@ -1,0 +1,599 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/ios_bg_gradient"
+    android:fillViewport="true"
+    android:fitsSystemWindows="true"
+    android:scrollbars="none">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingBottom="28dp">
+
+        <include
+            android:id="@+id/mortgageHeader"
+            layout="@layout/view_page_header" />
+
+        <!-- ===== 卡片1：贷款信息 ===== -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="@dimen/screen_side"
+            android:layout_marginEnd="@dimen/screen_side"
+            android:background="@drawable/ios_glass_card"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/mortgage_loan_info"
+                android:textColor="#1C2B36"
+                android:textSize="16sp"
+                android:textStyle="bold" />
+
+            <!-- 起始年月 -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:orientation="horizontal">
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView style="@style/Mortgage.FieldLabel" android:text="@string/mortgage_start_year" />
+
+                    <EditText
+                        android:id="@+id/etStartYear"
+                        android:layout_width="match_parent"
+                        android:layout_height="44dp"
+                        android:background="@drawable/mortgage_input_bg"
+                        android:gravity="center"
+                        android:inputType="number"
+                        android:maxLines="1"
+                        android:textSize="14sp" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView style="@style/Mortgage.FieldLabel" android:text="@string/mortgage_start_month" />
+
+                    <EditText
+                        android:id="@+id/etStartMonth"
+                        android:layout_width="match_parent"
+                        android:layout_height="44dp"
+                        android:background="@drawable/mortgage_input_bg"
+                        android:gravity="center"
+                        android:inputType="number"
+                        android:maxLines="1"
+                        android:textSize="14sp" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <!-- 贷款类型 -->
+            <TextView
+                style="@style/Mortgage.FieldLabel"
+                android:layout_marginTop="12dp"
+                android:text="@string/mortgage_loan_type" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:id="@+id/tvTypeCommercial"
+                    android:layout_width="0dp"
+                    android:layout_height="42dp"
+                    android:layout_weight="1"
+                    android:background="@drawable/mortgage_seg_bg"
+                    android:gravity="center"
+                    android:text="@string/mortgage_type_commercial"
+                    android:textColor="@color/mortgage_seg_text"
+                    android:textSize="13sp" />
+
+                <TextView
+                    android:id="@+id/tvTypeFund"
+                    android:layout_width="0dp"
+                    android:layout_height="42dp"
+                    android:layout_marginStart="8dp"
+                    android:layout_weight="1"
+                    android:background="@drawable/mortgage_seg_bg"
+                    android:gravity="center"
+                    android:text="@string/mortgage_type_fund"
+                    android:textColor="@color/mortgage_seg_text"
+                    android:textSize="13sp" />
+
+                <TextView
+                    android:id="@+id/tvTypeCombo"
+                    android:layout_width="0dp"
+                    android:layout_height="42dp"
+                    android:layout_marginStart="8dp"
+                    android:layout_weight="1"
+                    android:background="@drawable/mortgage_seg_bg"
+                    android:gravity="center"
+                    android:text="@string/mortgage_type_combo"
+                    android:textColor="@color/mortgage_seg_text"
+                    android:textSize="13sp" />
+            </LinearLayout>
+
+            <!-- 商业贷款区块 -->
+            <include
+                android:id="@+id/sectionCommercial"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                layout="@layout/view_mortgage_loan" />
+
+            <!-- 公积金贷款区块 -->
+            <include
+                android:id="@+id/sectionFund"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                layout="@layout/view_mortgage_loan" />
+        </LinearLayout>
+
+        <!-- ===== 卡片2：提前还款 ===== -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="@dimen/screen_side"
+            android:layout_marginTop="14dp"
+            android:layout_marginEnd="@dimen/screen_side"
+            android:background="@drawable/ios_glass_card"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/mortgage_prepay"
+                    android:textColor="#1C2B36"
+                    android:textSize="16sp"
+                    android:textStyle="bold" />
+
+                <androidx.appcompat.widget.SwitchCompat
+                    android:id="@+id/swPrepay"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/prepayBody"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="gone">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:orientation="horizontal">
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView style="@style/Mortgage.FieldLabel" android:text="@string/mortgage_prepay_amount" />
+
+                        <EditText
+                            android:id="@+id/etPrepayAmount"
+                            android:layout_width="match_parent"
+                            android:layout_height="44dp"
+                            android:background="@drawable/mortgage_input_bg"
+                            android:gravity="center"
+                            android:inputType="numberDecimal"
+                            android:maxLines="1"
+                            android:textSize="14sp" />
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="8dp"
+                        android:layout_weight="1.35"
+                        android:orientation="vertical">
+
+                        <TextView style="@style/Mortgage.FieldLabel" android:text="@string/mortgage_prepay_target" />
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal">
+
+                            <TextView
+                                android:id="@+id/tvTargetCommercial"
+                                android:layout_width="0dp"
+                                android:layout_height="44dp"
+                                android:layout_weight="1"
+                                android:background="@drawable/mortgage_seg_bg"
+                                android:gravity="center"
+                                android:text="@string/mortgage_type_commercial"
+                                android:textColor="@color/mortgage_seg_text"
+                                android:textSize="12sp" />
+
+                            <TextView
+                                android:id="@+id/tvTargetFund"
+                                android:layout_width="0dp"
+                                android:layout_height="44dp"
+                                android:layout_marginStart="6dp"
+                                android:layout_weight="1"
+                                android:background="@drawable/mortgage_seg_bg"
+                                android:gravity="center"
+                                android:text="@string/mortgage_type_fund"
+                                android:textColor="@color/mortgage_seg_text"
+                                android:textSize="12sp" />
+
+                            <TextView
+                                android:id="@+id/tvTargetAuto"
+                                android:layout_width="0dp"
+                                android:layout_height="44dp"
+                                android:layout_marginStart="6dp"
+                                android:layout_weight="1"
+                                android:background="@drawable/mortgage_seg_bg"
+                                android:gravity="center"
+                                android:text="@string/mortgage_target_auto"
+                                android:textColor="@color/mortgage_seg_text"
+                                android:textSize="12sp" />
+                        </LinearLayout>
+                    </LinearLayout>
+                </LinearLayout>
+
+                <TextView
+                    style="@style/Mortgage.FieldLabel"
+                    android:layout_marginTop="12dp"
+                    android:text="@string/mortgage_prepay_months" />
+
+                <LinearLayout
+                    android:id="@+id/monthChipContainer"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical" />
+
+                <TextView
+                    style="@style/Mortgage.FieldLabel"
+                    android:layout_marginTop="12dp"
+                    android:text="@string/mortgage_prepay_mode" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:id="@+id/tvModeShorten"
+                        android:layout_width="0dp"
+                        android:layout_height="46dp"
+                        android:layout_weight="1"
+                        android:background="@drawable/mortgage_seg_bg"
+                        android:gravity="center"
+                        android:paddingStart="6dp"
+                        android:paddingEnd="6dp"
+                        android:text="@string/mortgage_mode_shorten"
+                        android:textColor="@color/mortgage_seg_text"
+                        android:textSize="12.5sp" />
+
+                    <TextView
+                        android:id="@+id/tvModeReduce"
+                        android:layout_width="0dp"
+                        android:layout_height="46dp"
+                        android:layout_marginStart="8dp"
+                        android:layout_weight="1"
+                        android:background="@drawable/mortgage_seg_bg"
+                        android:gravity="center"
+                        android:paddingStart="6dp"
+                        android:paddingEnd="6dp"
+                        android:text="@string/mortgage_mode_reduce"
+                        android:textColor="@color/mortgage_seg_text"
+                        android:textSize="12.5sp" />
+                </LinearLayout>
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- ===== 卡片3：收入与存款 ===== -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="@dimen/screen_side"
+            android:layout_marginTop="14dp"
+            android:layout_marginEnd="@dimen/screen_side"
+            android:background="@drawable/ios_glass_card"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/mortgage_income"
+                    android:textColor="#1C2B36"
+                    android:textSize="16sp"
+                    android:textStyle="bold" />
+
+                <androidx.appcompat.widget.SwitchCompat
+                    android:id="@+id/swIncome"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/incomeBody"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="gone">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:orientation="horizontal">
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView style="@style/Mortgage.FieldLabel" android:text="@string/mortgage_savings" />
+
+                        <EditText
+                            android:id="@+id/etSavings"
+                            android:layout_width="match_parent"
+                            android:layout_height="44dp"
+                            android:background="@drawable/mortgage_input_bg"
+                            android:gravity="center"
+                            android:inputType="numberDecimal"
+                            android:maxLines="1"
+                            android:text="0"
+                            android:textSize="14sp" />
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="8dp"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView style="@style/Mortgage.FieldLabel" android:text="@string/mortgage_annual_income" />
+
+                        <EditText
+                            android:id="@+id/etAnnualIncome"
+                            android:layout_width="match_parent"
+                            android:layout_height="44dp"
+                            android:background="@drawable/mortgage_input_bg"
+                            android:gravity="center"
+                            android:inputType="numberDecimal"
+                            android:maxLines="1"
+                            android:textSize="14sp" />
+                    </LinearLayout>
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:orientation="horizontal">
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView style="@style/Mortgage.FieldLabel" android:text="@string/mortgage_annual_living" />
+
+                        <EditText
+                            android:id="@+id/etAnnualLiving"
+                            android:layout_width="match_parent"
+                            android:layout_height="44dp"
+                            android:background="@drawable/mortgage_input_bg"
+                            android:gravity="center"
+                            android:inputType="numberDecimal"
+                            android:maxLines="1"
+                            android:textSize="14sp" />
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="8dp"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView style="@style/Mortgage.FieldLabel" android:text="@string/mortgage_monthly_fund" />
+
+                        <EditText
+                            android:id="@+id/etMonthlyFund"
+                            android:layout_width="match_parent"
+                            android:layout_height="44dp"
+                            android:background="@drawable/mortgage_input_bg"
+                            android:gravity="center"
+                            android:inputType="numberDecimal"
+                            android:maxLines="1"
+                            android:textSize="14sp" />
+                    </LinearLayout>
+                </LinearLayout>
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- 开始测算 -->
+        <TextView
+            android:id="@+id/btnCalculate"
+            android:layout_width="match_parent"
+            android:layout_height="50dp"
+            android:layout_marginStart="@dimen/screen_side"
+            android:layout_marginTop="18dp"
+            android:layout_marginEnd="@dimen/screen_side"
+            android:background="@drawable/mortgage_btn_primary"
+            android:gravity="center"
+            android:text="@string/mortgage_calculate"
+            android:textColor="#FFFFFF"
+            android:textSize="16sp"
+            android:textStyle="bold" />
+
+        <!-- ===== 结果区 ===== -->
+        <LinearLayout
+            android:id="@+id/resultArea"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="@dimen/screen_side"
+                android:layout_marginTop="18dp"
+                android:layout_marginEnd="@dimen/screen_side"
+                android:orientation="horizontal">
+
+                <LinearLayout style="@style/Mortgage.ResultCard">
+                    <TextView style="@style/Mortgage.ResultLabel" android:text="@string/mortgage_res_first_pay" />
+                    <TextView android:id="@+id/tvResFirstPay" style="@style/Mortgage.ResultValue" />
+                </LinearLayout>
+
+                <LinearLayout style="@style/Mortgage.ResultCard" android:layout_marginStart="10dp">
+                    <TextView style="@style/Mortgage.ResultLabel" android:text="@string/mortgage_res_months" />
+                    <TextView android:id="@+id/tvResMonths" style="@style/Mortgage.ResultValue" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="@dimen/screen_side"
+                android:layout_marginTop="10dp"
+                android:layout_marginEnd="@dimen/screen_side"
+                android:orientation="horizontal">
+
+                <LinearLayout style="@style/Mortgage.ResultCard">
+                    <TextView style="@style/Mortgage.ResultLabel" android:text="@string/mortgage_res_interest" />
+                    <TextView android:id="@+id/tvResInterest" style="@style/Mortgage.ResultValue" />
+                </LinearLayout>
+
+                <LinearLayout style="@style/Mortgage.ResultCard" android:layout_marginStart="10dp">
+                    <TextView style="@style/Mortgage.ResultLabel" android:text="@string/mortgage_res_prepay" />
+                    <TextView android:id="@+id/tvResPrepay" style="@style/Mortgage.ResultValue" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="@dimen/screen_side"
+                android:layout_marginTop="10dp"
+                android:layout_marginEnd="@dimen/screen_side"
+                android:orientation="horizontal">
+
+                <LinearLayout style="@style/Mortgage.ResultCard">
+                    <TextView style="@style/Mortgage.ResultLabel" android:text="@string/mortgage_res_payoff" />
+                    <TextView android:id="@+id/tvResPayoff" style="@style/Mortgage.ResultValueSmall" />
+                </LinearLayout>
+
+                <LinearLayout style="@style/Mortgage.ResultCard" android:layout_marginStart="10dp">
+                    <TextView style="@style/Mortgage.ResultLabel" android:text="@string/mortgage_res_earliest" />
+                    <TextView android:id="@+id/tvResEarliest" style="@style/Mortgage.ResultValueSmall" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <!-- 每笔贷款汇总 -->
+            <LinearLayout
+                android:id="@+id/loanSummaryContainer"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="@dimen/screen_side"
+                android:layout_marginTop="14dp"
+                android:layout_marginEnd="@dimen/screen_side"
+                android:background="@drawable/ios_glass_card"
+                android:orientation="vertical"
+                android:padding="14dp" />
+
+            <!-- 明细筛选 -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="@dimen/screen_side"
+                android:layout_marginTop="14dp"
+                android:layout_marginEnd="@dimen/screen_side"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:id="@+id/tvFilterAll"
+                    android:layout_width="0dp"
+                    android:layout_height="38dp"
+                    android:layout_weight="1"
+                    android:background="@drawable/mortgage_seg_bg"
+                    android:gravity="center"
+                    android:text="@string/mortgage_filter_all"
+                    android:textColor="@color/mortgage_seg_text"
+                    android:textSize="13sp" />
+
+                <TextView
+                    android:id="@+id/tvFilterPrepay"
+                    android:layout_width="0dp"
+                    android:layout_height="38dp"
+                    android:layout_marginStart="8dp"
+                    android:layout_weight="1"
+                    android:background="@drawable/mortgage_seg_bg"
+                    android:gravity="center"
+                    android:text="@string/mortgage_filter_prepay"
+                    android:textColor="@color/mortgage_seg_text"
+                    android:textSize="13sp" />
+
+                <TextView
+                    android:id="@+id/tvFilterAnnual"
+                    android:layout_width="0dp"
+                    android:layout_height="38dp"
+                    android:layout_marginStart="8dp"
+                    android:layout_weight="1"
+                    android:background="@drawable/mortgage_seg_bg"
+                    android:gravity="center"
+                    android:text="@string/mortgage_filter_annual"
+                    android:textColor="@color/mortgage_seg_text"
+                    android:textSize="13sp" />
+            </LinearLayout>
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/rvSchedule"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="@dimen/screen_side"
+                android:layout_marginTop="10dp"
+                android:layout_marginEnd="@dimen/screen_side"
+                android:clipToPadding="false"
+                android:nestedScrollingEnabled="false"
+                android:paddingBottom="10dp" />
+        </LinearLayout>
+    </LinearLayout>
+</ScrollView>
