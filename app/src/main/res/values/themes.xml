@@ -190,6 +190,8 @@
         <item name="shapeAppearanceOverlay">@style/Mortgage.FieldShape</item>
         <item name="hintTextColor">#0F3B5D</item>
         <item name="hintTextAppearance">@style/Mortgage.Hint</item>
+        <item name="expandedHintEnabled">false</item>
+        <item name="hintAnimationEnabled">false</item>
     </style>
 
     <style name="Mortgage.DropdownField"
@@ -200,6 +202,8 @@
         <item name="shapeAppearanceOverlay">@style/Mortgage.FieldShape</item>
         <item name="hintTextColor">#0F3B5D</item>
         <item name="hintTextAppearance">@style/Mortgage.Hint</item>
+        <item name="expandedHintEnabled">false</item>
+        <item name="hintAnimationEnabled">false</item>
     </style>
 
     <style name="Mortgage.Hint" parent="TextAppearance.MaterialComponents.Caption">
