@@ -69,6 +69,11 @@ class WebViewShellActivity : AppCompatActivity() {
             override fun handleOnBackPressed() = onNavBack()
         })
 
+        // lol 页面：在本 app 进程内自动起本地回环服务（无需独立服务 APK / 手动启动）
+        if (toolId == "lol") {
+            LolEmbeddedServer.start(applicationContext)
+        }
+
         setupWebView()
         binding.webView.loadUrl(WebToolRegistry.assetUrl(toolId))
     }

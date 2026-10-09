@@ -1,6 +1,7 @@
 ﻿plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
+    id("com.chaquo.python")
 }
 
 android {
@@ -12,8 +13,14 @@ android {
         applicationId = "com.example.videodownloader"
         minSdk = 26
         targetSdk = 34
-        versionCode = 60
-        versionName = "1.9.32"
+        versionCode = 61
+        versionName = "1.9.33"
+
+        // Chaquopy 内嵌 CPython：lol 本地服务（server.py）在 app 进程内运行，
+        // 纯标准库无需 pip；只打主流真机 ABI 控制体积
+        ndk {
+            abiFilters += listOf("arm64-v8a", "armeabi-v7a")
+        }
     }
 
     signingConfigs {
@@ -45,6 +52,13 @@ android {
     }
     buildFeatures {
         viewBinding = true
+    }
+}
+
+// Chaquopy 新版 DSL（Kotlin 必须用顶层 chaquopy 块）：内嵌 Python 3.11，纯标准库
+chaquopy {
+    defaultConfig {
+        version = "3.11"
     }
 }
 
