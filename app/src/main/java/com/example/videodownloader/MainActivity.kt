@@ -64,6 +64,9 @@ class MainActivity : AppCompatActivity() {
 
         // 底部显示版本号，方便用户确认当前安装的版本
         binding.tvVersion.text = "v${getVersionName()}"
+        binding.versionUpdatePill.setOnClickListener {
+            if (binding.btnCheckUpdate.isEnabled) checkForUpdates(manual = true)
+        }
         binding.btnCheckUpdate.setOnClickListener { checkForUpdates(manual = true) }
         checkForUpdates(manual = false)
     }
