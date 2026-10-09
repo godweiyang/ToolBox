@@ -3,7 +3,9 @@ package com.example.videodownloader.mortgage
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
-import android.widget.LinearLayout
+import android.view.ViewGroup
+import android.widget.ArrayAdapter
+import android.widget.AutoCompleteTextView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
@@ -12,306 +14,490 @@ import androidx.recyclerview.widget.RecyclerView
 import com.example.videodownloader.R
 import com.example.videodownloader.databinding.ActivityMortgageBinding
 import com.example.videodownloader.databinding.ItemMortgageRowBinding
+import com.example.videodownloader.databinding.SheetMortgageDetailBinding
 import com.example.videodownloader.databinding.ViewMortgageLoanBinding
 import java.util.Calendar
-import java.util.Locale
 
-/* 原生房贷计算器：表单录入 → MortgageEngine 测算 → 汇总卡片 + 逐月明细。 */
+/**
+ * 原生房贷计算器（重构版）：
+ * - 卡片化表单，年限/方式/目标等用 ExposedDropdown 下拉
+ * - 逐月明细分页展示（每页 24 期），点击行用 BottomSheet 展示整洁详情
+ */
 class MortgageCalculatorActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMortgageBinding
 
-    // 选中的提前还款月份（1-based）
-    private val prepayMonths = mutableSetOf<Int>()
-    private var lastResult: ScheduleResult? = null
-    private var loanNames: List<String> = emptyList()
+    private var result: ScheduleResult? = null
+    private var filteredRows: List<ScheduleRow> = emptyList()
+    private var pageItems: List<ScheduleRow> = emptyList()
+    private var currentPage = 0
+    private var filterMode = FILTER_ALL
+    private val rowAdapter = RowAdapter()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityMortgageBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        binding.mortgageHeader.pageTitle.setText(R.string.tool_mortgage_native_title)
-        binding.mortgageHeader.pageSubtitle.setText(R.string.tool_mortgage_native_desc)
+        val header = binding.mortgageHeader
+        header.pageTitle.setText(R.string.tool_mortgage_native_title)
+        header.pageSubtitle.setText(R.string.tool_mortgage_native_desc)
 
-        val now = Calendar.getInstance()
-        binding.etStartYear.setText(now.get(Calendar.YEAR).toString())
-        binding.etStartMonth.setText((now.get(Calendar.MONTH) + 1).toString())
+        setupDefaults()
+        setupDropdowns()
+        setupSegments()
+        setupMonthChips()
+        setupResults()
 
-        binding.sectionCommercial.tvLoanSectionTitle.setText(R.string.mortgage_type_commercial)
-        binding.sectionFund.tvLoanSectionTitle.setText(R.string.mortgage_type_fund)
-        binding.sectionCommercial.etLoanRate.setText("3.5")
-        binding.sectionFund.etLoanRate.setText("2.85")
-        binding.sectionCommercial.etLoanYears.setText("30")
-        binding.sectionFund.etLoanYears.setText("30")
-
-        // 贷款类型
-        bindSegment(
-            listOf(binding.tvTypeCommercial, binding.tvTypeFund, binding.tvTypeCombo), 0
-        ) { index -> applyLoanType(index) }
-
-        // 每笔贷款的还款方式
-        bindSectionMethod(binding.sectionCommercial)
-        bindSectionMethod(binding.sectionFund)
-
-        // 提前还款
         binding.swPrepay.setOnCheckedChangeListener { _, on ->
             binding.prepayBody.visibility = if (on) View.VISIBLE else View.GONE
         }
-        bindSegment(
-            listOf(binding.tvTargetCommercial, binding.tvTargetFund, binding.tvTargetAuto), 2
-        ) {}
-        bindSegment(listOf(binding.tvModeShorten, binding.tvModeReduce), 0) {}
-        buildMonthChips()
-
-        // 收入与存款
         binding.swIncome.setOnCheckedChangeListener { _, on ->
             binding.incomeBody.visibility = if (on) View.VISIBLE else View.GONE
         }
-
         binding.btnCalculate.setOnClickListener { calculate() }
-
-        // 明细筛选
-        bindSegment(
-            listOf(binding.tvFilterAll, binding.tvFilterPrepay, binding.tvFilterAnnual), 0
-        ) { renderSchedule() }
-
-        binding.rvSchedule.layoutManager = LinearLayoutManager(this)
-    }
-
-    private fun applyLoanType(index: Int) {
-        binding.sectionCommercial.root.visibility =
-            if (index == 0 || index == 2) View.VISIBLE else View.GONE
-        binding.sectionFund.root.visibility =
-            if (index == 1 || index == 2) View.VISIBLE else View.GONE
-        // 单贷款时提前还款目标自动对齐
-        when (index) {
-            0 -> listOf(binding.tvTargetCommercial, binding.tvTargetFund, binding.tvTargetAuto)
-                .forEachIndexed { i, v -> v.isSelected = i == 0 }
-            1 -> listOf(binding.tvTargetCommercial, binding.tvTargetFund, binding.tvTargetAuto)
-                .forEachIndexed { i, v -> v.isSelected = i == 1 }
+        binding.btnPrevPage.setOnClickListener {
+            if (currentPage > 0) { currentPage--; renderPage() }
+        }
+        binding.btnNextPage.setOnClickListener {
+            if (currentPage < totalPages() - 1) { currentPage++; renderPage() }
         }
     }
 
-    private fun bindSectionMethod(section: ViewMortgageLoanBinding) {
-        bindSegment(
-            listOf(section.tvMethodEqualPayment, section.tvMethodEqualPrincipal), 0
-        ) {}
+    // ===== 初始化 =====
+
+    private fun setupDefaults() {
+        val now = Calendar.getInstance()
+        binding.etStartYear.setText(now.get(Calendar.YEAR).toString())
     }
 
-    /** 通用分段控件：返回选中项，点击切换。 */
-    private fun bindSegment(options: List<TextView>, defaultIndex: Int, onChange: (Int) -> Unit) {
-        fun select(i: Int) {
-            options.forEachIndexed { idx, v -> v.isSelected = idx == i }
-            onChange(i)
+    private fun setupDropdowns() {
+        bindDropdown(binding.ddStartMonth,
+            (1..12).map { "${it}月" },
+            "${Calendar.getInstance().get(Calendar.MONTH) + 1}月")
+
+        bindDropdown(binding.sectionCommercial.ddYears,
+            (5..30).map { "${it}年" }, "30年")
+        bindDropdown(binding.sectionCommercial.ddMethod,
+            listOf(getString(R.string.mortgage_method_equal_payment),
+                getString(R.string.mortgage_method_equal_principal)),
+            getString(R.string.mortgage_method_equal_payment))
+
+        bindDropdown(binding.sectionFund.ddYears,
+            (5..30).map { "${it}年" }, "30年")
+        bindDropdown(binding.sectionFund.ddMethod,
+            listOf(getString(R.string.mortgage_method_equal_payment),
+                getString(R.string.mortgage_method_equal_principal)),
+            getString(R.string.mortgage_method_equal_payment))
+
+        bindDropdown(binding.ddPrepayTarget,
+            listOf(getString(R.string.mortgage_type_commercial),
+                getString(R.string.mortgage_type_fund),
+                getString(R.string.mortgage_target_auto)),
+            getString(R.string.mortgage_target_auto))
+        bindDropdown(binding.ddPrepayMode,
+            listOf(getString(R.string.mortgage_mode_shorten),
+                getString(R.string.mortgage_mode_reduce)),
+            getString(R.string.mortgage_mode_shorten))
+    }
+
+    private fun bindDropdown(
+        actv: AutoCompleteTextView, items: List<String>, initial: String
+    ) {
+        actv.setAdapter(ArrayAdapter(this, android.R.layout.simple_list_item_1, items))
+        actv.setText(initial, false)
+    }
+
+    private fun setupSegments() {
+        bindSegment(listOf(binding.segCommercial, binding.segFund, binding.segCombo), 0) { idx ->
+            binding.sectionCommercial.root.visibility =
+                if (idx == 1) View.GONE else View.VISIBLE
+            binding.sectionFund.root.visibility =
+                if (idx == 0) View.GONE else View.VISIBLE
         }
-        options.forEachIndexed { i, v -> v.setOnClickListener { select(i) } }
-        select(defaultIndex)
+        bindSegment(listOf(binding.filterAll, binding.filterPrepay, binding.filterDecember), 0) { idx ->
+            filterMode = idx
+            currentPage = 0
+            applyFilter()
+        }
     }
 
-    private fun buildMonthChips() {
+    private fun bindSegment(views: List<TextView>, selected: Int, onSelect: (Int) -> Unit) {
+        fun render(idx: Int) {
+            views.forEachIndexed { i, v -> v.isSelected = i == idx }
+        }
+        views.forEachIndexed { i, v ->
+            v.setOnClickListener { render(i); onSelect(i) }
+        }
+        render(selected)
+    }
+
+    private val monthChips = mutableListOf<TextView>()
+
+    private fun setupMonthChips() {
         val container = binding.monthChipContainer
+        monthChips.clear()
         for (row in 0 until 3) {
-            val ll = LinearLayout(this).apply {
-                orientation = LinearLayout.HORIZONTAL
-                layoutParams = LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT
-                ).apply { if (row > 0) topMargin = dp(6) }
-            }
+            val rowView = LinearLayoutRow()
             for (col in 0 until 4) {
                 val month = row * 4 + col + 1
-                val tv = TextView(this).apply {
-                    text = month.toString()
-                    gravity = android.view.Gravity.CENTER
-                    textSize = 12.5f
-                    setBackgroundResource(R.drawable.mortgage_chip_bg)
-                    setTextColor(getColorStateList(R.color.mortgage_chip_text))
-                    layoutParams = LinearLayout.LayoutParams(0, dp(36)).apply {
-                        weight = 1f
-                        if (col > 0) marginStart = dp(6)
-                    }
-                    setOnClickListener {
-                        isSelected = !isSelected
-                        if (isSelected) prepayMonths.add(month) else prepayMonths.remove(month)
-                    }
+                val chip = layoutInflater.inflate(
+                    R.layout.item_mortgage_month_chip, rowView, false
+                ) as TextView
+                chip.text = "${month}月"
+                chip.layoutParams = (chip.layoutParams as android.widget.LinearLayout.LayoutParams).apply {
+                    width = 0
+                    weight = 1f
+                    if (col > 0) marginStart = dp(8)
                 }
-                ll.addView(tv)
+                chip.setOnClickListener { chip.isSelected = !chip.isSelected }
+                if (month == 12) chip.isSelected = true
+                rowView.addView(chip)
+                monthChips.add(chip)
             }
-            container.addView(ll)
+            if (row > 0) rowView.layoutParams = android.widget.LinearLayout.LayoutParams(
+                android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
+                android.widget.LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { topMargin = dp(8) }
+            container.addView(rowView)
         }
+    }
+
+    private fun LinearLayoutRow(): android.widget.LinearLayout =
+        android.widget.LinearLayout(this).apply {
+            orientation = android.widget.LinearLayout.HORIZONTAL
+            layoutParams = android.widget.LinearLayout.LayoutParams(
+                android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
+                android.widget.LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+        }
+
+    private fun setupResults() {
+        binding.rvSchedule.layoutManager = LinearLayoutManager(this)
+        binding.rvSchedule.adapter = rowAdapter
+    }
+
+    // ===== 测算 =====
+
+    private fun calculate() {
+        val startYear = binding.etStartYear.text.toString().toIntOrNull()
+        val startMonth = binding.ddStartMonth.text.toString().trimEnd('月').toIntOrNull()?.minus(1)
+        if (startYear == null || startMonth == null || startMonth !in 0..11) {
+            invalid(); return
+        }
+
+        val typeIdx = listOf(
+            binding.segCommercial, binding.segFund, binding.segCombo
+        ).indexOfFirst { it.isSelected }
+
+        val loans = mutableListOf<LoanInput>()
+        if (typeIdx != 1) {
+            collectLoan(binding.sectionCommercial, getString(R.string.mortgage_type_commercial))
+                ?.let { loans += it } ?: run { invalid(); return }
+        }
+        if (typeIdx != 0) {
+            collectLoan(binding.sectionFund, getString(R.string.mortgage_type_fund))
+                ?.let { loans += it } ?: run { invalid(); return }
+        }
+
+        val prepay = if (binding.swPrepay.isChecked) {
+            val amountWan = binding.etPrepayAmount.text.toString().toDoubleOrNull()
+            if (amountWan == null || amountWan <= 0) { invalid(); return }
+            val months = monthChips.filter { it.isSelected }
+                .map { it.text.toString().trimEnd('月').toInt() }
+            if (months.isEmpty()) { invalid(); return }
+            val target = when (binding.ddPrepayTarget.text.toString()) {
+                getString(R.string.mortgage_type_commercial) -> PrepayTarget.Index(0)
+                getString(R.string.mortgage_type_fund) ->
+                    PrepayTarget.Index(if (typeIdx == 2) 1 else 0)
+                else -> PrepayTarget.Highest
+            }
+            val mode = if (binding.ddPrepayMode.text.toString() ==
+                getString(R.string.mortgage_mode_reduce)
+            ) PrepayMode.REDUCE else PrepayMode.SHORTEN
+            PrepayConfig(true, amountWan * 10000, months, target, mode)
+        } else PrepayConfig()
+
+        val income = if (binding.swIncome.isChecked) {
+            fun wanOf(id: TextView): Double? = id.text.toString().toDoubleOrNull()
+            val savings = wanOf(binding.etSavings)
+            val annualIncome = wanOf(binding.etAnnualIncome)
+            val annualLiving = wanOf(binding.etAnnualLiving)
+            val monthlyFund = wanOf(binding.etMonthlyFund)
+            if (savings == null || annualIncome == null || annualLiving == null ||
+                monthlyFund == null
+            ) { invalid(); return }
+            IncomeConfig(
+                true, savings * 10000, annualIncome * 10000,
+                annualLiving * 10000, monthlyFund * 10000
+            )
+        } else IncomeConfig()
+
+        result = MortgageEngine.buildSchedule(
+            ScheduleConfig(startYear, startMonth, loans, prepay, income)
+        )
+        renderResults(result!!)
+        binding.resultsContainer.visibility = View.VISIBLE
+        currentPage = 0
+        applyFilter()
+        binding.scrollView.post {
+            binding.scrollView.smoothScrollTo(0, binding.resultsContainer.top)
+        }
+    }
+
+    private fun collectLoan(section: ViewMortgageLoanBinding, name: String): LoanInput? {
+        val amountWan = section.etAmount.text.toString().toDoubleOrNull()
+        val rate = section.etRate.text.toString().toDoubleOrNull()
+        val years = section.ddYears.text.toString().trimEnd('年').toIntOrNull()
+        if (amountWan == null || rate == null || years == null ||
+            amountWan <= 0 || rate < 0 || years <= 0
+        ) return null
+        val method = if (section.ddMethod.text.toString() ==
+            getString(R.string.mortgage_method_equal_principal)
+        ) LoanMethod.EQUAL_PRINCIPAL else LoanMethod.EQUAL_PAYMENT
+        return LoanInput(name, amountWan * 10000, rate!!, years * 12, method)
+    }
+
+    private fun invalid() {
+        Toast.makeText(this, R.string.mortgage_input_invalid, Toast.LENGTH_SHORT).show()
+    }
+
+    // ===== 结果渲染 =====
+
+    private fun renderResults(r: ScheduleResult) {
+        binding.tvTotalPayment.text = money(r.rows.sumOf { it.cashOut })
+        binding.tvTotalInterest.text = money(r.totalInterest)
+        binding.tvTotalPrepay.text = money(r.totalPrepay)
+        binding.tvDuration.text = "${r.rows.size}期"
+        binding.tvFirstPayment.text = money(r.rows.first().cashOut)
+        binding.tvEarliest.text = r.earliest?.label ?: getString(R.string.mortgage_no_payoff)
+
+        val c = binding.loanSummaryContainer
+        c.removeAllViews()
+        r.loanSummary.forEachIndexed { i, s ->
+            val block = android.widget.LinearLayout(this).apply {
+                orientation = android.widget.LinearLayout.VERTICAL
+            }
+            val title = TextView(this).apply {
+                text = s.name
+                setTextColor(0xFF0F3B5D.toInt())
+                textSize = 13.5f
+                typeface = android.graphics.Typeface.DEFAULT_BOLD
+            }
+            block.addView(title)
+            val stats = android.widget.LinearLayout(this).apply {
+                orientation = android.widget.LinearLayout.HORIZONTAL
+                layoutParams = android.widget.LinearLayout.LayoutParams(
+                    android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
+                    android.widget.LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply { topMargin = dp(8) }
+            }
+            stats.addView(miniStat("累计利息", money(s.totalInterest)))
+            stats.addView(miniStat("提前还款", money(s.totalPrepay), start = 10))
+            stats.addView(miniStat("结清时间", s.payoff, start = 10))
+            block.addView(stats)
+            c.addView(block)
+            if (i < r.loanSummary.lastIndex) c.addView(divider())
+        }
+    }
+
+    private fun miniStat(label: String, value: String, start: Int = 0): View {
+        val ll = android.widget.LinearLayout(this).apply {
+            orientation = android.widget.LinearLayout.VERTICAL
+            layoutParams = android.widget.LinearLayout.LayoutParams(
+                0, android.widget.LinearLayout.LayoutParams.WRAP_CONTENT, 1f
+            ).apply { if (start > 0) marginStart = dp(start) }
+        }
+        ll.addView(TextView(this).apply {
+            text = label
+            setTextColor(0xFF8A98A3.toInt())
+            textSize = 11f
+        })
+        ll.addView(TextView(this).apply {
+            text = value
+            setTextColor(0xFF1C2B36.toInt())
+            textSize = 13.5f
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+            layoutParams = android.widget.LinearLayout.LayoutParams(
+                android.widget.LinearLayout.LayoutParams.WRAP_CONTENT,
+                android.widget.LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { topMargin = dp(3) }
+        })
+        return ll
+    }
+
+    private fun divider(): View = View(this).apply {
+        setBackgroundColor(0xFFEEF2F5.toInt())
+        layoutParams = android.widget.LinearLayout.LayoutParams(
+            android.widget.LinearLayout.LayoutParams.MATCH_PARENT, dp(1)
+        ).apply { topMargin = dp(14); bottomMargin = dp(14) }
+    }
+
+    // ===== 筛选与分页 =====
+
+    private fun applyFilter() {
+        val rows = result?.rows ?: return
+        filteredRows = when (filterMode) {
+            FILTER_PREPAY -> rows.filter { it.prepayTotal > 0 }
+            FILTER_DECEMBER -> rows.filter { it.m == 11 }
+            else -> rows
+        }
+        if (currentPage > totalPages() - 1) currentPage = 0
+        renderPage()
+    }
+
+    private fun totalPages(): Int =
+        maxOf(1, (filteredRows.size + PAGE_SIZE - 1) / PAGE_SIZE)
+
+    private fun renderPage() {
+        val from = currentPage * PAGE_SIZE
+        val to = minOf(from + PAGE_SIZE, filteredRows.size)
+        pageItems = if (filteredRows.isEmpty()) emptyList()
+        else filteredRows.subList(from, to)
+        rowAdapter.notifyDataSetChanged()
+        binding.tvPageInfo.text =
+            "第${currentPage + 1}/${totalPages()}页 · 共${filteredRows.size}期"
+        binding.btnPrevPage.isEnabled = currentPage > 0
+        binding.btnNextPage.isEnabled = currentPage < totalPages() - 1
+    }
+
+    // ===== 明细列表 =====
+
+    inner class RowAdapter : RecyclerView.Adapter<RowAdapter.VH>() {
+        inner class VH(val itemBinding: ItemMortgageRowBinding) :
+            RecyclerView.ViewHolder(itemBinding.root)
+
+        override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): VH {
+            val itemBinding = ItemMortgageRowBinding.inflate(
+                LayoutInflater.from(parent.context), parent, false
+            )
+            return VH(itemBinding)
+        }
+
+        override fun getItemCount(): Int = pageItems.size
+
+        override fun onBindViewHolder(holder: VH, position: Int) {
+            val row = pageItems[position]
+            with(holder.itemBinding) {
+                tvRowIndex.text = "${result!!.rows.indexOf(row) + 1}"
+                tvRowDate.text = "${row.y}年${row.m + 1}月"
+                tvRowPay.text = money(row.cashOut)
+                tvRowPrepay.visibility = if (row.prepayTotal > 0) View.VISIBLE else View.GONE
+                root.setOnClickListener {
+                    showDetail(row)
+                }
+            }
+        }
+    }
+
+    // ===== 期次详情 BottomSheet =====
+
+    private fun showDetail(row: ScheduleRow) {
+        val sheetBinding = SheetMortgageDetailBinding.inflate(layoutInflater)
+        sheetBinding.tvSheetTitle.text = "第${result!!.rows.indexOf(row) + 1}期"
+        sheetBinding.tvSheetSubtitle.text = "${row.y}年${row.m + 1}月"
+        sheetBinding.tvSheetPayment.text = money(row.cashOut)
+        sheetBinding.tvSheetPrincipal.text = money(row.regPrinTotal)
+        sheetBinding.tvSheetInterest.text = money(row.interestTotal)
+        sheetBinding.tvSheetBalance.text = money(row.endTotal)
+        if (row.prepayTotal > 0) {
+            sheetBinding.tvSheetPrepay.visibility = View.VISIBLE
+            sheetBinding.tvSheetPrepay.text = "本期提前还款 ${money(row.prepayTotal)} 元"
+        }
+
+        val container = sheetBinding.sheetLoanContainer
+        val names = result!!.loanSummary.map { it.name }
+        row.perLoan.forEachIndexed { loanIndex, loan ->
+            val block = android.widget.LinearLayout(this).apply {
+                orientation = android.widget.LinearLayout.VERTICAL
+                setBackgroundResource(R.drawable.mortgage_card_inner)
+                setPadding(dp(12), dp(12), dp(12), dp(12))
+                layoutParams = android.widget.LinearLayout.LayoutParams(
+                    android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
+                    android.widget.LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply { topMargin = dp(10) }
+            }
+            block.addView(TextView(this).apply {
+                text = names.getOrElse(loanIndex) { "贷款${loanIndex + 1}" }
+                setTextColor(0xFF0F3B5D.toInt())
+                textSize = 13f
+                typeface = android.graphics.Typeface.DEFAULT_BOLD
+            })
+            val cellRows = listOf(
+                listOf("月供" to money(loan.regPay), "本金" to money(loan.regPrin)),
+                listOf("利息" to money(loan.interest), "余额" to money(loan.end))
+            )
+            val grid = android.widget.LinearLayout(this).apply {
+                orientation = android.widget.LinearLayout.VERTICAL
+                layoutParams = android.widget.LinearLayout.LayoutParams(
+                    android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
+                    android.widget.LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply { topMargin = dp(8) }
+            }
+            cellRows.forEachIndexed { rowIdx, cellRow ->
+                val hr = android.widget.LinearLayout(this).apply {
+                    orientation = android.widget.LinearLayout.HORIZONTAL
+                    if (rowIdx > 0) layoutParams = android.widget.LinearLayout.LayoutParams(
+                        android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
+                        android.widget.LinearLayout.LayoutParams.WRAP_CONTENT
+                    ).apply { topMargin = dp(8) }
+                }
+                cellRow.forEachIndexed { i, (label, value) ->
+                    val cell = android.widget.LinearLayout(this).apply {
+                        orientation = android.widget.LinearLayout.VERTICAL
+                        layoutParams = android.widget.LinearLayout.LayoutParams(
+                            0, android.widget.LinearLayout.LayoutParams.WRAP_CONTENT, 1f
+                        ).apply { if (i > 0) marginStart = dp(10) }
+                    }
+                    cell.addView(TextView(this).apply {
+                        text = label
+                        setTextColor(0xFF8A98A3.toInt())
+                        textSize = 11f
+                    })
+                    cell.addView(TextView(this).apply {
+                        text = value
+                        setTextColor(0xFF1C2B36.toInt())
+                        textSize = 13f
+                        typeface = android.graphics.Typeface.DEFAULT_BOLD
+                        layoutParams = android.widget.LinearLayout.LayoutParams(
+                            android.widget.LinearLayout.LayoutParams.WRAP_CONTENT,
+                            android.widget.LinearLayout.LayoutParams.WRAP_CONTENT
+                        ).apply { topMargin = dp(3) }
+                    })
+                    hr.addView(cell)
+                }
+                grid.addView(hr)
+            }
+            block.addView(grid)
+            container.addView(block)
+        }
+
+        com.google.android.material.bottomsheet.BottomSheetDialog(this).apply {
+            setContentView(sheetBinding.root)
+            show()
+        }
+    }
+
+    // ===== 工具 =====
+
+    private fun money(v: Long): String {
+        val s = v.toString()
+        val sb = StringBuilder()
+        val neg = s.startsWith("-")
+        val digits = if (neg) s.substring(1) else s
+        for (i in digits.indices) {
+            if (i > 0 && (digits.length - i) % 3 == 0) sb.append(",")
+            sb.append(digits[i])
+        }
+        return (if (neg) "-" else "") + sb.toString()
     }
 
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
 
-    private fun readSection(section: ViewMortgageLoanBinding, name: String): LoanInput? {
-        val wan = section.etLoanAmount.text.toString().toDoubleOrNull()
-        val rate = section.etLoanRate.text.toString().toDoubleOrNull()
-        val years = section.etLoanYears.text.toString().toIntOrNull()
-        if (wan == null || rate == null || years == null) return null
-        if (wan <= 0 || rate < 0 || years <= 0) return null
-        val method = if (section.tvMethodEqualPayment.isSelected)
-            LoanMethod.EQUAL_PAYMENT else LoanMethod.EQUAL_PRINCIPAL
-        return LoanInput(name, wan * 10000, rate, years * 12, method)
-    }
-
-    private fun calculate() {
-        val typeIndex = listOf(
-            binding.tvTypeCommercial, binding.tvTypeFund, binding.tvTypeCombo
-        ).indexOfFirst { it.isSelected }
-
-        val loans = mutableListOf<LoanInput>()
-        if (typeIndex == 0 || typeIndex == 2)
-            readSection(binding.sectionCommercial, getString(R.string.mortgage_type_commercial))
-                ?.let { loans.add(it) }
-        if (typeIndex == 1 || typeIndex == 2)
-            readSection(binding.sectionFund, getString(R.string.mortgage_type_fund))
-                ?.let { loans.add(it) }
-
-        if (loans.isEmpty()) {
-            Toast.makeText(this, R.string.mortgage_input_invalid, Toast.LENGTH_SHORT).show()
-            return
-        }
-
-        val startYear = binding.etStartYear.text.toString().toIntOrNull()
-        val startMonthInput = binding.etStartMonth.text.toString().toIntOrNull()
-        if (startYear == null || startMonthInput == null ||
-            startMonthInput !in 1..12
-        ) {
-            Toast.makeText(this, R.string.mortgage_input_invalid, Toast.LENGTH_SHORT).show()
-            return
-        }
-
-        val prepay = if (binding.swPrepay.isChecked) {
-            val amount = binding.etPrepayAmount.text.toString().toDoubleOrNull() ?: 0.0
-            val target = when {
-                binding.tvTargetCommercial.isSelected ->
-                    PrepayTarget.Index(loans.indexOfFirst { it.name == getString(R.string.mortgage_type_commercial) }
-                        .coerceAtLeast(0))
-                binding.tvTargetFund.isSelected ->
-                    PrepayTarget.Index(loans.indexOfFirst { it.name == getString(R.string.mortgage_type_fund) }
-                        .coerceAtLeast(0))
-                else -> PrepayTarget.Highest
-            }
-            val mode = if (binding.tvModeShorten.isSelected)
-                PrepayMode.SHORTEN else PrepayMode.REDUCE
-            PrepayConfig(true, amount, prepayMonths.sorted(), target, mode)
-        } else PrepayConfig()
-
-        val income = if (binding.swIncome.isChecked) IncomeConfig(
-            enabled = true,
-            startingSavings = binding.etSavings.text.toString().toDoubleOrNull() ?: 0.0,
-            annualIncome = binding.etAnnualIncome.text.toString().toDoubleOrNull() ?: 0.0,
-            annualLiving = binding.etAnnualLiving.text.toString().toDoubleOrNull() ?: 0.0,
-            monthlyFund = binding.etMonthlyFund.text.toString().toDoubleOrNull() ?: 0.0
-        ) else IncomeConfig()
-
-        val cfg = ScheduleConfig(startYear, startMonthInput - 1, loans, prepay, income)
-        val result = MortgageEngine.buildSchedule(cfg)
-        lastResult = result
-        loanNames = loans.map { it.name }
-        renderResult(result)
-    }
-
-    private fun money(v: Long): String = "%,d".format(Locale.US, v)
-
-    private fun renderResult(result: ScheduleResult) {
-        binding.resultArea.visibility = View.VISIBLE
-        val first = result.rows.first()
-        val last = result.rows.last()
-        binding.tvResFirstPay.text = "${money(first.regPayTotal)} 元"
-        binding.tvResMonths.text = "${result.rows.size} 期"
-        binding.tvResInterest.text = "${money(result.totalInterest)} 元"
-        binding.tvResPrepay.text = "${money(result.totalPrepay)} 元"
-        binding.tvResPayoff.text = "${last.y}年${last.m + 1}月"
-        binding.tvResEarliest.text = result.earliest?.label ?: "—"
-
-        // 每笔贷款汇总
-        val container = binding.loanSummaryContainer
-        container.removeAllViews()
-        result.loanSummary.forEachIndexed { i, summary ->
-            val title = TextView(this).apply {
-                text = "${loanNames.getOrElse(i) { summary.name }} · ${summary.payoff} 结清"
-                setTextColor(0xFF0F3B5D.toInt())
-                textSize = 14f
-                setTypeface(typeface, android.graphics.Typeface.BOLD)
-            }
-            container.addView(title)
-            val body = TextView(this).apply {
-                text = "累计利息 ${money(summary.totalInterest)} 元 · " +
-                    "提前还款 ${money(summary.totalPrepay)} 元"
-                setTextColor(0xFF5C6B77.toInt())
-                textSize = 12.5f
-                setPadding(0, dp(5), 0, if (i == result.loanSummary.lastIndex) 0 else dp(10))
-            }
-            container.addView(body)
-        }
-        renderSchedule()
-    }
-
-    private fun renderSchedule() {
-        val result = lastResult ?: return
-        val filterIndex = listOf(
-            binding.tvFilterAll, binding.tvFilterPrepay, binding.tvFilterAnnual
-        ).indexOfFirst { it.isSelected }
-        val rows = result.rows.filter { r ->
-            when (filterIndex) {
-                1 -> r.prepayTotal > 0
-                2 -> r.m == 11
-                else -> true
-            }
-        }
-        binding.rvSchedule.adapter = ScheduleAdapter(rows, loanNames)
-    }
-
-    private inner class ScheduleAdapter(
-        val rows: List<ScheduleRow>,
-        val names: List<String>
-    ) : RecyclerView.Adapter<ScheduleAdapter.VH>() {
-
-        inner class VH(val itemBinding: ItemMortgageRowBinding) :
-            RecyclerView.ViewHolder(itemBinding.root)
-
-        override fun onCreateViewHolder(parent: android.view.ViewGroup, viewType: Int): VH {
-            val b = ItemMortgageRowBinding.inflate(
-                LayoutInflater.from(parent.context), parent, false
-            )
-            return VH(b)
-        }
-
-        override fun onBindViewHolder(holder: VH, position: Int) {
-            val r = rows[position]
-            with(holder.itemBinding) {
-                tvRowDate.text = "第${position + 1}期 · ${r.label}"
-                tvRowPay.text = "月供 ${money(r.regPayTotal)}"
-                tvRowDetail.text = "本金 ${money(r.regPrinTotal)} · 利息 ${money(r.interestTotal)}" +
-                    " · 余额 ${money(r.endTotal)}"
-                if (r.prepayTotal > 0) {
-                    tvRowPrepay.visibility = View.VISIBLE
-                    tvRowPrepay.text = "本月提前还款 ${money(r.prepayTotal)} 元"
-                } else tvRowPrepay.visibility = View.GONE
-
-                rowLoanDetail.removeAllViews()
-                r.perLoan.forEachIndexed { i, p ->
-                    if (p.begin > 0 || p.extra > 0) {
-                        val tv = TextView(root.context).apply {
-                            text = "${names.getOrElse(i) { "贷款${i + 1}" }}：月供 ${money(p.regPay)}" +
-                                " · 本金 ${money(p.regPrin + p.extra)} · 利息 ${money(p.interest)}" +
-                                " · 余额 ${money(p.end)}"
-                            setTextColor(0xFF5C6B77.toInt())
-                            textSize = 11.5f
-                            setPadding(0, dp(3), 0, dp(3))
-                        }
-                        rowLoanDetail.addView(tv)
-                    }
-                }
-                root.setOnClickListener {
-                    rowLoanDetail.visibility =
-                        if (rowLoanDetail.visibility == View.VISIBLE) View.GONE else View.VISIBLE
-                }
-            }
-        }
-
-        override fun getItemCount(): Int = rows.size
+    companion object {
+        private const val PAGE_SIZE = 24
+        private const val FILTER_ALL = 0
+        private const val FILTER_PREPAY = 1
+        private const val FILTER_DECEMBER = 2
     }
 }

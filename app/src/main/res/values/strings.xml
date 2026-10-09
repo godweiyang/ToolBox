@@ -321,6 +321,33 @@
     <string name="mortgage_filter_prepay">提前还款月</string>
     <string name="mortgage_filter_annual">每年12月</string>
     <string name="mortgage_input_invalid">请填写完整且正确的贷款信息</string>
+
+    <!-- 重构版（v1.9.45） -->
+    <string name="mortgage_loan_settings">贷款设置</string>
+    <string name="mortgage_amount_wan">金额（万元）</string>
+    <string name="mortgage_rate_percent">年利率（%）</string>
+    <string name="mortgage_prepay_amount_wan">金额（万元）</string>
+    <string name="mortgage_savings_wan">存款（万元）</string>
+    <string name="mortgage_annual_income_wan">年收入（万元）</string>
+    <string name="mortgage_annual_living_wan">年支出（万元）</string>
+    <string name="mortgage_monthly_fund_wan">月公积金（万元）</string>
+    <string name="mortgage_total_payment">还款总额</string>
+    <string name="mortgage_total_interest">累计利息</string>
+    <string name="mortgage_total_prepay">提前还款总额</string>
+    <string name="mortgage_duration">还款月数</string>
+    <string name="mortgage_first_payment">首月月供</string>
+    <string name="mortgage_earliest">最快结清</string>
+    <string name="mortgage_schedule">还款明细</string>
+    <string name="mortgage_prepay_short">提前还款</string>
+    <string name="mortgage_filter_december">每年12月</string>
+    <string name="mortgage_prev_page">上一页</string>
+    <string name="mortgage_next_page">下一页</string>
+    <string name="mortgage_monthly_payment">月供</string>
+    <string name="mortgage_principal">本金</string>
+    <string name="mortgage_interest">利息</string>
+    <string name="mortgage_balance">期末余额</string>
+    <string name="mortgage_per_loan">分笔明细</string>
+    <string name="mortgage_no_payoff">无法结清</string>
     <string name="tool_mortgage_native_title">房贷计算器（原生版）</string>
     <string name="tool_mortgage_native_desc">原生页面离线测算月供、提前还款与结清时点</string>
     <string name="home_layout_density">首页布局</string>

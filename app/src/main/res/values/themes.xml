@@ -176,6 +176,36 @@
 
     <style name="Mortgage" parent="@android:style/Widget" />
 
+    <!-- 输入框：OutlinedBox，10dp 圆角 -->
+    <style name="Mortgage.FieldShape">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">10dp</item>
+    </style>
+
+    <style name="Mortgage.OutlinedField"
+        parent="Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+        <item name="boxStrokeColor">#2F7FB8</item>
+        <item name="boxStrokeWidth">1dp</item>
+        <item name="boxBackgroundColor">#FCFDFE</item>
+        <item name="shapeAppearanceOverlay">@style/Mortgage.FieldShape</item>
+        <item name="hintTextColor">#0F3B5D</item>
+        <item name="hintTextAppearance">@style/Mortgage.Hint</item>
+    </style>
+
+    <style name="Mortgage.DropdownField"
+        parent="Widget.MaterialComponents.TextInputLayout.OutlinedBox.ExposedDropdownMenu">
+        <item name="boxStrokeColor">#2F7FB8</item>
+        <item name="boxStrokeWidth">1dp</item>
+        <item name="boxBackgroundColor">#FCFDFE</item>
+        <item name="shapeAppearanceOverlay">@style/Mortgage.FieldShape</item>
+        <item name="hintTextColor">#0F3B5D</item>
+        <item name="hintTextAppearance">@style/Mortgage.Hint</item>
+    </style>
+
+    <style name="Mortgage.Hint" parent="TextAppearance.MaterialComponents.Caption">
+        <item name="android:textSize">12sp</item>
+    </style>
+
     <style name="Mortgage.FieldLabel" parent="@android:style/Widget.TextView">
         <item name="android:layout_width">wrap_content</item>
         <item name="android:layout_height">wrap_content</item>

@@ -13,8 +13,8 @@ android {
         applicationId = "com.example.videodownloader"
         minSdk = 26
         targetSdk = 34
-        versionCode = 72
-        versionName = "1.9.44"
+        versionCode = 73
+        versionName = "1.9.45"
 
         // Chaquopy 内嵌 CPython：lol 本地服务（server.py）在 app 进程内运行，
         // 纯标准库无需 pip；只打主流真机 ABI 控制体积
@@ -88,4 +88,7 @@ dependencies {
 
     // EXIF 读取（光影边框）
     implementation("androidx.exifinterface:exifinterface:1.3.7")
+
+    // Markwon：更新弹窗 Markdown 渲染
+    implementation("io.noties.markwon:core:4.6.2")
 }

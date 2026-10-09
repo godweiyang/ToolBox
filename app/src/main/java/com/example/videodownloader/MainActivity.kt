@@ -166,7 +166,12 @@ class MainActivity : AppCompatActivity() {
         val content = DialogAppUpdateBinding.inflate(layoutInflater)
         content.tvUpdateTitle.text = getString(R.string.update_available, info.tag)
         content.tvUpdateSubtitle.text = getString(R.string.update_current, "v${getVersionName()}")
-        content.tvUpdateNotes.text = plainReleaseNotes(info.notes)
+        if (info.notes.isBlank()) {
+            content.tvUpdateNotes.setText(R.string.update_notes_empty)
+        } else {
+            io.noties.markwon.Markwon.create(this)
+                .setMarkdown(content.tvUpdateNotes, info.notes)
+        }
         val dialog = AlertDialog.Builder(this).setView(content.root).create()
         dialog.setOnShowListener { sizeUpdateDialog(dialog) }
         content.btnUpdateGo.setOnClickListener {
@@ -180,18 +185,6 @@ class MainActivity : AppCompatActivity() {
         }
         content.btnUpdateLater.setOnClickListener { dialog.dismiss() }
         dialog.show()
-    }
-
-    /** GitHub Release 正文（Markdown）转纯文本：去掉标题/加粗等符号，保留列表。 */
-    private fun plainReleaseNotes(md: String): String {
-        if (md.isBlank()) return getString(R.string.update_notes_empty)
-        val text = md.lineSequence().joinToString("\n") { raw ->
-            var l = raw.trim()
-            l = Regex("^#{1,6}\\s*").replace(l, "")
-            l = l.replace("**", "").replace("__", "").replace("`", "")
-            l
-        }
-        return Regex("\n{3,}").replace(text, "\n\n").trim()
     }
 
     private fun showLatestDialog() {

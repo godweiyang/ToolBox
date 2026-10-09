@@ -1,8 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:background="#FCFDFE"
+    android:background="@drawable/mortgage_card_inner"
     android:orientation="vertical"
     android:padding="14dp">
 
@@ -17,100 +18,88 @@
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="10dp"
+        android:layout_marginTop="12dp"
         android:orientation="horizontal">
 
-        <LinearLayout
+        <com.google.android.material.textfield.TextInputLayout
+            android:id="@+id/tilAmount"
+            style="@style/Mortgage.OutlinedField"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_weight="1.15"
-            android:orientation="vertical">
+            android:layout_weight="1"
+            android:hint="@string/mortgage_amount_wan">
 
-            <TextView style="@style/Mortgage.FieldLabel" android:text="@string/mortgage_amount" />
-
-            <EditText
-                android:id="@+id/etLoanAmount"
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/etAmount"
                 android:layout_width="match_parent"
-                android:layout_height="44dp"
-                android:background="@drawable/mortgage_input_bg"
-                android:gravity="center"
+                android:layout_height="wrap_content"
                 android:inputType="numberDecimal"
-                android:maxLines="1"
+                android:maxLength="7"
                 android:textSize="14sp" />
-        </LinearLayout>
+        </com.google.android.material.textfield.TextInputLayout>
 
-        <LinearLayout
+        <com.google.android.material.textfield.TextInputLayout
+            android:id="@+id/tilRate"
+            style="@style/Mortgage.OutlinedField"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginStart="8dp"
-            android:layout_weight="0.85"
-            android:orientation="vertical">
+            android:layout_marginStart="10dp"
+            android:layout_weight="1"
+            android:hint="@string/mortgage_rate_percent">
 
-            <TextView style="@style/Mortgage.FieldLabel" android:text="@string/mortgage_rate" />
-
-            <EditText
-                android:id="@+id/etLoanRate"
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/etRate"
                 android:layout_width="match_parent"
-                android:layout_height="44dp"
-                android:background="@drawable/mortgage_input_bg"
-                android:gravity="center"
+                android:layout_height="wrap_content"
                 android:inputType="numberDecimal"
-                android:maxLines="1"
+                android:maxLength="5"
                 android:textSize="14sp" />
-        </LinearLayout>
-
-        <LinearLayout
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="8dp"
-            android:layout_weight="0.85"
-            android:orientation="vertical">
-
-            <TextView style="@style/Mortgage.FieldLabel" android:text="@string/mortgage_years" />
-
-            <EditText
-                android:id="@+id/etLoanYears"
-                android:layout_width="match_parent"
-                android:layout_height="44dp"
-                android:background="@drawable/mortgage_input_bg"
-                android:gravity="center"
-                android:inputType="number"
-                android:maxLines="1"
-                android:textSize="14sp" />
-        </LinearLayout>
+        </com.google.android.material.textfield.TextInputLayout>
     </LinearLayout>
-
-    <TextView
-        style="@style/Mortgage.FieldLabel"
-        android:layout_marginTop="10dp"
-        android:text="@string/mortgage_method" />
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
         android:orientation="horizontal">
 
-        <TextView
-            android:id="@+id/tvMethodEqualPayment"
+        <com.google.android.material.textfield.TextInputLayout
+            android:id="@+id/tilYears"
+            style="@style/Mortgage.DropdownField"
             android:layout_width="0dp"
-            android:layout_height="42dp"
+            android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:background="@drawable/mortgage_seg_bg"
-            android:gravity="center"
-            android:text="@string/mortgage_method_equal_payment"
-            android:textColor="@color/mortgage_seg_text"
-            android:textSize="13.5sp" />
+            android:hint="@string/mortgage_years">
 
-        <TextView
-            android:id="@+id/tvMethodEqualPrincipal"
+            <AutoCompleteTextView
+                android:id="@+id/ddYears"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:clickable="true"
+                android:cursorVisible="false"
+                android:focusable="false"
+                android:inputType="none"
+                android:textSize="14sp" />
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <com.google.android.material.textfield.TextInputLayout
+            android:id="@+id/tilMethod"
+            style="@style/Mortgage.DropdownField"
             android:layout_width="0dp"
-            android:layout_height="42dp"
-            android:layout_marginStart="8dp"
-            android:layout_weight="1"
-            android:background="@drawable/mortgage_seg_bg"
-            android:gravity="center"
-            android:text="@string/mortgage_method_equal_principal"
-            android:textColor="@color/mortgage_seg_text"
-            android:textSize="13.5sp" />
+            android:layout_height="wrap_content"
+            android:layout_marginStart="10dp"
+            android:layout_weight="1.15"
+            android:hint="@string/mortgage_method">
+
+            <AutoCompleteTextView
+                android:id="@+id/ddMethod"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:clickable="true"
+                android:cursorVisible="false"
+                android:focusable="false"
+                android:inputType="none"
+                android:textSize="14sp" />
+        </com.google.android.material.textfield.TextInputLayout>
     </LinearLayout>
 </LinearLayout>
