@@ -171,7 +171,7 @@
                         android:layout_weight="1"
                         android:text="@string/mortgage_prepay" />
 
-                    <com.google.android.material.materialswitch.MaterialSwitch
+                    <com.google.android.material.switchmaterial.SwitchMaterial
                         android:id="@+id/swPrepay"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content" />
@@ -295,7 +295,7 @@
                         android:layout_weight="1"
                         android:text="@string/mortgage_income" />
 
-                    <com.google.android.material.materialswitch.MaterialSwitch
+                    <com.google.android.material.switchmaterial.SwitchMaterial
                         android:id="@+id/swIncome"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content" />
