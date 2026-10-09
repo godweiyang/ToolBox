@@ -121,7 +121,7 @@
                 android:textSize="12sp"
                 android:textStyle="bold" />
 
-            <!-- 检查更新 -->
+            <!-- 关于（含版本状态与更新检查） -->
             <LinearLayout
                 android:id="@+id/rowDrawerUpdate"
                 android:layout_width="match_parent"
@@ -137,45 +137,7 @@
                 android:paddingEnd="16dp">
 
                 <ImageView
-                    android:layout_width="22dp"
-                    android:layout_height="22dp"
-                    android:contentDescription="@null"
-                    android:src="@drawable/ic_drawer_update" />
-
-                <TextView
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="18dp"
-                    android:layout_weight="1"
-                    android:text="@string/update_check"
-                    android:textColor="#1F202B"
-                    android:textSize="15sp" />
-
-                <TextView
-                    android:id="@+id/tvDrawerUpdateStatus"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/update_preparing"
-                    android:textColor="#9AA0AD"
-                    android:textSize="12.5sp" />
-            </LinearLayout>
-
-            <!-- 关于 ToolBox -->
-            <LinearLayout
-                android:id="@+id/rowDrawerAbout"
-                android:layout_width="match_parent"
-                android:layout_height="52dp"
-                android:layout_marginStart="12dp"
-                android:layout_marginEnd="12dp"
-                android:background="@drawable/drawer_row_ripple"
-                android:clickable="true"
-                android:focusable="true"
-                android:gravity="center_vertical"
-                android:orientation="horizontal"
-                android:paddingStart="16dp"
-                android:paddingEnd="16dp">
-
-                <ImageView
+                    android:id="@+id/ivDrawerAboutIcon"
                     android:layout_width="22dp"
                     android:layout_height="22dp"
                     android:contentDescription="@null"
@@ -189,6 +151,14 @@
                     android:text="@string/drawer_about"
                     android:textColor="#1F202B"
                     android:textSize="15sp" />
+
+                <TextView
+                    android:id="@+id/tvDrawerUpdateStatus"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/update_preparing"
+                    android:textColor="#9AA0AD"
+                    android:textSize="12.5sp" />
             </LinearLayout>
         </LinearLayout>
     </ScrollView>

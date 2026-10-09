@@ -5,8 +5,10 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.graphics.Typeface
 import android.provider.Settings
 import android.view.View
+import android.widget.ImageView
 import android.widget.Toast
 import androidx.core.view.GravityCompat
 import androidx.lifecycle.lifecycleScope
@@ -98,15 +100,6 @@ class MainActivity : AppCompatActivity() {
                 .rotation(if (expanded) 0f else 180f).setDuration(180).start()
         }
         drawer.rowDrawerUpdate.setOnClickListener { checkForUpdates(manual = true) }
-        drawer.rowDrawerAbout.setOnClickListener { showAboutDialog() }
-    }
-
-    private fun showAboutDialog() {
-        AlertDialog.Builder(this)
-            .setTitle("${getString(R.string.app_name)} v${getVersionName()}")
-            .setMessage(R.string.subtitle_hint)
-            .setPositiveButton(R.string.update_close, null)
-            .show()
     }
 
     private fun applyGridColumns(columnsInput: Int, persist: Boolean) {
@@ -125,7 +118,12 @@ class MainActivity : AppCompatActivity() {
     private fun checkForUpdates(manual: Boolean) {
         val drawer = binding.drawerHome
         drawer.rowDrawerUpdate.isEnabled = false
-        drawer.tvDrawerUpdateStatus.setText(R.string.update_checking)
+        drawer.tvDrawerUpdateStatus.apply {
+            setText(R.string.update_checking)
+            setTextColor(0xFF9AA0AD.toInt())
+            setTypeface(typeface, Typeface.NORMAL)
+        }
+        drawer.ivDrawerAboutIcon.setColorFilter(0xFF8A8E99.toInt())
         lifecycleScope.launch {
             val result = withContext(Dispatchers.IO) { runCatching { AppUpdater.fetchLatest() } }
             drawer.rowDrawerUpdate.isEnabled = true
@@ -133,15 +131,30 @@ class MainActivity : AppCompatActivity() {
                 getSharedPreferences("updates", MODE_PRIVATE).edit()
                     .putLong("last_check", System.currentTimeMillis()).apply()
                 if (AppVersions.isNewer(info.tag, getVersionName())) {
-                    drawer.tvDrawerUpdateStatus.text =
-                        getString(R.string.drawer_status_newer, info.tag)
+                    // 有新版本：整行高亮（紫色图标 + 紫色加粗状态）
+                    drawer.ivDrawerAboutIcon.setColorFilter(0xFF5856D6.toInt())
+                    drawer.tvDrawerUpdateStatus.apply {
+                        text = getString(R.string.drawer_status_newer, info.tag)
+                        setTextColor(0xFF5856D6.toInt())
+                        setTypeface(typeface, Typeface.BOLD)
+                    }
                     showUpdateDialog(info)
                 } else {
-                    drawer.tvDrawerUpdateStatus.setText(R.string.drawer_status_latest)
-                    if (manual) showLatestDialog(info)
+                    drawer.ivDrawerAboutIcon.setColorFilter(0xFF8A8E99.toInt())
+                    drawer.tvDrawerUpdateStatus.apply {
+                        setText(R.string.drawer_status_latest)
+                        setTextColor(0xFF9AA0AD.toInt())
+                        setTypeface(typeface, Typeface.NORMAL)
+                    }
+                    if (manual) showLatestDialog()
                 }
             }.onFailure {
-                drawer.tvDrawerUpdateStatus.setText(R.string.drawer_status_failed)
+                drawer.ivDrawerAboutIcon.setColorFilter(0xFF8A8E99.toInt())
+                drawer.tvDrawerUpdateStatus.apply {
+                    setText(R.string.drawer_status_failed)
+                    setTextColor(0xFF9AA0AD.toInt())
+                    setTypeface(typeface, Typeface.NORMAL)
+                }
                 if (manual) Toast.makeText(this@MainActivity,
                     R.string.update_failed, Toast.LENGTH_SHORT).show()
             }
@@ -168,19 +181,12 @@ class MainActivity : AppCompatActivity() {
         dialog.show()
     }
 
-    private fun showLatestDialog(info: ReleaseInfo) {
-        val content = DialogAppUpdateBinding.inflate(layoutInflater)
-        content.tvUpdateIcon.text = "✓"
-        content.tvUpdateTitle.text = getString(R.string.update_latest)
-        content.tvUpdateSubtitle.text = getString(R.string.update_latest_detail, "v${getVersionName()}")
-        content.tvUpdateNotes.text = info.notes.ifBlank { getString(R.string.update_notes_empty) }
-        content.btnUpdateGo.text = getString(R.string.update_close)
-        content.btnUpdateBrowser.visibility = View.GONE
-        content.btnUpdateLater.visibility = View.GONE
-        val dialog = AlertDialog.Builder(this).setView(content.root).create()
-        dialog.setOnShowListener { sizeUpdateDialog(dialog) }
-        content.btnUpdateGo.setOnClickListener { dialog.dismiss() }
-        dialog.show()
+    private fun showLatestDialog() {
+        // 已是最新版：极简提示，不展示更新日志
+        AlertDialog.Builder(this)
+            .setMessage(R.string.update_latest)
+            .setPositiveButton(R.string.update_close, null)
+            .show()
     }
 
     /** 弹窗尺寸：手机上不超过屏宽 88%、最大 340dp，背景透明以显示自定义圆角卡片。 */
