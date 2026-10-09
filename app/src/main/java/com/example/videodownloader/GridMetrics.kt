@@ -19,7 +19,7 @@ data class GridPresentation(
 object GridMetrics {
     const val MIN_COLUMNS = 2
     const val MAX_COLUMNS = 5
-    const val DEFAULT_COLUMNS = 2
+    const val DEFAULT_COLUMNS = 4
     const val WIDE_SCREEN_DP = 600
 
     fun normalizeColumns(value: Int): Int = value.coerceIn(MIN_COLUMNS, MAX_COLUMNS)

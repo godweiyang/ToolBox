@@ -1,0 +1,211 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#FFFFFF"
+    android:fitsSystemWindows="true"
+    android:orientation="vertical">
+
+    <!-- 抽屉头部：品牌字标 -->
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:paddingStart="22dp"
+        android:paddingTop="22dp"
+        android:paddingEnd="22dp"
+        android:paddingBottom="18dp"
+        android:text="ToolBox"
+        android:textColor="#5856D6"
+        android:textSize="24sp"
+        android:textStyle="bold" />
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="0.5dp"
+        android:background="#ECECF0" />
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:scrollbars="none">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingTop="8dp"
+            android:paddingBottom="12dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:paddingStart="26dp"
+                android:paddingTop="12dp"
+                android:paddingBottom="4dp"
+                android:text="显示"
+                android:textColor="#9AA0AD"
+                android:textSize="12sp"
+                android:textStyle="bold" />
+
+            <!-- 首页布局（可展开列数选择） -->
+            <LinearLayout
+                android:id="@+id/rowDrawerLayout"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <LinearLayout
+                    android:id="@+id/rowDrawerLayoutHead"
+                    android:layout_width="match_parent"
+                    android:layout_height="52dp"
+                    android:layout_marginStart="12dp"
+                    android:layout_marginEnd="12dp"
+                    android:background="@drawable/drawer_row_ripple"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingStart="16dp"
+                    android:paddingEnd="16dp">
+
+                    <ImageView
+                        android:layout_width="22dp"
+                        android:layout_height="22dp"
+                        android:contentDescription="@null"
+                        android:src="@drawable/ic_drawer_grid" />
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="18dp"
+                        android:layout_weight="1"
+                        android:text="@string/home_layout_density"
+                        android:textColor="#1F202B"
+                        android:textSize="15sp" />
+
+                    <ImageView
+                        android:id="@+id/ivDrawerLayoutChevron"
+                        android:layout_width="22dp"
+                        android:layout_height="22dp"
+                        android:contentDescription="@null"
+                        android:src="@drawable/ic_drawer_expand" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/panelDrawerColumns"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center"
+                    android:orientation="horizontal"
+                    android:paddingTop="2dp"
+                    android:paddingBottom="12dp"
+                    android:visibility="gone">
+
+                    <TextView android:id="@+id/chipD2" android:layout_width="0dp" android:layout_height="40dp" android:layout_marginStart="6dp" android:layout_weight="1" android:background="@drawable/drawer_chip_bg" android:gravity="center" android:text="2" android:textColor="@color/drawer_chip_text" android:textSize="14sp" android:textStyle="bold" />
+                    <TextView android:id="@+id/chipD3" android:layout_width="0dp" android:layout_height="40dp" android:layout_marginStart="8dp" android:layout_weight="1" android:background="@drawable/drawer_chip_bg" android:gravity="center" android:text="3" android:textColor="@color/drawer_chip_text" android:textSize="14sp" android:textStyle="bold" />
+                    <TextView android:id="@+id/chipD4" android:layout_width="0dp" android:layout_height="40dp" android:layout_marginStart="8dp" android:layout_weight="1" android:background="@drawable/drawer_chip_bg" android:gravity="center" android:text="4" android:textColor="@color/drawer_chip_text" android:textSize="14sp" android:textStyle="bold" />
+                    <TextView android:id="@+id/chipD5" android:layout_width="0dp" android:layout_height="40dp" android:layout_marginStart="8dp" android:layout_marginEnd="6dp" android:layout_weight="1" android:background="@drawable/drawer_chip_bg" android:gravity="center" android:text="5" android:textColor="@color/drawer_chip_text" android:textSize="14sp" android:textStyle="bold" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:paddingStart="26dp"
+                android:paddingTop="10dp"
+                android:paddingBottom="4dp"
+                android:text="关于"
+                android:textColor="#9AA0AD"
+                android:textSize="12sp"
+                android:textStyle="bold" />
+
+            <!-- 检查更新 -->
+            <LinearLayout
+                android:id="@+id/rowDrawerUpdate"
+                android:layout_width="match_parent"
+                android:layout_height="52dp"
+                android:layout_marginStart="12dp"
+                android:layout_marginEnd="12dp"
+                android:background="@drawable/drawer_row_ripple"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingStart="16dp"
+                android:paddingEnd="16dp">
+
+                <ImageView
+                    android:layout_width="22dp"
+                    android:layout_height="22dp"
+                    android:contentDescription="@null"
+                    android:src="@drawable/ic_drawer_update" />
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="18dp"
+                    android:layout_weight="1"
+                    android:text="@string/update_check"
+                    android:textColor="#1F202B"
+                    android:textSize="15sp" />
+
+                <TextView
+                    android:id="@+id/tvDrawerUpdateStatus"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/update_preparing"
+                    android:textColor="#9AA0AD"
+                    android:textSize="12.5sp" />
+            </LinearLayout>
+
+            <!-- 关于 ToolBox -->
+            <LinearLayout
+                android:id="@+id/rowDrawerAbout"
+                android:layout_width="match_parent"
+                android:layout_height="52dp"
+                android:layout_marginStart="12dp"
+                android:layout_marginEnd="12dp"
+                android:background="@drawable/drawer_row_ripple"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingStart="16dp"
+                android:paddingEnd="16dp">
+
+                <ImageView
+                    android:layout_width="22dp"
+                    android:layout_height="22dp"
+                    android:contentDescription="@null"
+                    android:src="@drawable/ic_drawer_about" />
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="18dp"
+                    android:layout_weight="1"
+                    android:text="@string/drawer_about"
+                    android:textColor="#1F202B"
+                    android:textSize="15sp" />
+            </LinearLayout>
+        </LinearLayout>
+    </ScrollView>
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="0.5dp"
+        android:background="#ECECF0" />
+
+    <TextView
+        android:id="@+id/tvDrawerVersion"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center"
+        android:padding="14dp"
+        android:textColor="#9AA0AD"
+        android:textSize="12sp"
+        tools:ignore="HardcodedText" />
+
+</LinearLayout>

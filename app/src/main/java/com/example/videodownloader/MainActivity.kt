@@ -6,7 +6,9 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
+import android.view.View
 import android.widget.Toast
+import androidx.core.view.GravityCompat
 import androidx.lifecycle.lifecycleScope
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.GridLayoutManager
@@ -49,42 +51,62 @@ class MainActivity : AppCompatActivity() {
         adapter = ToolAdapter(orderedTools) { tool ->
             startActivity(tool.launcher(this))
         }
-        binding.homeHeader.pageTitle.text = getString(R.string.app_name)
-        binding.homeHeader.pageSubtitle.text = getString(R.string.subtitle_hint)
         val prefs = getSharedPreferences(HOME_PREFS, MODE_PRIVATE)
         gridColumns = if (prefs.contains(KEY_GRID_COLUMNS))
             GridMetrics.normalizeColumns(prefs.getInt(KEY_GRID_COLUMNS, GridMetrics.DEFAULT_COLUMNS))
-        else GridMetrics.defaultColumnsForWidth(resources.configuration.screenWidthDp)
+        else GridMetrics.DEFAULT_COLUMNS
         gridLayoutManager = GridLayoutManager(this, gridColumns)
         binding.rvTools.layoutManager = gridLayoutManager
         binding.rvTools.adapter = adapter
         adapter.setPresentation(GridMetrics.presentation(gridColumns))
-        setupDensityChooser()
 
-        // 3. 配置长按拖拽
+        // 顶部汉堡按钮 + 左侧抽屉（Gmail 风格），抽屉宽度为屏宽 82%、最大 320dp
+        binding.btnOpenDrawer.setOnClickListener {
+            binding.drawerLayout.openDrawer(GravityCompat.START)
+        }
+        val dm = resources.displayMetrics
+        val drawerWidth = minOf((dm.widthPixels * 0.82).toInt(), (320 * dm.density).toInt())
+        binding.drawerHome.root.layoutParams =
+            binding.drawerHome.root.layoutParams.apply { width = drawerWidth }
+        setupDrawer()
+
+        // 长按拖拽排序
         setupDragSort()
 
-        // 底部显示版本号，方便用户确认当前安装的版本
-        binding.tvVersion.text = "v${getVersionName()}"
-        binding.versionUpdatePill.setOnClickListener {
-            if (binding.btnCheckUpdate.isEnabled) checkForUpdates(manual = true)
-        }
-        binding.btnCheckUpdate.setOnClickListener { checkForUpdates(manual = true) }
+        // 抽屉底部显示当前版本
+        binding.drawerHome.tvDrawerVersion.text = "v${getVersionName()}"
         checkForUpdates(manual = false)
     }
 
-    private fun setupDensityChooser() {
+    private fun setupDrawer() {
+        val drawer = binding.drawerHome
         val chips = mapOf(
-            2 to binding.chipColumns2,
-            3 to binding.chipColumns3,
-            4 to binding.chipColumns4,
-            5 to binding.chipColumns5
+            2 to drawer.chipD2, 3 to drawer.chipD3,
+            4 to drawer.chipD4, 5 to drawer.chipD5
         )
         chips.forEach { (columns, view) ->
             view.contentDescription = getString(R.string.home_layout_columns, columns)
             view.setOnClickListener { applyGridColumns(columns, persist = true) }
         }
         applyGridColumns(gridColumns, persist = false)
+
+        // 首页布局：展开/收起列数选择
+        drawer.rowDrawerLayoutHead.setOnClickListener {
+            val expanded = drawer.panelDrawerColumns.visibility == View.VISIBLE
+            drawer.panelDrawerColumns.visibility = if (expanded) View.GONE else View.VISIBLE
+            drawer.ivDrawerLayoutChevron.animate()
+                .rotation(if (expanded) 0f else 180f).setDuration(180).start()
+        }
+        drawer.rowDrawerUpdate.setOnClickListener { checkForUpdates(manual = true) }
+        drawer.rowDrawerAbout.setOnClickListener { showAboutDialog() }
+    }
+
+    private fun showAboutDialog() {
+        AlertDialog.Builder(this)
+            .setTitle("${getString(R.string.app_name)} v${getVersionName()}")
+            .setMessage(R.string.subtitle_hint)
+            .setPositiveButton(R.string.update_close, null)
+            .show()
     }
 
     private fun applyGridColumns(columnsInput: Int, persist: Boolean) {
@@ -92,33 +114,34 @@ class MainActivity : AppCompatActivity() {
         gridColumns = columns
         gridLayoutManager.spanCount = columns
         adapter.setPresentation(GridMetrics.presentation(columns))
-        listOf(binding.chipColumns2, binding.chipColumns3,
-            binding.chipColumns4, binding.chipColumns5).forEachIndexed { index, chip ->
-            chip.isSelected = index + 2 == columns
-        }
+        val drawer = binding.drawerHome
+        listOf(drawer.chipD2, drawer.chipD3, drawer.chipD4, drawer.chipD5)
+            .forEachIndexed { index, chip -> chip.isSelected = index + 2 == columns }
         binding.rvTools.itemAnimator = null
         if (persist) getSharedPreferences(HOME_PREFS, MODE_PRIVATE).edit()
             .putInt(KEY_GRID_COLUMNS, columns).apply()
     }
 
     private fun checkForUpdates(manual: Boolean) {
-        binding.btnCheckUpdate.isEnabled = false
-        binding.btnCheckUpdate.text = getString(R.string.update_checking)
+        val drawer = binding.drawerHome
+        drawer.rowDrawerUpdate.isEnabled = false
+        drawer.tvDrawerUpdateStatus.setText(R.string.update_checking)
         lifecycleScope.launch {
             val result = withContext(Dispatchers.IO) { runCatching { AppUpdater.fetchLatest() } }
-            binding.btnCheckUpdate.isEnabled = true
+            drawer.rowDrawerUpdate.isEnabled = true
             result.onSuccess { info ->
                 getSharedPreferences("updates", MODE_PRIVATE).edit()
                     .putLong("last_check", System.currentTimeMillis()).apply()
                 if (AppVersions.isNewer(info.tag, getVersionName())) {
-                    binding.btnCheckUpdate.text = info.tag
+                    drawer.tvDrawerUpdateStatus.text =
+                        getString(R.string.drawer_status_newer, info.tag)
                     showUpdateDialog(info)
                 } else {
-                    binding.btnCheckUpdate.text = getString(R.string.update_latest)
+                    drawer.tvDrawerUpdateStatus.setText(R.string.drawer_status_latest)
                     if (manual) showLatestDialog(info)
                 }
             }.onFailure {
-                binding.btnCheckUpdate.text = getString(R.string.update_check)
+                drawer.tvDrawerUpdateStatus.setText(R.string.drawer_status_failed)
                 if (manual) Toast.makeText(this@MainActivity,
                     R.string.update_failed, Toast.LENGTH_SHORT).show()
             }
@@ -130,20 +153,18 @@ class MainActivity : AppCompatActivity() {
         content.tvUpdateTitle.text = getString(R.string.update_available, info.tag)
         content.tvUpdateSubtitle.text = getString(R.string.update_current, "v${getVersionName()}")
         content.tvUpdateNotes.text = info.notes.ifBlank { getString(R.string.update_notes_empty) }
-        val dialog = AlertDialog.Builder(this).setView(content.root)
-            .setNegativeButton(R.string.update_later, null)
-            .setNeutralButton(R.string.update_open_browser) { _, _ -> AppUpdater.openBrowser(this, info.pageUrl) }
-            .setPositiveButton(R.string.update_download_install, null)
-            .create()
-        dialog.setOnShowListener {
-            dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
-            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
-                if (!canRequestPackageInstalls()) {
-                    requestInstallPermission()
-                    Toast.makeText(this, R.string.update_install_permission, Toast.LENGTH_LONG).show()
-                } else downloadAndInstall(info, dialog, content)
-            }
+        val dialog = AlertDialog.Builder(this).setView(content.root).create()
+        dialog.setOnShowListener { sizeUpdateDialog(dialog) }
+        content.btnUpdateGo.setOnClickListener {
+            if (!canRequestPackageInstalls()) {
+                requestInstallPermission()
+                Toast.makeText(this, R.string.update_install_permission, Toast.LENGTH_LONG).show()
+            } else downloadAndInstall(info, dialog, content)
         }
+        content.btnUpdateBrowser.setOnClickListener {
+            AppUpdater.openBrowser(this, info.pageUrl); dialog.dismiss()
+        }
+        content.btnUpdateLater.setOnClickListener { dialog.dismiss() }
         dialog.show()
     }
 
@@ -153,48 +174,100 @@ class MainActivity : AppCompatActivity() {
         content.tvUpdateTitle.text = getString(R.string.update_latest)
         content.tvUpdateSubtitle.text = getString(R.string.update_latest_detail, "v${getVersionName()}")
         content.tvUpdateNotes.text = info.notes.ifBlank { getString(R.string.update_notes_empty) }
-        val dialog = AlertDialog.Builder(this).setView(content.root)
-            .setPositiveButton(R.string.update_close, null).create()
-        dialog.setOnShowListener {
-            dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
-        }
+        content.btnUpdateGo.text = getString(R.string.update_close)
+        content.btnUpdateBrowser.visibility = View.GONE
+        content.btnUpdateLater.visibility = View.GONE
+        val dialog = AlertDialog.Builder(this).setView(content.root).create()
+        dialog.setOnShowListener { sizeUpdateDialog(dialog) }
+        content.btnUpdateGo.setOnClickListener { dialog.dismiss() }
         dialog.show()
+    }
+
+    /** 弹窗尺寸：手机上不超过屏宽 88%、最大 340dp，背景透明以显示自定义圆角卡片。 */
+    private fun sizeUpdateDialog(dialog: AlertDialog) {
+        dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
+        val dm = resources.displayMetrics
+        val maxWidthPx = (340 * dm.density).toInt()
+        val width = minOf((dm.widthPixels * 0.88).toInt(), maxWidthPx)
+        dialog.window?.setLayout(width, android.view.WindowManager.LayoutParams.WRAP_CONTENT)
     }
 
     private fun downloadAndInstall(info: ReleaseInfo, dialog: AlertDialog,
                                    content: DialogAppUpdateBinding) {
-        val button = dialog.getButton(AlertDialog.BUTTON_POSITIVE)
-        button.isEnabled = false
+        val go = content.btnUpdateGo
+        go.isEnabled = false
+        content.btnUpdateBrowser.isEnabled = false
+        content.btnUpdateLater.isEnabled = false
+        content.pbUpdate.apply { visibility = View.VISIBLE; isIndeterminate = true }
+        content.tvUpdateProgress.visibility = View.VISIBLE
+        content.tvUpdateSubtitle.setText(R.string.update_preparing)
         lifecycleScope.launch {
             val result = withContext(Dispatchers.IO) {
-                runCatching { AppUpdater.downloadApk(this@MainActivity, info) { progress ->
-                    runOnUiThread {
-                        button.text = getString(R.string.update_downloading, progress)
-                        content.tvUpdateSubtitle.text = getString(R.string.update_downloading, progress)
+                runCatching {
+                    AppUpdater.downloadApk(this@MainActivity, info) { copied, total, speed ->
+                        runOnUiThread { renderDownloadProgress(content, copied, total, speed) }
                     }
-                } }
+                }
             }
             result.onSuccess { apk ->
-                val archive = runCatching { packageManager.getPackageArchiveInfo(apk.absolutePath, 0) }.getOrNull()
+                val archive = runCatching {
+                    packageManager.getPackageArchiveInfo(apk.absolutePath, 0)
+                }.getOrNull()
                 if (archive?.packageName != packageName) {
                     apk.delete()
-                    Toast.makeText(this@MainActivity, R.string.update_download_failed, Toast.LENGTH_LONG).show()
-                    AppUpdater.openBrowser(this@MainActivity, info.pageUrl)
-                    button.isEnabled = true
-                    button.text = getString(R.string.update_download_install)
+                    resetDownloadUi(content)
+                    Toast.makeText(this@MainActivity,
+                        R.string.update_download_failed, Toast.LENGTH_LONG).show()
                     return@onSuccess
                 }
-                runCatching { AppUpdater.install(this@MainActivity, apk) }.onFailure {
-                    AppUpdater.openBrowser(this@MainActivity, info.pageUrl)
+                val installOk = runCatching {
+                    AppUpdater.install(this@MainActivity, apk)
+                }.isSuccess
+                if (installOk) dialog.dismiss() else {
+                    resetDownloadUi(content)
+                    Toast.makeText(this@MainActivity,
+                        R.string.update_download_failed, Toast.LENGTH_LONG).show()
                 }
-                dialog.dismiss()
             }.onFailure {
-                button.isEnabled = true
-                button.text = getString(R.string.update_download_install)
-                Toast.makeText(this@MainActivity, R.string.update_download_failed, Toast.LENGTH_LONG).show()
-                AppUpdater.openBrowser(this@MainActivity, info.pageUrl)
+                resetDownloadUi(content)
+                Toast.makeText(this@MainActivity,
+                    R.string.update_download_failed, Toast.LENGTH_LONG).show()
             }
         }
+    }
+
+    /** 刷新下载进度：已知总大小走百分比进度条，未知则走不确定动画 + 已下载 MB。 */
+    private fun renderDownloadProgress(
+        content: DialogAppUpdateBinding, copied: Long, total: Long, speed: Long
+    ) {
+        val mb = copied / 1048576.0
+        val speedMb = speed / 1048576.0
+        if (total > 0) {
+            content.pbUpdate.isIndeterminate = false
+            content.pbUpdate.progress = (copied * 100 / total).toInt().coerceIn(0, 100)
+            content.tvUpdateProgress.text = getString(
+                R.string.update_progress_format, mb, total / 1048576.0, speedMb
+            )
+            content.btnUpdateGo.text = getString(
+                R.string.update_downloading, (copied * 100 / total).toInt()
+            )
+        } else {
+            content.pbUpdate.isIndeterminate = true
+            content.tvUpdateProgress.text = getString(
+                R.string.update_progress_format_nototal, mb, speedMb
+            )
+            content.btnUpdateGo.setText(R.string.update_downloading_nototal)
+        }
+    }
+
+    /** 下载失败后恢复按钮状态（主按钮变为重试），不自动跳转浏览器。 */
+    private fun resetDownloadUi(content: DialogAppUpdateBinding) {
+        content.btnUpdateGo.isEnabled = true
+        content.btnUpdateGo.setText(R.string.update_retry)
+        content.btnUpdateBrowser.isEnabled = true
+        content.btnUpdateLater.isEnabled = true
+        content.pbUpdate.visibility = View.GONE
+        content.tvUpdateProgress.visibility = View.GONE
     }
 
     private fun canRequestPackageInstalls(): Boolean =

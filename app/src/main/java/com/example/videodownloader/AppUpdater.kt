@@ -8,17 +8,28 @@ import com.google.gson.JsonParser
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.File
+import java.io.FileOutputStream
 import java.util.concurrent.TimeUnit
 
 internal object AppUpdater {
     const val RELEASES_PAGE = "https://github.com/godweiyang/ToolBox/releases/latest"
     private const val LATEST_API = "https://api.github.com/repos/godweiyang/ToolBox/releases/latest"
     private const val DOWNLOAD_BASE = "https://github.com/godweiyang/ToolBox/releases/download"
+    private const val MAX_DOWNLOAD_ATTEMPTS = 4
+    private const val PROGRESS_INTERVAL_MS = 200L
 
     private val client = OkHttpClient.Builder()
         .connectTimeout(10, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
         .followRedirects(true)
+        .build()
+
+    // 下载专用 client：移动网络抖动多，读超时放宽、连接失败自动重试
+    private val downloadClient = OkHttpClient.Builder()
+        .connectTimeout(15, TimeUnit.SECONDS)
+        .readTimeout(60, TimeUnit.SECONDS)
+        .followRedirects(true)
+        .retryOnConnectionFailure(true)
         .build()
 
     fun fetchLatest(): ReleaseInfo {
@@ -63,36 +74,98 @@ internal object AppUpdater {
         }
     }
 
-    fun downloadApk(context: Context, info: ReleaseInfo, onProgress: (Int) -> Unit): File {
+    /**
+     * 下载 APK 到缓存目录。
+     * - 移动网络中断/读超时：最多 4 轮尝试，基于 HTTP Range 从 .part 断点续传，不重头开始；
+     * - onProgress 约每 200ms 回调一次：copied 已下载字节、total 总字节（-1 表示未知，
+     *   此时 UI 应显示不确定进度条）、speedBps 瞬时速度（字节/秒）。
+     */
+    fun downloadApk(
+        context: Context,
+        info: ReleaseInfo,
+        onProgress: (copied: Long, total: Long, speedBps: Long) -> Unit
+    ): File {
         val url = requireNotNull(info.apkUrl) { "no apk asset" }
-        val request = Request.Builder().url(url).header("User-Agent", "ToolBox-Android-Updater").build()
-        val destination = File(context.cacheDir, "updates").apply { mkdirs() }
-            .resolve("ToolBox-${info.tag}.apk")
-        client.newCall(request).execute().use { response ->
-            check(response.isSuccessful) { "download ${response.code}" }
-            val body = requireNotNull(response.body)
-            val total = body.contentLength()
-            destination.outputStream().use { output ->
+        val dir = File(context.cacheDir, "updates").apply { mkdirs() }
+        val target = dir.resolve("ToolBox-${info.tag}.apk")
+        val part = dir.resolve("ToolBox-${info.tag}.apk.part")
+
+        var lastError: Exception? = null
+        for (attempt in 1..MAX_DOWNLOAD_ATTEMPTS) {
+            try {
+                streamOnce(url, part, onProgress)
+                require(part.length() > 1024L) { "downloaded apk is empty" }
+                part.inputStream().use { input ->
+                    val magic = ByteArray(4)
+                    require(input.read(magic) == 4 &&
+                        magic.contentEquals(byteArrayOf(0x50, 0x4B, 0x03, 0x04))) {
+                        "download is not an apk archive"
+                    }
+                }
+                if (target.exists()) target.delete()
+                check(part.renameTo(target)) { "rename apk failed" }
+                return target
+            } catch (e: Exception) {
+                lastError = e
+                if (attempt < MAX_DOWNLOAD_ATTEMPTS) Thread.sleep(1500L * attempt)
+            }
+        }
+        throw lastError ?: IllegalStateException("download failed")
+    }
+
+    private fun streamOnce(
+        url: String,
+        part: File,
+        onProgress: (copied: Long, total: Long, speedBps: Long) -> Unit
+    ) {
+        val existing = if (part.exists()) part.length() else 0L
+        val builder = Request.Builder().url(url).header("User-Agent", "ToolBox-Android-Updater")
+        if (existing > 0) builder.header("Range", "bytes=$existing-")
+        downloadClient.newCall(builder.build()).execute().use { response ->
+            if (response.code == 416) {
+                // 本地 .part 比服务器文件还大（换了更低版本等），删掉重下
+                part.delete()
+                throw java.io.IOException("range not satisfiable")
+            }
+            check(response.code in 200..299) { "download HTTP ${response.code}" }
+            val body = requireNotNull(response.body) { "empty response body" }
+
+            val resumed = response.code == 206
+            val start = if (resumed) existing else 0L
+            if (!resumed && existing > 0) part.delete()
+
+            // 总大小：206 时从 Content-Range 解析完整长度，否则取 Content-Length（可能为 -1）
+            var total = body.contentLength()
+            response.header("Content-Range")?.let { range ->
+                Regex("bytes\\s+\\d+-\\d+/(\\d+)").find(range)?.let { m ->
+                    m.groupValues[1].toLongOrNull()?.let { total = it }
+                }
+            }
+
+            var copied = start
+            FileOutputStream(part, resumed).use { output ->
                 body.byteStream().use { input ->
-                    val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
-                    var copied = 0L
+                    val buffer = ByteArray(64 * 1024)
+                    var lastEmit = 0L
+                    var lastEmitCopied = copied
                     while (true) {
                         val read = input.read(buffer)
                         if (read < 0) break
-                        output.write(buffer, 0, read); copied += read
-                        if (total > 0) onProgress((copied * 100 / total).toInt().coerceIn(0, 100))
+                        output.write(buffer, 0, read)
+                        copied += read
+                        val now = System.currentTimeMillis()
+                        if (now - lastEmit >= PROGRESS_INTERVAL_MS) {
+                            val speed = if (lastEmit > 0L)
+                                (copied - lastEmitCopied) * 1000 / (now - lastEmit) else 0L
+                            onProgress(copied, total, speed)
+                            lastEmit = now
+                            lastEmitCopied = copied
+                        }
                     }
                 }
             }
+            onProgress(copied, total, 0L)
         }
-        require(destination.length() > 1024L) { "downloaded apk is empty" }
-        destination.inputStream().use { input ->
-            val magic = ByteArray(4)
-            require(input.read(magic) == 4 && magic.contentEquals(byteArrayOf(0x50, 0x4B, 0x03, 0x04))) {
-                "download is not an apk archive"
-            }
-        }
-        return destination
     }
 
     fun install(context: Context, apk: File) {
