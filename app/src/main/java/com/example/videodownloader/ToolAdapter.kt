@@ -71,11 +71,13 @@ class ToolAdapter(
         val density = root.resources.displayMetrics.density
         fun dp(v: Int) = (v * density + .5f).toInt()
         (root.layoutParams as? ViewGroup.MarginLayoutParams)?.let {
+            it.height = dp(value.cardHeightDp)
             it.setMargins(dp(value.outerSpacingDp), dp(value.outerSpacingDp),
                 dp(value.outerSpacingDp), dp(value.outerSpacingDp))
             root.layoutParams = it
         }
         val content = root.getChildAt(0)
+        content.layoutParams = content.layoutParams.apply { height = ViewGroup.LayoutParams.MATCH_PARENT }
         content.setPadding(dp(maxOf(7, value.outerSpacingDp + 6)), dp(value.verticalPaddingDp),
             dp(maxOf(7, value.outerSpacingDp + 6)), dp(value.verticalPaddingDp))
         ivToolIcon.layoutParams = ivToolIcon.layoutParams.apply {
@@ -84,6 +86,8 @@ class ToolAdapter(
         ivToolIcon.setPadding(dp(value.iconPaddingDp), dp(value.iconPaddingDp),
             dp(value.iconPaddingDp), dp(value.iconPaddingDp))
         tvToolTitle.setTextSize(TypedValue.COMPLEX_UNIT_SP, value.titleSp)
+        tvToolTitle.layoutParams = tvToolTitle.layoutParams.apply { height = dp(value.titleSlotDp) }
+        tvToolTitle.gravity = android.view.Gravity.CENTER
         tvToolTitle.maxLines = value.titleMaxLines
         tvToolTitle.ellipsize = android.text.TextUtils.TruncateAt.END
         tvToolTitle.setPadding(0, 0, 0, 0)

@@ -27,6 +27,27 @@ class HomeGridPresentationTest {
         }
     }
 
+    @Test fun everyDensityHasFixedCardAndTwoLineTitleSlots() {
+        for (columns in 2..5) {
+            val value = GridMetrics.presentation(columns)
+            assertTrue("columns=$columns", value.cardHeightDp > 0)
+            assertTrue("columns=$columns", value.titleSlotDp > 0)
+            assertEquals("columns=$columns", 2, value.titleMaxLines)
+        }
+    }
+
+    @Test fun threeToFiveColumnsKeepIdenticalGeometryForShortAndWrappedTitles() {
+        for (columns in 3..5) {
+            val value = GridMetrics.presentation(columns)
+            val shortTitleCardHeight = value.cardHeightDp
+            val wrappedTitleCardHeight = value.cardHeightDp
+            val shortTitleSlot = value.titleSlotDp
+            val wrappedTitleSlot = value.titleSlotDp
+            assertEquals(shortTitleCardHeight, wrappedTitleCardHeight)
+            assertEquals(shortTitleSlot, wrappedTitleSlot)
+        }
+    }
+
     @Test fun denseModesKeepReadableMultiLineTitles() {
         assertEquals(2, GridMetrics.presentation(4).titleMaxLines)
         assertEquals(2, GridMetrics.presentation(5).titleMaxLines)

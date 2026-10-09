@@ -9,6 +9,8 @@ data class GridPresentation(
     val verticalPaddingDp: Int,
     val titleSp: Float,
     val titleMaxLines: Int,
+    val titleSlotDp: Int,
+    val cardHeightDp: Int,
     val descriptionMaxLines: Int
 ) {
     val showDescription: Boolean get() = descriptionMaxLines > 0
@@ -29,9 +31,9 @@ object GridMetrics {
     fun spanCountForWidth(screenWidthDp: Int): Int = defaultColumnsForWidth(screenWidthDp)
 
     fun presentation(columnsInput: Int): GridPresentation = when (normalizeColumns(columnsInput)) {
-        2 -> GridPresentation(2, 60, 15, 6, 20, 16f, 2, 2)
-        3 -> GridPresentation(3, 48, 12, 4, 15, 14f, 2, 1)
-        4 -> GridPresentation(4, 40, 10, 3, 12, 12.5f, 2, 0)
-        else -> GridPresentation(5, 34, 8, 2, 10, 11f, 2, 0)
+        2 -> GridPresentation(2, 60, 15, 6, 20, 16f, 2, 44, 200, 2)
+        3 -> GridPresentation(3, 48, 12, 4, 15, 14f, 2, 40, 152, 1)
+        4 -> GridPresentation(4, 40, 10, 3, 12, 12.5f, 2, 36, 112, 0)
+        else -> GridPresentation(5, 34, 8, 2, 10, 11f, 2, 32, 96, 0)
     }
 }
