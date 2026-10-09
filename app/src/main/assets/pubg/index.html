@@ -142,21 +142,21 @@ header.top h1{font-size:18px;margin:0;letter-spacing:1.2px;text-align:center;fon
 #keyPoolRoot .keyrow{gap:6px}#keyPoolRoot .keyrow::before{flex-basis:24px}
 #keyPoolRoot .keyrow .keymark{flex-basis:74px;font-size:10.5px;padding:3px 5px}}
 /* ===== 个人海报弹窗（深色海报本体，保留） ===== */
-#posterRoot{position:fixed;inset:0;z-index:9999;display:none}
+#posterRoot{position:fixed;inset:0;z-index:9999;display:none;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
 #posterRoot.show{display:block}
-#posterRoot .pomask{position:absolute;inset:0;background:rgba(12,8,24,.55);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
-#posterRoot .pocard{position:relative;margin:2.5vh auto;max-width:430px;width:calc(100% - 24px);max-height:95vh;overflow:auto;background:#17102e;border:1px solid #3a2c63;border-radius:22px;box-shadow:0 28px 80px rgba(20,10,50,.6);padding:16px 16px 18px;color:#eae6ff;animation:pop .24s ease}
+#posterRoot .pomask{position:fixed;inset:0;background:rgba(12,8,24,.55);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
+#posterRoot .pocard{position:relative;margin:16px auto;max-width:430px;width:calc(100% - 24px);background:#17102e;border:1px solid #3a2c63;border-radius:22px;box-shadow:0 28px 80px rgba(20,10,50,.6);padding:16px 16px 18px;color:#eae6ff;animation:pop .24s ease}
 #posterRoot .poph{display:flex;align-items:center;gap:10px;margin-bottom:11px}
 #posterRoot .poph h3{font-size:16px;margin:0;flex:1;color:#fff;letter-spacing:1px;font-weight:800}
 #posterRoot .pox{border:1px solid #3a2c63;background:#2c2150;color:#cfc6f5;width:32px;height:32px;min-width:32px;border-radius:50%;cursor:pointer;font-size:17px;line-height:1;padding:0;display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto}
 #posterRoot .pox:hover{background:#3a2c63}
 #posterRoot .poimg{display:flex;justify-content:center}
-#posterRoot .poimg img{display:block;width:100%;max-height:73vh;border-radius:14px;box-shadow:0 10px 34px rgba(0,0,0,.5)}
+#posterRoot .poimg img{display:block;width:100%;height:auto;border-radius:14px;box-shadow:0 10px 34px rgba(0,0,0,.5)}
 #posterRoot .pofoot{display:flex;gap:10px;margin-top:13px}
 #posterRoot .pofoot button{flex:1;border-radius:12px;padding:12px 0;font-size:14px;font-weight:800;cursor:pointer;border:1px solid transparent}
 #posterRoot .popri{background:linear-gradient(135deg,#0a84ff,#5e9bff);color:#fff;box-shadow:0 8px 20px -8px rgba(10,132,255,.7)}
 #posterRoot .pobtn{background:#241a47;color:#cfc6f5;border-color:#3a2c63!important}
-@media(max-width:640px){#posterRoot .pocard{margin:1.5vh auto;width:calc(100% - 16px)}#posterRoot .poimg img{max-height:68vh}}
+@media(max-width:640px){#posterRoot .pocard{margin:10px auto;width:calc(100% - 16px)}}
 /* ===== 视图切换：毛玻璃 segmented ===== */
 .viewtabs{display:inline-flex;justify-content:center;gap:4px;margin:20px auto 6px;padding:4px;
   background:var(--glass-2);-webkit-backdrop-filter:var(--glass-blur);backdrop-filter:var(--glass-blur);
@@ -2454,6 +2454,14 @@ function shotCapture(el,fname,btn){
         opt.H=el.scrollHeight; // 宽度展开后重测根完整高度
       }
       restoreTmp=()=>tmp.forEach(t=>t.n.setAttribute('style',t.style));
+      // App 内：原生全文档渲染截图（所见即所得），替代 foreignObject 重绘（WebView 下会错位）
+      if(window.AppBridge&&typeof AppBridge.captureShot==='function'){
+        await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
+        const rr=el.getBoundingClientRect();
+        const rect={x:rr.left+window.scrollX,y:rr.top+window.scrollY,w:rr.width,h:rr.height};
+        AppBridge.captureShot(JSON.stringify(rect),fname+'.png','copy');
+        return;
+      }
       const opts={pixelRatio:Math.min(window.devicePixelRatio||1,2),backgroundColor:bg,cacheBust:false,
         filter:nd=>{
           if(nd.nodeType!==1)return true;

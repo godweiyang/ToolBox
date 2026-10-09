@@ -2,6 +2,8 @@ package com.example.videodownloader.web
 
 import android.Manifest
 import android.annotation.SuppressLint
+import android.graphics.Bitmap
+import org.json.JSONObject
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -386,6 +388,69 @@ class WebViewShellActivity : AppCompatActivity() {
         storagePermissionLauncher.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
     }
 
+    /**
+     * captureShot 桥入口：由页面把目标元素的文档坐标矩形（CSS px JSON {x,y,w,h}）传过来，
+     * 原生全文档渲染截图（所见即所得，不经过 foreignObject 重绘），再按 mode 处理：
+     *  - "share"：保存进相册并弹分享面板
+     *  - "copy" ：保存进相册并把图片复制到剪贴板
+     *  - 其它   ：仅保存进相册
+     */
+    private fun onCaptureShot(rectJson: String, fileName: String, mode: String) {
+        val rect = runCatching {
+            val o = JSONObject(rectJson)
+            floatArrayOf(
+                o.getDouble("x").toFloat(), o.getDouble("y").toFloat(),
+                o.getDouble("w").toFloat(), o.getDouble("h").toFloat()
+            )
+        }.getOrNull() ?: return
+        lifecycleScope.launch {
+            // 截图必须在 UI 线程执行（WebView.draw）
+            val bmp = runCatching {
+                WebViewCapture.captureElement(
+                    binding.webView, rect[0], rect[1], rect[2], rect[3]
+                )
+            }.getOrNull()
+            if (bmp == null) {
+                toast(R.string.web_shell_download_failed); return@launch
+            }
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q &&
+                ContextCompat.checkSelfPermission(
+                    this@WebViewShellActivity, Manifest.permission.WRITE_EXTERNAL_STORAGE
+                ) != PackageManager.PERMISSION_GRANTED
+            ) {
+                if (!requestStoragePermission()) {
+                    bmp.recycle(); toast(R.string.web_shell_download_failed); return@launch
+                }
+            }
+            val name = DownloadNaming.resolve(fileName, null, "image/png")
+            val bytes = withContext(Dispatchers.IO) {
+                runCatching {
+                    val baos = ByteArrayOutputStream()
+                    bmp.compress(Bitmap.CompressFormat.PNG, 100, baos)
+                    bmp.recycle()
+                    baos.toByteArray()
+                }.getOrNull()
+            } ?: run { toast(R.string.web_shell_download_failed); return@launch }
+            val uri = withContext(Dispatchers.IO) {
+                runCatching {
+                    GallerySaver.save(this@WebViewShellActivity, name, bytes, "image/png")
+                }.getOrNull()
+            }
+            runOnUiThread {
+                if (uri == null) { toast(R.string.web_shell_download_failed); return@runOnUiThread }
+                when (mode) {
+                    "share" -> { toast("已保存到手机相册"); offerShare(uri, "image/png") }
+                    "copy" -> {
+                        val cm = getSystemService(ClipboardManager::class.java)
+                        cm.setPrimaryClip(ClipData.newUri(contentResolver, "image", uri))
+                        toast("长图已复制，去聊天框或文档直接粘贴即可")
+                    }
+                    else -> toast("已保存到手机相册")
+                }
+            }
+        }
+    }
+
     /** 复制图片到系统剪贴板（相册 content uri），聊天/文档可直接粘贴。 */
     private fun onCopyImage(fileName: String, data: String) {
         lifecycleScope.launch {
@@ -477,6 +542,16 @@ class WebViewShellActivity : AppCompatActivity() {
 
         @android.webkit.JavascriptInterface
         fun isReady(): Boolean = true
+
+        /**
+         * 原生全文档截图（替代页面 html-to-image，避免 WebView 下错位）。
+         * @param rectJson 目标元素文档坐标矩形 JSON：{x,y,w,h}，CSS px
+         * @param fileName 文件名（可含 .png）
+         * @param mode share=保存并分享 / copy=保存并复制到剪贴板 / save=仅保存
+         */
+        @android.webkit.JavascriptInterface
+        fun captureShot(rectJson: String, fileName: String, mode: String) =
+            onCaptureShot(rectJson, fileName, mode)
     }
 
     /**
@@ -487,6 +562,14 @@ class WebViewShellActivity : AppCompatActivity() {
      * 方法名/参数顺序严格对齐 pubg/index.html 里的调用。
      */
     inner class AppBridgeCompat {
+        /**
+         * 原生全文档截图（同 NativeBridge.captureShot 契约），PUBG 页截图分享/海报长图走这里。
+         */
+        @android.webkit.JavascriptInterface
+        fun captureShot(rectJson: String, fileName: String, mode: String) {
+            onCaptureShot(rectJson, fileName, mode)
+        }
+
         @android.webkit.JavascriptInterface
         fun saveImage(fileName: String, base64: String): Boolean {
             onNativeSave(fileName, base64, "image/png", shareAfter = false)
