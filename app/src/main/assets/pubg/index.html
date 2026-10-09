@@ -52,16 +52,6 @@ header.top{
 }
 header.top h1{font-size:18px;margin:0;letter-spacing:1.2px;text-align:center;font-weight:800;color:var(--ink)}
 .title-row{position:relative;width:100%;display:flex;align-items:center;justify-content:center}
-.cross-link{
-  position:absolute;right:0;top:50%;transform:translateY(-50%);
-  display:inline-flex;align-items:center;gap:5px;font-size:12.5px;font-weight:800;
-  padding:8px 15px;border-radius:999px;text-decoration:none;white-space:nowrap;
-  background:rgba(29,29,31,.86);color:#fff;box-shadow:0 6px 16px -6px rgba(29,29,31,.5);
-  -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);
-  transition:transform .18s,box-shadow .18s,background .18s;
-}
-.cross-link:hover{transform:translateY(-50%) translateX(2px);background:#1d1d1f;box-shadow:0 10px 22px -6px rgba(29,29,31,.55)}
-@media(max-width:640px){.title-row{flex-direction:column;gap:8px}.cross-link{position:static;transform:none}.cross-link:hover{transform:translateX(2px)}}
 .keybar{display:flex;align-items:center;justify-content:center;gap:9px;flex-wrap:wrap;width:100%}
 .keybar input[type=password],.keybar input[type=text],.keybar select{
   border:1px solid rgba(255,255,255,.9);border-radius:11px;padding:9px 12px;font-size:13px;
@@ -142,6 +132,12 @@ header.top h1{font-size:18px;margin:0;letter-spacing:1.2px;text-align:center;fon
 #keyPoolRoot .kpfoot{margin-top:14px;color:var(--sub);font-size:11.5px;line-height:1.7}
 #keyPoolRoot .kpfoot a{color:var(--pri-d);font-weight:700;text-decoration:none}
 #keyPoolRoot .kpempty{padding:26px;text-align:center;color:var(--sub-2);font-size:13px}
+#keyPoolRoot .kpbulk{margin-bottom:13px;display:flex;flex-direction:column;gap:8px}
+#keyPoolRoot .kpbulk[hidden]{display:none}
+#keyPoolRoot #keyBulkArea{width:100%;min-height:88px;resize:vertical;border:1px solid rgba(15,23,42,.12);border-radius:11px;padding:10px 12px;font-size:12.5px;font-family:ui-monospace,Menlo,Consolas,monospace;background:rgba(255,255,255,.7);color:var(--ink);line-height:1.5}
+#keyPoolRoot #keyBulkArea:focus{outline:none;border-color:var(--pri);box-shadow:var(--ring);background:#fff}
+#keyPoolRoot .kpbrow{display:flex;align-items:center;flex-wrap:wrap;gap:8px}
+#keyPoolRoot .kpbhint{font-size:11.5px;color:var(--sub-2)}
 @media(max-width:640px){#keyPoolRoot .kpcard{margin:2vh auto;width:calc(100% - 16px);max-height:96vh;padding:15px 13px;border-radius:19px}
 #keyPoolRoot .keyrow{gap:6px}#keyPoolRoot .keyrow::before{flex-basis:24px}
 #keyPoolRoot .keyrow .keymark{flex-basis:74px;font-size:10.5px;padding:3px 5px}}
@@ -513,22 +509,22 @@ html{scroll-behavior:smooth}
 ::-webkit-scrollbar-thumb:hover{background:rgba(120,140,180,.62);background-clip:content-box;border:2px solid transparent}
 ::-webkit-scrollbar-corner{background:transparent}
 /* 交互缓动统一为 spring（只覆盖 timing-function，保留各自时长） */
-button,.pg,.viewtabs a,.viewtabs .on,.tabs button,.cross-link,.pool-btn,.svc-dl,.svc-stop,.kpbtn,.kpx,.x,.pox,.pager .pg,.rank-card,.stat-box,.card,.sg,.mm,.match,.mrow,.chp,.ohp,.pill,input,textarea,select,.keyinp,.caret{transition-timing-function:var(--ease-spring)}
+button,.pg,.viewtabs a,.viewtabs .on,.tabs button,.pool-btn,.svc-dl,.svc-stop,.kpbtn,.kpx,.x,.pox,.pager .pg,.rank-card,.stat-box,.card,.sg,.mm,.match,.mrow,.chp,.ohp,.pill,input,textarea,select,.keyinp,.caret{transition-timing-function:var(--ease-spring)}
 /* 按压反馈 */
 button:not(:disabled):active,.pager .pg:not(.dis):not(.cur):active,.tabs button:active,.kpbtn:active,.pool-btn:active,.svc-dl:active,.svc-stop:active{transform:scale(.96)}
-.viewtabs a:active,.cross-link:active{transform:scale(.97)}
+.viewtabs a:active{transform:scale(.97)}
 /* ---------- 滚动入场（配合 motion.js 打 [data-rv]/.rv-in） ---------- */
 [data-rv]{opacity:0;transform:translateY(22px);transition:opacity .6s var(--ease-out),transform .6s var(--ease-spring);will-change:opacity,transform}
 [data-rv].rv-in{opacity:1;transform:none}
 /* ---------- 弹窗：遮罩淡入 + 卡片 spring 上滑（覆盖原 pop） ---------- */
-#keyPoolRoot .kpcard,#lolpoolRoot .card,#posterRoot .pocard{animation:modalIn .46s var(--ease-spring) both}
-#keyPoolRoot .kpmask,#lolpoolRoot .mask,#posterRoot .pomask{animation:maskIn .32s var(--ease-out) both}
+#keyPoolRoot .kpcard,#posterRoot .pocard{animation:modalIn .46s var(--ease-spring) both}
+#keyPoolRoot .kpmask,#posterRoot .pomask{animation:maskIn .32s var(--ease-out) both}
 @keyframes modalIn{from{opacity:0;transform:translateY(26px) scale(.965)}to{opacity:1;transform:none}}
 @keyframes maskIn{from{opacity:0}to{opacity:1}}
 @keyframes modalOut{to{opacity:0;transform:translateY(18px) scale(.975)}}
 @keyframes maskOut{to{opacity:0}}
-#keyPoolRoot.closing .kpcard,#lolpoolRoot.closing .card,#posterRoot.closing .pocard{animation:modalOut .26s var(--ease-inout) both}
-#keyPoolRoot.closing .kpmask,#lolpoolRoot.closing .mask,#posterRoot.closing .pomask{animation:maskOut .26s var(--ease-inout) both}
+#keyPoolRoot.closing .kpcard,#posterRoot.closing .pocard{animation:modalOut .26s var(--ease-inout) both}
+#keyPoolRoot.closing .kpmask,#posterRoot.closing .pomask{animation:maskOut .26s var(--ease-inout) both}
 /* ---------- 卡片展开丝滑（PUBG .mdetail / LOL 单人 .m-detail，高度由 motion.js 精确给） ---------- */
 .mrow .mdetail{display:block;max-height:0;opacity:0;overflow:hidden;padding:0 13px;background:rgba(255,255,255,.4);
   transition:max-height .46s var(--ease-spring),opacity .34s var(--ease-out),padding .34s var(--ease-spring)}
@@ -541,8 +537,8 @@ button:not(:disabled):active,.pager .pg:not(.dis):not(.cur):active,.tabs button:
 @media (prefers-reduced-motion:reduce){
   html{scroll-behavior:auto}
   [data-rv]{opacity:1!important;transform:none!important;transition:none!important}
-  #keyPoolRoot .kpcard,#lolpoolRoot .card,#posterRoot .pocard,
-  #keyPoolRoot .kpmask,#lolpoolRoot .mask,#posterRoot .pomask{animation-duration:.01ms!important}
+  #keyPoolRoot .kpcard,#posterRoot .pocard,
+  #keyPoolRoot .kpmask,#posterRoot .pomask{animation-duration:.01ms!important}
   .mrow .mdetail,.match .m-detail{transition:none}
 }
 </style>
@@ -552,7 +548,6 @@ button:not(:disabled):active,.pager .pg:not(.dis):not(.cur):active,.tabs button:
   <header class="top">
     <div class="title-row">
       <h1>PUBG 战绩查询（端游 · 官方 API）</h1>
-      <a class="cross-link" href="/lol/" target="_blank" rel="noopener" title="在新标签页打开 LOL 战绩查询">LOL 战绩查询 →</a>
     </div>
     <div class="keybar">
       <button class="kbtn pool-open" id="poolOpenBtn" type="button" title="管理 API Key 账号池">🔑 API Key 账号池<span class="pool-cnt" id="poolCnt">未配置</span></button>
@@ -576,12 +571,22 @@ button:not(:disabled):active,.pager .pg:not(.dis):not(.cur):active,.tabs button:
       <div class="kpsum" id="kpSum"></div>
       <div class="kptools">
         <button class="kpbtn" id="keyAdd" type="button" title="再添加一个 Key">＋ 添加 Key</button>
+        <button class="kpbtn" id="keyRestore" type="button" title="一键补回内置的 6 个默认 Key；已存在的自动跳过，不会重复">＋ 默认 Key</button>
+        <button class="kpbtn" id="keyBulk" type="button" title="把多个 Key 一次性粘进来，自动按换行/逗号/空格拆分、去空白、去重">批量导入</button>
         <button class="kpbtn" id="testBtn" type="button">测试全部</button>
         <button class="kpbtn" id="eyeBtn" type="button" title="显示/隐藏">显示</button>
         <button class="kpbtn kpclear" id="keyClear" type="button" title="删除所有检测为无效的 Key" hidden>清除无效 Key</button>
       </div>
+      <div class="kpbulk" id="keyBulkBox" hidden>
+        <textarea id="keyBulkArea" spellcheck="false" placeholder="把多个 API Key 粘到这里（每行一个；也支持用逗号或空格分隔）。导入时自动去空白、去重，已存在的 Key 自动跳过。"></textarea>
+        <div class="kpbrow">
+          <button class="kpbtn" id="keyBulkGo" type="button">解析并导入</button>
+          <button class="kpbtn" id="keyBulkCancel" type="button">收起</button>
+          <span class="kpbhint" id="keyBulkHint"></span>
+        </div>
+      </div>
       <div class="kprows" id="keyRows"></div>
-      <div class="kpfoot">Key 仅保存在本浏览器（localStorage），不上传任何服务器；免费 Key 约 10 次/分钟，添加多个后查询时自动轮询、叠加配额；显示「限流中」会在约 1 分钟内自动恢复，并非无效。<br><a href="https://developer.pubg.com/" target="_blank" rel="noopener">没有 Key？去 developer.pubg.com 免费注册 →</a><span> 小提示：用 Outlook 邮箱加号别名（如 name+1、name+2@outlook.com）即可注册多个账号。</span></div>
+      <div class="kpfoot">仅保存在本机（localStorage），不上传任何服务器；免费 Key 约 10 次/分钟，添加多个后查询时自动轮询、叠加配额；显示「限流中」会在约 1 分钟内自动恢复，并非无效。<br><a href="https://developer.pubg.com/">没有 Key？去 developer.pubg.com 免费注册 →</a><span> 小提示：用 Outlook 邮箱加号别名（如 name+1、name+2@outlook.com）即可注册多个账号。</span></div>
     </div>
   </div>
 
@@ -965,8 +970,15 @@ function mBadgeCell(pl){
 const KEY_STORE='pubg_api_key',PLAT_STORE='pubg_platform',
   PK_MULTI_IN='pubg_multi_input',PK_SINGLE_IN='pubg_single_input',PK_MODE='pubg_mode_filter',PK_RECENT='pubg_recent_n',
   PK_MULTI='pubg_multi_state',PK_SINGLE='pubg_single_state';
-// 内置默认 Key 池：Android 离线包不携带任何真实 Key；首次打开一律为空，由用户自行添加并持久化到 localStorage
-const DEFAULT_KEYS=[];
+// 内置默认 Key 池：首次打开（本地从未保存过 Key）时自动填入，开箱即用；用户一旦自行增删/清空，则完全以本地 localStorage 为准
+const DEFAULT_KEYS=[
+'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJqdGkiOiJlNzRjOGZmMC05MDNlLTAxM2YtYjM0ZC0xMmM4MmIzNmRhOGQiLCJpc3MiOiJnYW1lbG9ja2VyIiwiaWF0IjoxNzg5MTUyMzM3LCJwdWIiOiJibHVlaG9sZSIsInRpdGxlIjoicHViZyIsImFwcCI6InpqY3gifQ.FNl5G5LNm_aYUAHiIqe2s9yjs7QHnyrgJhuYeIUsTIU',
+'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJqdGkiOiIwMjU1OGYzMC05MDg4LTAxM2YtMWQ5YS0zNmUwMGUzOGE3YTQiLCJpc3MiOiJnYW1lbG9ja2VyIiwiaWF0IjoxNzg5MTgzNzM2LCJwdWIiOiJibHVlaG9sZSIsInRpdGxlIjoicHViZyIsImFwcCI6InB1Ymd6amN4In0.ySOTYRrj_gaxhP6Ot4ZNGLn5Ix_766bBQatdwHuxLtc',
+'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJqdGkiOiJjZTc2NzJjMC05MDg5LTAxM2YtYjM1OS0xMmM4MmIzNmRhOGQiLCJpc3MiOiJnYW1lbG9ja2VyIiwiaWF0IjoxNzg5MTg0NTA4LCJwdWIiOiJibHVlaG9sZSIsInRpdGxlIjoicHViZyIsImFwcCI6Ii01NzRlZjgxOC00ODlmLTQ2NGItODUxOS0zODVmOTZhOWU2OTkifQ.zYzI_-09E5L-IJA4MLnP4TAQqaXAgvzkGc4QnIH6WnI',
+'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJqdGkiOiI4ZjFhMTQ5MC05MDhhLTAxM2YtMWQ5Yy0zNmUwMGUzOGE3YTQiLCJpc3MiOiJnYW1lbG9ja2VyIiwiaWF0IjoxNzg5MTg0ODMxLCJwdWIiOiJibHVlaG9sZSIsInRpdGxlIjoicHViZyIsImFwcCI6Ii0zZGI5M2MzMy1iN2M1LTRhN2QtYTVjNy1jNDIzMDhkZDVlNTMifQ.RIoVCm6gIjV79H8f6HHiWfU06O9lyY53ku6Uj6odSlA',
+'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJqdGkiOiJlMTFlZGIzMC05MDhhLTAxM2YtYjM1Yi0xMmM4MmIzNmRhOGQiLCJpc3MiOiJnYW1lbG9ja2VyIiwiaWF0IjoxNzg5MTg0OTY4LCJwdWIiOiJibHVlaG9sZSIsInRpdGxlIjoicHViZyIsImFwcCI6Ii04NzdjMjViZC1iN2UwLTQxZDMtOGVkYy1iMzEyOGQxZDY4MTAifQ.QDNPXi1gMcHtOAjZGfLp9lClKXuM4jy6UXRA0gkxFeI',
+'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJqdGkiOiI2NjE1Y2RkMC05MGM1LTAxM2YtYjM2Yy0xMmM4MmIzNmRhOGQiLCJpc3MiOiJnYW1lbG9ja2VyIiwiaWF0IjoxNzg5MjEwMTAyLCJwdWIiOiJibHVlaG9sZSIsInRpdGxlIjoicHViZyIsImFwcCI6InB1Ymd6amN4MTAifQ.GPcEw5TIasjH6tFlnO7aMORF4WFPtSusRtA9QsyuSh4'
+];
 // 控件值持久化：刷新后恢复输入框/下拉，并在改动时写回
 function bindPersist(el,key,evt){if(!el)return;
   try{const v=localStorage.getItem(key);if(v!==null)el.value=v;}catch(e){}
@@ -985,6 +997,17 @@ function rawKeyFrags(){
 function collectKeyVals(){return [...new Set(rawKeyFrags())];}
 function getKeys(){return collectKeyVals();}
 function getKey(){return getKeys()[0]||'';}
+// 纯函数：把任意粘贴文本按换行/逗号/空格/分号拆成干净 Key 片段（去首尾空白、去空项）
+function parseKeyBlob(text){
+  return String(text==null?'':text).split(/[\s,;；，]+/).map(s=>s.trim()).filter(Boolean);
+}
+// 纯函数：合并现有 Key 与新导入 Key，保持出现顺序、整体去重、去空白
+function mergeKeys(existing,incoming){
+  const seen=new Set(),out=[];
+  (existing||[]).map(s=>String(s).trim()).filter(Boolean).forEach(k=>{if(!seen.has(k)){seen.add(k);out.push(k);}});
+  (incoming||[]).map(s=>String(s).trim()).filter(Boolean).forEach(k=>{if(!seen.has(k)){seen.add(k);out.push(k);}});
+  return out;
+}
 // 透明计数：输入行数 / Key 片段总数（含重复）/ 去重后实际参与轮询数 / 重复数 / 空框数
 function keyCounts(){
   const rows=[...KEY_ROWS.querySelectorAll('input.keyinp')];
@@ -1144,11 +1167,34 @@ function clearBadKeys(){
   let vals=[],firstVisit=false,storedKeys=null;
   try{storedKeys=localStorage.getItem(KEY_STORE);
     const p=localStorage.getItem(PLAT_STORE);if(p)$('platformSel').value=p;}catch(e){}
-  if(storedKeys===null){vals=DEFAULT_KEYS.slice();firstVisit=true;} // 从未配置过：内置池为空，仅展示一个空输入框，引导用户自行添加
+  if(storedKeys===null){vals=DEFAULT_KEYS.slice();firstVisit=true;} // 从未配置过：用内置默认 Key，开箱即用
   else if(storedKeys)vals=storedKeys.split(/\r?\n/).map(s=>s.trim()).filter(Boolean); // 已保存则以本地为准（空串=主动清空，保持空）
   if(vals.length)vals.forEach(v=>addKeyRow(v));else addKeyRow('');
   if(firstVisit){try{localStorage.setItem(KEY_STORE,collectKeyVals().join('\n'));}catch(e){}}
   $('keyAdd').addEventListener('click',()=>addKeyRow('',true));
+  $('keyRestore').addEventListener('click',()=>{ // 一键补回内置默认 Key：已存在的跳过，缺失的追加，绝不重复
+    const cur=collectKeyVals(),have=new Set(cur);
+    const missing=DEFAULT_KEYS.filter(k=>!have.has(k));
+    if(!missing.length){toast('6 个默认 Key 均已存在，无需添加','s');return;}
+    rebuildKeyRows(cur.concat(missing));persistKeys();
+    const skip=DEFAULT_KEYS.length-missing.length;
+    toast(skip?`已补回 ${missing.length} 个默认 Key，跳过 ${skip} 个已存在`:`已添加全部 ${missing.length} 个默认 Key`,'s');
+  });
+  $('keyBulk').addEventListener('click',()=>{ // 展开/收起批量导入粘贴区
+    const box=$('keyBulkBox');box.hidden=!box.hidden;if(!box.hidden)$('keyBulkArea').focus();
+  });
+  $('keyBulkCancel').addEventListener('click',()=>{$('keyBulkBox').hidden=true;});
+  $('keyBulkGo').addEventListener('click',()=>{ // 解析粘贴文本，合并去重后导入；只计数，绝不记录/打印 Key 内容
+    const incoming=parseKeyBlob($('keyBulkArea').value);
+    if(!incoming.length){$('keyBulkHint').textContent='未识别到有效 Key，请检查粘贴内容';return;}
+    const cur=collectKeyVals();
+    const merged=mergeKeys(cur,incoming);
+    const added=merged.length-cur.length;
+    rebuildKeyRows(merged);persistKeys();
+    $('keyBulkArea').value='';
+    $('keyBulkBox').hidden=true;
+    toast(added>0?`已导入 ${added} 个新 Key`:'没有新 Key（全部重复或已存在）','s');
+  });
   $('keyClear').addEventListener('click',clearBadKeys);
   $('platformSel').addEventListener('change',()=>{try{localStorage.setItem(PLAT_STORE,platform());}catch(e){}});
   $('eyeBtn').onclick=()=>{const show=$('eyeBtn').textContent==='显示';
@@ -5016,7 +5062,7 @@ routeView();
   }
   function lockScroll(on){lockDocs().forEach(function(d){setDocLock(d,on);});}
   var RV_SEL='.card,.sg,.mrow,.mm,.match,.rank-card,.stat-box,.fgroup';
-  var MODAL_SEL='#keyPoolRoot,#lolpoolRoot,#posterRoot';
+  var MODAL_SEL='#keyPoolRoot,#posterRoot';
   var MODAL_CARD='.kpcard,.card,.pocard';
   /* ---------------- 滚动入场 ---------------- */
   var io=null;
