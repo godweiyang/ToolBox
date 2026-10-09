@@ -253,6 +253,9 @@ class Handler(BaseHTTPRequestHandler):
                 open_in_file_manager(p)
                 return self._ok(True)
             if path == "/api/shutdown":
+                if IS_ANDROID:
+                    # 内嵌于 app 进程：后端生命周期跟随 app，不允许网页关停（旧页面残留按钮兜底）
+                    return self._ok(True)
                 self._ok(True)
                 def _stop(srv):
                     try:
