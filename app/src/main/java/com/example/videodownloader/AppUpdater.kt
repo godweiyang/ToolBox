@@ -18,6 +18,18 @@ internal object AppUpdater {
     private const val MAX_DOWNLOAD_ATTEMPTS = 4
     private const val PROGRESS_INTERVAL_MS = 200L
 
+    /** 下载取消句柄：cancel() 同时中断网络请求，阻塞中的连接/读取会立即抛异常。 */
+    class DownloadHandle {
+        @Volatile var cancelled = false
+            private set
+        @Volatile var activeCall: okhttp3.Call? = null
+
+        fun cancel() {
+            cancelled = true
+            activeCall?.cancel()
+        }
+    }
+
     private val client = OkHttpClient.Builder()
         .connectTimeout(10, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
@@ -83,6 +95,7 @@ internal object AppUpdater {
     fun downloadApk(
         context: Context,
         info: ReleaseInfo,
+        handle: DownloadHandle = DownloadHandle(),
         onProgress: (copied: Long, total: Long, speedBps: Long) -> Unit
     ): File {
         val url = requireNotNull(info.apkUrl) { "no apk asset" }
@@ -92,8 +105,9 @@ internal object AppUpdater {
 
         var lastError: Exception? = null
         for (attempt in 1..MAX_DOWNLOAD_ATTEMPTS) {
+            if (handle.cancelled) throw java.util.concurrent.CancellationException("download cancelled")
             try {
-                streamOnce(url, part, onProgress)
+                streamOnce(url, part, handle, onProgress)
                 require(part.length() > 1024L) { "downloaded apk is empty" }
                 part.inputStream().use { input ->
                     val magic = ByteArray(4)
@@ -105,23 +119,39 @@ internal object AppUpdater {
                 if (target.exists()) target.delete()
                 check(part.renameTo(target)) { "rename apk failed" }
                 return target
+            } catch (e: java.util.concurrent.CancellationException) {
+                throw e
             } catch (e: Exception) {
+                if (handle.cancelled) throw java.util.concurrent.CancellationException("download cancelled")
                 lastError = e
-                if (attempt < MAX_DOWNLOAD_ATTEMPTS) Thread.sleep(1500L * attempt)
+                if (attempt < MAX_DOWNLOAD_ATTEMPTS) interruptibleSleep(1500L * attempt, handle)
             }
         }
         throw lastError ?: IllegalStateException("download failed")
     }
 
+    private fun interruptibleSleep(ms: Long, handle: DownloadHandle) {
+        var waited = 0L
+        while (waited < ms) {
+            if (handle.cancelled) throw java.util.concurrent.CancellationException("download cancelled")
+            val step = minOf(200L, ms - waited)
+            Thread.sleep(step)
+            waited += step
+        }
+    }
+
     private fun streamOnce(
         url: String,
         part: File,
+        handle: DownloadHandle,
         onProgress: (copied: Long, total: Long, speedBps: Long) -> Unit
     ) {
         val existing = if (part.exists()) part.length() else 0L
         val builder = Request.Builder().url(url).header("User-Agent", "ToolBox-Android-Updater")
         if (existing > 0) builder.header("Range", "bytes=$existing-")
-        downloadClient.newCall(builder.build()).execute().use { response ->
+        val call = downloadClient.newCall(builder.build())
+        handle.activeCall = call
+        call.execute().use { response ->
             if (response.code == 416) {
                 // 本地 .part 比服务器文件还大（换了更低版本等），删掉重下
                 part.delete()
@@ -151,6 +181,7 @@ internal object AppUpdater {
                     while (true) {
                         val read = input.read(buffer)
                         if (read < 0) break
+                        if (handle.cancelled) throw java.util.concurrent.CancellationException("download cancelled")
                         output.write(buffer, 0, read)
                         copied += read
                         val now = System.currentTimeMillis()

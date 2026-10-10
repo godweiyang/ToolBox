@@ -174,16 +174,25 @@ class MainActivity : AppCompatActivity() {
         }
         val dialog = AlertDialog.Builder(this).setView(content.root).create()
         dialog.setOnShowListener { sizeUpdateDialog(dialog) }
+        // 下载过程中也允许点背景 / 返回键取消
+        dialog.setCanceledOnTouchOutside(true)
+        var downloadHandle: AppUpdater.DownloadHandle? = null
+        dialog.setOnCancelListener { downloadHandle?.cancel() }
         content.btnUpdateGo.setOnClickListener {
             if (!canRequestPackageInstalls()) {
                 requestInstallPermission()
                 Toast.makeText(this, R.string.update_install_permission, Toast.LENGTH_LONG).show()
-            } else downloadAndInstall(info, dialog, content)
+            } else {
+                val handle = AppUpdater.DownloadHandle()
+                downloadHandle = handle
+                downloadAndInstall(info, dialog, content, handle)
+            }
         }
         content.btnUpdateBrowser.setOnClickListener {
+            downloadHandle?.cancel()
             AppUpdater.openBrowser(this, info.pageUrl); dialog.dismiss()
         }
-        content.btnUpdateLater.setOnClickListener { dialog.dismiss() }
+        content.btnUpdateLater.setOnClickListener { dialog.cancel() }
         dialog.show()
     }
 
@@ -205,18 +214,18 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun downloadAndInstall(info: ReleaseInfo, dialog: AlertDialog,
-                                   content: DialogAppUpdateBinding) {
+                                   content: DialogAppUpdateBinding,
+                                   handle: AppUpdater.DownloadHandle) {
         val go = content.btnUpdateGo
         go.isEnabled = false
-        content.btnUpdateBrowser.isEnabled = false
-        content.btnUpdateLater.isEnabled = false
+        // 下载（含卡住）时「浏览器下载」「稍后」与背景点击始终可用，不做禁用
         content.pbUpdate.apply { visibility = View.VISIBLE; isIndeterminate = true }
         content.tvUpdateProgress.visibility = View.VISIBLE
         content.tvUpdateSubtitle.setText(R.string.update_preparing)
         lifecycleScope.launch {
             val result = withContext(Dispatchers.IO) {
                 runCatching {
-                    AppUpdater.downloadApk(this@MainActivity, info) { copied, total, speed ->
+                    AppUpdater.downloadApk(this@MainActivity, info, handle) { copied, total, speed ->
                         runOnUiThread { renderDownloadProgress(content, copied, total, speed) }
                     }
                 }
@@ -241,6 +250,9 @@ class MainActivity : AppCompatActivity() {
                         R.string.update_download_failed, Toast.LENGTH_LONG).show()
                 }
             }.onFailure {
+                // 用户主动取消（稍后 / 浏览器 / 背景 / 返回键）：弹窗已关，静默处理
+                if (it is java.util.concurrent.CancellationException) return@onFailure
+                if (!dialog.isShowing) return@onFailure
                 resetDownloadUi(content)
                 Toast.makeText(this@MainActivity,
                     R.string.update_download_failed, Toast.LENGTH_LONG).show()
