@@ -57,9 +57,16 @@ class MortgageCalculatorActivity : AppCompatActivity() {
             binding.incomeBody.visibility = if (on) View.VISIBLE else View.GONE
         }
         binding.btnCalculate.setOnClickListener { calculate() }
-        binding.scrollView.setOnScrollChangeListener { _: View, _: Int, _: Int, _: Int, _: Int ->
-            updateStickyHeader()
-        }
+        binding.scrollView.setOnScrollChangeListener(
+            object : androidx.core.widget.NestedScrollView.OnScrollChangeListener {
+                override fun onScrollChange(
+                    v: androidx.core.widget.NestedScrollView,
+                    scrollX: Int, scrollY: Int, oldScrollX: Int, oldScrollY: Int
+                ) {
+                    updateStickyHeader()
+                }
+            }
+        )
         binding.btnPrevPage.setOnClickListener {
             if (currentPage > 0) { currentPage--; renderPage() }
         }
@@ -450,31 +457,25 @@ class MortgageCalculatorActivity : AppCompatActivity() {
         binding.cardSchedule.post { updateStickyHeader() }
     }
 
-    /** 列名吸顶：明细列表顶部滚出屏幕时，把复制的列名固定在视口顶部。 */
+    /** 列名吸顶：明细列表顶部滚出屏幕时，把覆盖层列名固定在视口顶部。 */
     private fun updateStickyHeader() {
         val sticky = binding.stickyHeader
-        val rv = binding.rvSchedule
         if (result == null || filteredRows.isEmpty()) {
             sticky.visibility = View.GONE
             return
         }
+        val rv = binding.rvSchedule
         val rvLoc = IntArray(2)
         rv.getLocationOnScreen(rvLoc)
         val rvTop = rvLoc[1]
         val rvBottom = rvTop + rv.height
         sticky.measure(
-            View.MeasureSpec.makeMeasureSpec(binding.cardSchedule.width, View.MeasureSpec.EXACTLY),
+            View.MeasureSpec.makeMeasureSpec(binding.root.width, View.MeasureSpec.EXACTLY),
             View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED)
         )
         val h = sticky.measuredHeight
-        if (rvTop < 0 && rvBottom > h) {
-            val cardLoc = IntArray(2)
-            binding.cardSchedule.getLocationOnScreen(cardLoc)
-            sticky.visibility = View.VISIBLE
-            sticky.translationY = (-cardLoc[1]).toFloat()
-        } else {
-            sticky.visibility = View.GONE
-        }
+        sticky.visibility =
+            if (rvTop < 0 && rvBottom > h) View.VISIBLE else View.GONE
     }
 
     // ===== 明细列表 =====

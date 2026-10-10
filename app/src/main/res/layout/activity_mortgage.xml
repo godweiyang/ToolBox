@@ -1,6 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.core.widget.NestedScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+<androidx.core.widget.NestedScrollView
     android:id="@+id/scrollView"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
@@ -755,47 +759,50 @@
                             android:textSize="13.5sp" />
                     </LinearLayout>
                 </LinearLayout>
-
-                <!-- 吸顶列名：明细列表滚动到顶部时固定显示 -->
-                <LinearLayout
-                    android:id="@+id/stickyHeader"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_gravity="top"
-                    android:layout_marginStart="16dp"
-                    android:layout_marginEnd="16dp"
-                    android:background="#FFFFFF"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal"
-                    android:paddingStart="14dp"
-                    android:paddingTop="6dp"
-                    android:paddingEnd="14dp"
-                    android:paddingBottom="6dp"
-                    android:visibility="gone">
-
-                    <TextView
-                        android:layout_width="34dp"
-                        android:layout_height="wrap_content"
-                        android:text="@string/mortgage_col_index"
-                        android:textColor="#98A4AF"
-                        android:textSize="11sp" />
-
-                    <TextView
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:text="@string/mortgage_col_month"
-                        android:textColor="#98A4AF"
-                        android:textSize="11sp" />
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="@string/mortgage_col_balance"
-                        android:textColor="#98A4AF"
-                        android:textSize="11sp" />
-                </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
         </LinearLayout>
     </LinearLayout>
 </androidx.core.widget.NestedScrollView>
+
+    <!-- 吸顶列名：明细列表顶部滚出屏幕时固定在视口顶部 -->
+    <LinearLayout
+        android:id="@+id/stickyHeader"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top"
+        android:layout_marginStart="@dimen/screen_side"
+        android:layout_marginEnd="@dimen/screen_side"
+        android:background="#FFFFFF"
+        android:elevation="6dp"
+        android:fitsSystemWindows="true"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="30dp"
+        android:paddingTop="6dp"
+        android:paddingEnd="30dp"
+        android:paddingBottom="6dp"
+        android:visibility="gone">
+
+        <TextView
+            android:layout_width="34dp"
+            android:layout_height="wrap_content"
+            android:text="@string/mortgage_col_index"
+            android:textColor="#98A4AF"
+            android:textSize="11sp" />
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="@string/mortgage_col_month"
+            android:textColor="#98A4AF"
+            android:textSize="11sp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/mortgage_col_balance"
+            android:textColor="#98A4AF"
+            android:textSize="11sp" />
+    </LinearLayout>
+</FrameLayout>
