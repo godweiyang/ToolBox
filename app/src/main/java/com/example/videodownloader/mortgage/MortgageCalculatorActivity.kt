@@ -57,6 +57,9 @@ class MortgageCalculatorActivity : AppCompatActivity() {
             binding.incomeBody.visibility = if (on) View.VISIBLE else View.GONE
         }
         binding.btnCalculate.setOnClickListener { calculate() }
+        binding.scrollView.setOnScrollChangeListener { _: View, _: Int, _: Int, _: Int, _: Int ->
+            updateStickyHeader()
+        }
         binding.btnPrevPage.setOnClickListener {
             if (currentPage > 0) { currentPage--; renderPage() }
         }
@@ -444,6 +447,34 @@ class MortgageCalculatorActivity : AppCompatActivity() {
             "第${currentPage + 1}/${totalPages()}页 · 共${filteredRows.size}期"
         binding.btnPrevPage.isEnabled = currentPage > 0
         binding.btnNextPage.isEnabled = currentPage < totalPages() - 1
+        binding.cardSchedule.post { updateStickyHeader() }
+    }
+
+    /** 列名吸顶：明细列表顶部滚出屏幕时，把复制的列名固定在视口顶部。 */
+    private fun updateStickyHeader() {
+        val sticky = binding.stickyHeader
+        val rv = binding.rvSchedule
+        if (result == null || filteredRows.isEmpty()) {
+            sticky.visibility = View.GONE
+            return
+        }
+        val rvLoc = IntArray(2)
+        rv.getLocationOnScreen(rvLoc)
+        val rvTop = rvLoc[1]
+        val rvBottom = rvTop + rv.height
+        sticky.measure(
+            View.MeasureSpec.makeMeasureSpec(binding.cardSchedule.width, View.MeasureSpec.EXACTLY),
+            View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED)
+        )
+        val h = sticky.measuredHeight
+        if (rvTop < 0 && rvBottom > h) {
+            val cardLoc = IntArray(2)
+            binding.cardSchedule.getLocationOnScreen(cardLoc)
+            sticky.visibility = View.VISIBLE
+            sticky.translationY = (-cardLoc[1]).toFloat()
+        } else {
+            sticky.visibility = View.GONE
+        }
     }
 
     // ===== 明细列表 =====
@@ -464,9 +495,17 @@ class MortgageCalculatorActivity : AppCompatActivity() {
         override fun onBindViewHolder(holder: VH, position: Int) {
             val row = pageItems[position]
             with(holder.itemBinding) {
-                tvRowIndex.text = "${result!!.rows.indexOf(row) + 1}"
+                // 序号按当前筛选结果连续编号；实际总期次在点开详情中查看
+                tvRowIndex.text = "${filteredRows.indexOf(row) + 1}"
                 tvRowDate.text = "${row.y}年${row.m + 1}月"
-                tvRowPay.text = money(row.cashOut)
+                tvRowMonthly.text = getString(R.string.mortgage_monthly_label, money(row.regPayTotal))
+                if (row.endTotal == 0L) {
+                    tvRowPay.text = getString(R.string.mortgage_settled)
+                    tvRowPay.setTextColor(0xFF2E9E6B.toInt())
+                } else {
+                    tvRowPay.text = money(row.endTotal)
+                    tvRowPay.setTextColor(0xFF0F3B5D.toInt())
+                }
                 tvRowPrepay.visibility = if (row.prepayTotal > 0) View.VISIBLE else View.GONE
                 root.setOnClickListener {
                     showDetail(row)

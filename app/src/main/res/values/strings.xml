@@ -334,8 +334,12 @@
     <string name="mortgage_schedule">还款明细</string>
     <string name="mortgage_prepay_short">提前还款</string>
     <string name="mortgage_filter_december">每年12月</string>
-    <string name="mortgage_prev_page">上一页</string>
-    <string name="mortgage_next_page">下一页</string>
+    <string name="mortgage_prev_page">上一页</string>    <string name="mortgage_next_page">下一页</string>
+    <string name="mortgage_col_index">序号</string>
+    <string name="mortgage_col_month">还款月份</string>
+    <string name="mortgage_col_balance">剩余本金（元）</string>
+    <string name="mortgage_settled">已结清</string>
+    <string name="mortgage_monthly_label">月供 %1$s</string>
     <string name="mortgage_monthly_payment">月供</string>
     <string name="mortgage_principal">本金</string>
     <string name="mortgage_interest">利息</string>

@@ -1,29 +1,46 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
-    android:layout_height="50dp"
+    android:layout_height="wrap_content"
     android:background="?android:attr/selectableItemBackground"
     android:clickable="true"
     android:focusable="true"
     android:gravity="center_vertical"
+    android:minHeight="52dp"
     android:orientation="horizontal"
     android:paddingStart="14dp"
-    android:paddingEnd="14dp">
+    android:paddingTop="8dp"
+    android:paddingEnd="14dp"
+    android:paddingBottom="8dp">
 
     <TextView
         android:id="@+id/tvRowIndex"
-        android:layout_width="30dp"
+        android:layout_width="34dp"
         android:layout_height="wrap_content"
         android:textColor="#98A4AF"
         android:textSize="12sp" />
 
-    <TextView
-        android:id="@+id/tvRowDate"
+    <LinearLayout
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_weight="1"
-        android:textColor="#1C2B36"
-        android:textSize="13.5sp" />
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/tvRowDate"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textColor="#1C2B36"
+            android:textSize="14sp" />
+
+        <TextView
+            android:id="@+id/tvRowMonthly"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="1dp"
+            android:textColor="#98A4AF"
+            android:textSize="11sp" />
+    </LinearLayout>
 
     <TextView
         android:id="@+id/tvRowPrepay"
