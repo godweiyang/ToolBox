@@ -291,14 +291,14 @@
     <string name="mortgage_type_commercial">商业贷款</string>
     <string name="mortgage_type_fund">公积金贷款</string>
     <string name="mortgage_type_combo">组合贷款</string>
-    <string name="mortgage_amount">贷款金额（元）</string>
+    <string name="mortgage_amount">贷款金额</string>
     <string name="mortgage_rate">年利率（%）</string>
-    <string name="mortgage_years">年限（年）</string>
+    <string name="mortgage_years">年限</string>
     <string name="mortgage_method">还款方式</string>
     <string name="mortgage_method_equal_payment">等额本息</string>
     <string name="mortgage_method_equal_principal">等额本金</string>
     <string name="mortgage_prepay">提前还款（选填）</string>
-    <string name="mortgage_prepay_amount">每次还款金额（元）</string>
+    <string name="mortgage_prepay_amount">每次还款金额</string>
     <string name="mortgage_prepay_target">冲抵贷款</string>
     <string name="mortgage_target_auto">按利率自动</string>
     <string name="mortgage_prepay_months">提前还款月份（可多选）</string>
@@ -306,10 +306,10 @@
     <string name="mortgage_mode_shorten">缩短期限，月供不变</string>
     <string name="mortgage_mode_reduce">减少月供，期限不变</string>
     <string name="mortgage_income">收入与存款（选填）</string>
-    <string name="mortgage_savings">当前存款（元）</string>
-    <string name="mortgage_annual_income">税后年收入（元）</string>
-    <string name="mortgage_annual_living">年生活支出（元）</string>
-    <string name="mortgage_monthly_fund">月公积金（元）</string>
+    <string name="mortgage_savings">当前存款</string>
+    <string name="mortgage_annual_income">税后年收入</string>
+    <string name="mortgage_annual_living">年生活支出</string>
+    <string name="mortgage_monthly_fund">月公积金</string>
     <string name="mortgage_calculate">开始测算</string>
     <string name="mortgage_res_first_pay">首月月供</string>
     <string name="mortgage_res_months">还款月数</string>
@@ -324,7 +324,7 @@
 
     <!-- 重构版（v1.9.45） -->
     <string name="mortgage_loan_settings">贷款设置</string>
-    <string name="mortgage_rate_percent">年利率（%）</string>
+    <string name="mortgage_rate_percent">年利率</string>
     <string name="mortgage_total_payment">还款总额</string>
     <string name="mortgage_total_interest">累计利息</string>
     <string name="mortgage_total_prepay">提前还款总额</string>

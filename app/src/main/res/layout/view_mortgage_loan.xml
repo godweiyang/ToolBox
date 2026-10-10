@@ -27,7 +27,8 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:hint="@string/mortgage_amount">
+            android:hint="@string/mortgage_amount"
+            app:suffixText="元">
 
             <com.google.android.material.textfield.TextInputEditText
                             style="@style/Mortgage.Editor.EditText"
@@ -45,7 +46,8 @@
             android:layout_height="wrap_content"
             android:layout_marginStart="10dp"
             android:layout_weight="1"
-            android:hint="@string/mortgage_rate_percent">
+            android:hint="@string/mortgage_rate_percent"
+            app:suffixText="%">
 
             <com.google.android.material.textfield.TextInputEditText
                             style="@style/Mortgage.Editor.EditText"

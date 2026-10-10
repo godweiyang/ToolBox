@@ -172,7 +172,8 @@
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
                             android:layout_weight="1"
-                            android:hint="@string/mortgage_prepay_amount">
+                            android:hint="@string/mortgage_prepay_amount"
+                            app:suffixText="元">
 
                             <com.google.android.material.textfield.TextInputEditText
                             style="@style/Mortgage.Editor.EditText"
@@ -296,7 +297,8 @@
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
                             android:layout_weight="1"
-                            android:hint="@string/mortgage_savings">
+                            android:hint="@string/mortgage_savings"
+                            app:suffixText="元">
 
                             <com.google.android.material.textfield.TextInputEditText
                             style="@style/Mortgage.Editor.EditText"
@@ -314,7 +316,8 @@
                             android:layout_height="wrap_content"
                             android:layout_marginStart="10dp"
                             android:layout_weight="1"
-                            android:hint="@string/mortgage_annual_income">
+                            android:hint="@string/mortgage_annual_income"
+                            app:suffixText="元">
 
                             <com.google.android.material.textfield.TextInputEditText
                             style="@style/Mortgage.Editor.EditText"
@@ -338,7 +341,8 @@
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
                             android:layout_weight="1"
-                            android:hint="@string/mortgage_annual_living">
+                            android:hint="@string/mortgage_annual_living"
+                            app:suffixText="元">
 
                             <com.google.android.material.textfield.TextInputEditText
                             style="@style/Mortgage.Editor.EditText"
@@ -356,7 +360,8 @@
                             android:layout_height="wrap_content"
                             android:layout_marginStart="10dp"
                             android:layout_weight="1"
-                            android:hint="@string/mortgage_monthly_fund">
+                            android:hint="@string/mortgage_monthly_fund"
+                            app:suffixText="元">
 
                             <com.google.android.material.textfield.TextInputEditText
                             style="@style/Mortgage.Editor.EditText"
