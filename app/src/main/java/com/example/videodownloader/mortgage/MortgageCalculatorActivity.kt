@@ -102,8 +102,7 @@ class MortgageCalculatorActivity : AppCompatActivity() {
     }
 
     private fun bindLoanSection(section: ViewMortgageLoanBinding, defaultRate: String) {
-        bindDropdown(section.ddYears,
-            (5..30).map { "${it}年" }, "30年")
+        section.etMonths.setText("360")
         bindDropdown(section.ddMethod,
             listOf(getString(R.string.mortgage_method_equal_payment),
                 getString(R.string.mortgage_method_equal_principal)),
@@ -257,14 +256,14 @@ class MortgageCalculatorActivity : AppCompatActivity() {
     private fun collectLoan(section: ViewMortgageLoanBinding, name: String): LoanInput? {
         val amount = section.etAmount.text.toString().toDoubleOrNull()
         val rate = section.etRate.text.toString().toDoubleOrNull()
-        val years = section.ddYears.text.toString().trimEnd('年').toIntOrNull()
-        if (amount == null || rate == null || years == null ||
-            amount <= 0 || rate < 0 || years <= 0
+        val months = section.etMonths.text.toString().toIntOrNull()
+        if (amount == null || rate == null || months == null ||
+            amount <= 0 || rate < 0 || months <= 0
         ) return null
         val method = if (section.ddMethod.text.toString() ==
             getString(R.string.mortgage_method_equal_principal)
         ) LoanMethod.EQUAL_PRINCIPAL else LoanMethod.EQUAL_PAYMENT
-        return LoanInput(name, amount, rate, years * 12, method)
+        return LoanInput(name, amount, rate, months, method)
     }
 
     private fun invalid() {
@@ -286,7 +285,7 @@ class MortgageCalculatorActivity : AppCompatActivity() {
         fun saveSection(prefix: String, s: ViewMortgageLoanBinding) {
             p.putString("${prefix}amount", s.etAmount.text.toString())
             p.putString("${prefix}rate", s.etRate.text.toString())
-            p.putString("${prefix}years", s.ddYears.v())
+            p.putString("${prefix}months", s.etMonths.text.toString())
             p.putString("${prefix}method", s.ddMethod.v())
         }
         saveSection("c", binding.sectionCommercial)
@@ -322,7 +321,7 @@ class MortgageCalculatorActivity : AppCompatActivity() {
         fun restoreSection(prefix: String, s: ViewMortgageLoanBinding) {
             p.getString("${prefix}amount", null)?.let { s.etAmount.setText(it) }
             p.getString("${prefix}rate", null)?.let { s.etRate.setText(it) }
-            p.getString("${prefix}years", null)?.let { s.ddYears.setText(it, false) }
+            p.getString("${prefix}months", null)?.let { s.etMonths.setText(it) }
             p.getString("${prefix}method", null)?.let { s.ddMethod.setText(it, false) }
         }
         restoreSection("c", binding.sectionCommercial)

@@ -66,22 +66,19 @@
         android:orientation="horizontal">
 
         <com.google.android.material.textfield.TextInputLayout
-            android:id="@+id/tilYears"
-            style="@style/Mortgage.DropdownField"
+            android:id="@+id/tilMonths"
+            style="@style/Mortgage.OutlinedField"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:hint="@string/mortgage_years">
+            android:hint="@string/mortgage_months"
+            app:suffixText="期">
 
-            <AutoCompleteTextView
-                            style="@style/Mortgage.Editor.Dropdown"
-                android:id="@+id/ddYears"
-                android:layout_width="match_parent"
-                android:clickable="true"
-                android:cursorVisible="false"
-                android:focusable="false"
-                android:inputType="none"
-                android:textSize="14sp" />
+            <com.google.android.material.textfield.TextInputEditText
+                style="@style/Mortgage.Editor.EditText"
+                android:id="@+id/etMonths"
+                android:inputType="number"
+                android:maxLength="3" />
         </com.google.android.material.textfield.TextInputLayout>
 
         <com.google.android.material.textfield.TextInputLayout

@@ -293,7 +293,7 @@
     <string name="mortgage_type_combo">组合贷款</string>
     <string name="mortgage_amount">贷款金额</string>
     <string name="mortgage_rate">年利率（%）</string>
-    <string name="mortgage_years">年限</string>
+    <string name="mortgage_months">剩余期数</string>
     <string name="mortgage_method">还款方式</string>
     <string name="mortgage_method_equal_payment">等额本息</string>
     <string name="mortgage_method_equal_principal">等额本金</string>
