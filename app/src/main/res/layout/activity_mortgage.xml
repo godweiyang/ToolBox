@@ -40,7 +40,7 @@
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="14dp"
+                    android:layout_marginTop="12dp"
                     android:orientation="horizontal">
 
                     <com.google.android.material.textfield.TextInputLayout
@@ -52,9 +52,9 @@
                         android:hint="@string/mortgage_start_year">
 
                         <com.google.android.material.textfield.TextInputEditText
+                            style="@style/Mortgage.Editor.EditText"
                             android:id="@+id/etStartYear"
                             android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
                             android:inputType="number"
                             android:maxLength="4"
                             android:textSize="14sp" />
@@ -70,9 +70,9 @@
                         android:hint="@string/mortgage_start_month">
 
                         <AutoCompleteTextView
+                            style="@style/Mortgage.Editor.Dropdown"
                             android:id="@+id/ddStartMonth"
                             android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
                             android:clickable="true"
                             android:cursorVisible="false"
                             android:focusable="false"
@@ -86,13 +86,13 @@
                     style="@style/Mortgage.DropdownField"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="14dp"
+                    android:layout_marginTop="12dp"
                     android:hint="@string/mortgage_loan_type">
 
                     <AutoCompleteTextView
+                            style="@style/Mortgage.Editor.Dropdown"
                         android:id="@+id/ddLoanType"
                         android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
                         android:clickable="true"
                         android:cursorVisible="false"
                         android:focusable="false"
@@ -105,14 +105,14 @@
                     layout="@layout/view_mortgage_loan"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="14dp" />
+                    android:layout_marginTop="12dp" />
 
                 <include
                     android:id="@+id/sectionFund"
                     layout="@layout/view_mortgage_loan"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="10dp" />
+                    android:layout_marginTop="12dp" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
@@ -121,7 +121,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginStart="@dimen/screen_side"
-            android:layout_marginTop="14dp"
+            android:layout_marginTop="12dp"
             android:layout_marginEnd="@dimen/screen_side"
             app:cardBackgroundColor="#FFFFFF"
             app:cardCornerRadius="20dp"
@@ -163,7 +163,7 @@
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="14dp"
+                        android:layout_marginTop="12dp"
                         android:orientation="horizontal">
 
                         <com.google.android.material.textfield.TextInputLayout
@@ -175,9 +175,9 @@
                             android:hint="@string/mortgage_prepay_amount">
 
                             <com.google.android.material.textfield.TextInputEditText
+                            style="@style/Mortgage.Editor.EditText"
                                 android:id="@+id/etPrepayAmount"
                                 android:layout_width="match_parent"
-                                android:layout_height="wrap_content"
                                 android:inputType="number"
                                 android:maxLength="9"
                                 android:textSize="14sp" />
@@ -189,13 +189,13 @@
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
                             android:layout_marginStart="10dp"
-                            android:layout_weight="1.25"
+                            android:layout_weight="1"
                             android:hint="@string/mortgage_prepay_target">
 
                             <AutoCompleteTextView
+                            style="@style/Mortgage.Editor.Dropdown"
                                 android:id="@+id/ddPrepayTarget"
                                 android:layout_width="match_parent"
-                                android:layout_height="wrap_content"
                                 android:clickable="true"
                                 android:cursorVisible="false"
                                 android:focusable="false"
@@ -208,7 +208,7 @@
                         style="@style/Mortgage.FieldLabel"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="14dp"
+                        android:layout_marginTop="12dp"
                         android:text="@string/mortgage_prepay_months" />
 
                     <LinearLayout
@@ -227,9 +227,9 @@
                         android:hint="@string/mortgage_prepay_mode">
 
                         <AutoCompleteTextView
+                            style="@style/Mortgage.Editor.Dropdown"
                             android:id="@+id/ddPrepayMode"
                             android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
                             android:clickable="true"
                             android:cursorVisible="false"
                             android:focusable="false"
@@ -245,7 +245,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginStart="@dimen/screen_side"
-            android:layout_marginTop="14dp"
+            android:layout_marginTop="12dp"
             android:layout_marginEnd="@dimen/screen_side"
             app:cardBackgroundColor="#FFFFFF"
             app:cardCornerRadius="20dp"
@@ -287,7 +287,7 @@
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="14dp"
+                        android:layout_marginTop="12dp"
                         android:orientation="horizontal">
 
                         <com.google.android.material.textfield.TextInputLayout
@@ -299,9 +299,9 @@
                             android:hint="@string/mortgage_savings">
 
                             <com.google.android.material.textfield.TextInputEditText
+                            style="@style/Mortgage.Editor.EditText"
                                 android:id="@+id/etSavings"
                                 android:layout_width="match_parent"
-                                android:layout_height="wrap_content"
                                 android:inputType="number"
                                 android:maxLength="9"
                                 android:textSize="14sp" />
@@ -317,9 +317,9 @@
                             android:hint="@string/mortgage_annual_income">
 
                             <com.google.android.material.textfield.TextInputEditText
+                            style="@style/Mortgage.Editor.EditText"
                                 android:id="@+id/etAnnualIncome"
                                 android:layout_width="match_parent"
-                                android:layout_height="wrap_content"
                                 android:inputType="number"
                                 android:maxLength="9"
                                 android:textSize="14sp" />
@@ -329,7 +329,7 @@
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="10dp"
+                        android:layout_marginTop="12dp"
                         android:orientation="horizontal">
 
                         <com.google.android.material.textfield.TextInputLayout
@@ -341,9 +341,9 @@
                             android:hint="@string/mortgage_annual_living">
 
                             <com.google.android.material.textfield.TextInputEditText
+                            style="@style/Mortgage.Editor.EditText"
                                 android:id="@+id/etAnnualLiving"
                                 android:layout_width="match_parent"
-                                android:layout_height="wrap_content"
                                 android:inputType="number"
                                 android:maxLength="9"
                                 android:textSize="14sp" />
@@ -359,9 +359,9 @@
                             android:hint="@string/mortgage_monthly_fund">
 
                             <com.google.android.material.textfield.TextInputEditText
+                            style="@style/Mortgage.Editor.EditText"
                                 android:id="@+id/etMonthlyFund"
                                 android:layout_width="match_parent"
-                                android:layout_height="wrap_content"
                                 android:inputType="number"
                                 android:maxLength="9"
                                 android:textSize="14sp" />
@@ -580,7 +580,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="@dimen/screen_side"
-                android:layout_marginTop="14dp"
+                android:layout_marginTop="12dp"
                 android:layout_marginEnd="@dimen/screen_side"
                 app:cardBackgroundColor="#FFFFFF"
                 app:cardCornerRadius="16dp"
@@ -599,7 +599,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="@dimen/screen_side"
-                android:layout_marginTop="14dp"
+                android:layout_marginTop="12dp"
                 android:layout_marginEnd="@dimen/screen_side"
                 app:cardBackgroundColor="#FFFFFF"
                 app:cardCornerRadius="16dp"

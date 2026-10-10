@@ -30,9 +30,9 @@
             android:hint="@string/mortgage_amount">
 
             <com.google.android.material.textfield.TextInputEditText
+                            style="@style/Mortgage.Editor.EditText"
                 android:id="@+id/etAmount"
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
                 android:inputType="number"
                 android:maxLength="9"
                 android:textSize="14sp" />
@@ -48,9 +48,9 @@
             android:hint="@string/mortgage_rate_percent">
 
             <com.google.android.material.textfield.TextInputEditText
+                            style="@style/Mortgage.Editor.EditText"
                 android:id="@+id/etRate"
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
                 android:inputType="numberDecimal"
                 android:maxLength="5"
                 android:textSize="14sp" />
@@ -60,7 +60,7 @@
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="10dp"
+        android:layout_marginTop="12dp"
         android:orientation="horizontal">
 
         <com.google.android.material.textfield.TextInputLayout
@@ -72,9 +72,9 @@
             android:hint="@string/mortgage_years">
 
             <AutoCompleteTextView
+                            style="@style/Mortgage.Editor.Dropdown"
                 android:id="@+id/ddYears"
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
                 android:clickable="true"
                 android:cursorVisible="false"
                 android:focusable="false"
@@ -88,13 +88,13 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_marginStart="10dp"
-            android:layout_weight="1.15"
+            android:layout_weight="1"
             android:hint="@string/mortgage_method">
 
             <AutoCompleteTextView
+                            style="@style/Mortgage.Editor.Dropdown"
                 android:id="@+id/ddMethod"
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
                 android:clickable="true"
                 android:cursorVisible="false"
                 android:focusable="false"

@@ -86,7 +86,9 @@ class MortgageCalculatorActivity : AppCompatActivity() {
         binding.ddLoanType.setOnItemClickListener { _, _, position, _ -> applyLoanType(position) }
 
         bindLoanSection(binding.sectionCommercial, "3.5")
+        binding.sectionCommercial.tvLoanSectionTitle.setText(R.string.mortgage_type_commercial)
         bindLoanSection(binding.sectionFund, "2.85")
+        binding.sectionFund.tvLoanSectionTitle.setText(R.string.mortgage_type_fund)
 
         bindDropdown(binding.ddPrepayTarget,
             listOf(getString(R.string.mortgage_type_commercial),
