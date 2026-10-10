@@ -84,6 +84,7 @@ class MortgageCalculatorActivity : AppCompatActivity() {
                 getString(R.string.mortgage_type_combo)),
             getString(R.string.mortgage_type_commercial))
         binding.ddLoanType.setOnItemClickListener { _, _, position, _ -> applyLoanType(position) }
+        applyLoanType(0)
 
         bindLoanSection(binding.sectionCommercial, "3.5")
         binding.sectionCommercial.tvLoanSectionTitle.setText(R.string.mortgage_type_commercial)
@@ -199,6 +200,7 @@ class MortgageCalculatorActivity : AppCompatActivity() {
         }
 
         val typeIdx = currentLoanType()
+        applyLoanType(typeIdx)
 
         val loans = mutableListOf<LoanInput>()
         if (typeIdx != 1) {

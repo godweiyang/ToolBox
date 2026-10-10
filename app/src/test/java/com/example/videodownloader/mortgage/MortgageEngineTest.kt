@@ -62,6 +62,30 @@ class MortgageEngineTest {
     }
 
     @Test
+    fun combo_twoLoans_totals() {
+        val commercial = LoanInput("商业贷款", 1_000_000.0, 3.5, 120, LoanMethod.EQUAL_PAYMENT)
+        val fund = LoanInput("公积金贷款", 400_000.0, 2.85, 120, LoanMethod.EQUAL_PAYMENT)
+        val r = MortgageEngine.buildSchedule(ScheduleConfig(2026, 9, listOf(commercial, fund)))
+
+        assertEquals(120, r.rows.size)
+        val first = r.rows.first()
+        // 商贷月供 9889 + 公积金月供 3835 = 13724
+        assertEquals(13_724, first.regPayTotal)
+        // 首月利息 2917 + 950 = 3867
+        assertEquals(3_867, first.interestTotal)
+        // 独立复算：商贷总还款 1186620 + 公积金 460173
+        assertEquals(1_646_793L, r.rows.sumOf { it.cashOut })
+        assertEquals(246_793L, r.totalInterest)
+        // 两笔贷款都有独立汇总
+        assertEquals(2, r.loanSummary.size)
+        assertEquals("商业贷款", r.loanSummary[0].name)
+        assertEquals("公积金贷款", r.loanSummary[1].name)
+        assertEquals(186_620L, r.loanSummary[0].totalInterest)
+        assertEquals(60_173L, r.loanSummary[1].totalInterest)
+        assertEquals(0L, r.rows.last().endTotal)
+    }
+
+    @Test
     fun income_earliestPayoff() {
         val cfg = ScheduleConfig(
             2026, 9, listOf(commercialLoan),
