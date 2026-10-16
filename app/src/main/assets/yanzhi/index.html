@@ -300,7 +300,7 @@ function ensureOrtLib(){
     s.onload=()=>{
       try{
         if(!window.ort||!ort.env||!ort.env.wasm)throw new Error('ORT WASM runtime unavailable');
-        ort.env.wasm.wasmPaths='assets/ort/';
+        ort.env.wasm.wasmPaths=new URL('assets/ort/',location.href).href;
         ort.env.wasm.numThreads=1;
         ort.env.wasm.proxy=false;
         resolve();

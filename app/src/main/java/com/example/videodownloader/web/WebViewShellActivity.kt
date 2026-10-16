@@ -106,6 +106,11 @@ class WebViewShellActivity : AppCompatActivity() {
         }
 
         setupWebView()
+        if (toolId == "yanzhi") {
+            // 颜值运行时（ORT JS/MJS/WASM）随 APP 升级；清理 WebView HTTP 缓存可避免继续命中旧二进制。
+            // 三路 ONNX 位于 filesDir/yanzhi_models，不属于 WebView 缓存，不会被删除或重新下载。
+            binding.webView.clearCache(true)
+        }
         binding.webView.loadUrl(WebToolRegistry.assetUrl(toolId))
     }
 
