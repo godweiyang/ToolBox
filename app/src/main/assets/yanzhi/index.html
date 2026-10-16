@@ -296,8 +296,17 @@ function ensureOrtLib(){
   if (window.ort) return Promise.resolve();
   if (ortLoading) return ortLoading;
   ortLoading = new Promise((resolve,reject)=>{
-    const s=document.createElement('script'); s.src='assets/ort/ort.min.js';
-    s.onload=resolve; s.onerror=()=>{ortLoading=null;reject(new Error('ORT runtime load failed'));};
+    const s=document.createElement('script'); s.src='assets/ort/ort.wasm.min.js';
+    s.onload=()=>{
+      try{
+        if(!window.ort||!ort.env||!ort.env.wasm)throw new Error('ORT WASM runtime unavailable');
+        ort.env.wasm.wasmPaths='assets/ort/';
+        ort.env.wasm.numThreads=1;
+        ort.env.wasm.proxy=false;
+        resolve();
+      }catch(e){ortLoading=null;reject(e);}
+    };
+    s.onerror=()=>{ortLoading=null;reject(new Error('ORT runtime load failed'));};
     document.head.appendChild(s);
   });
   return ortLoading;
@@ -817,8 +826,10 @@ async function runAnalysis(){
   }catch(e){
     console.error(e);
     const msg=e&&e.message?e.message:String(e||"");
-    if(/fetch|wasm|network|Failed to load|createFromOptions/i.test(msg))
-      setStatus("本地人脸模型加载失败，请刷新重试；若仍失败，请清理浏览器缓存或换用最新版 Chrome/Edge","err");
+    if(/ORT|onnx|backend|jsep|runtime/i.test(msg))
+      setStatus("审美模型推理组件加载失败："+msg,"err");
+    else if(/fetch|wasm|network|Failed to load|createFromOptions/i.test(msg))
+      setStatus("本地人脸关键点组件加载失败："+msg,"err");
     else if(/memory|allocation|out of bounds/i.test(msg))
       setStatus("设备内存不足，请关闭其他页面或先将图片截屏/压缩后重试","err");
     else setStatus("分析失败："+msg,"err");
