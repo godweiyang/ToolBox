@@ -8,11 +8,11 @@ import org.junit.Test
 
 class WebToolRegistryTest {
 
-    @Test fun `registry knows the three offline tools`() {
-        assertEquals(setOf("lol", "pubg", "fangdai"), WebToolRegistry.ids.toSet())
+    @Test fun `registry knows the offline tools`() {
+        assertEquals(setOf("lol", "pubg", "yanzhi"), WebToolRegistry.ids.toSet())
         assertEquals("lol", WebToolRegistry.byId("lol")?.id)
         assertEquals("pubg", WebToolRegistry.byId("pubg")?.id)
-        assertEquals("fangdai", WebToolRegistry.byId("fangdai")?.id)
+        assertEquals("yanzhi", WebToolRegistry.byId("yanzhi")?.id)
         assertNull(WebToolRegistry.byId("not_a_tool"))
         assertNull(WebToolRegistry.byId(null))
     }
@@ -24,8 +24,8 @@ class WebToolRegistryTest {
     @Test fun `asset url points at appassets origin`() {
         assertEquals("https://appassets.androidplatform.net/assets/lol/index.html",
             WebToolRegistry.assetUrl("lol"))
-        assertEquals("https://appassets.androidplatform.net/assets/fangdai/index.html",
-            WebToolRegistry.assetUrl("fangdai"))
+        assertEquals("https://appassets.androidplatform.net/assets/yanzhi/index.html",
+            WebToolRegistry.assetUrl("yanzhi"))
     }
 
     /**
@@ -47,17 +47,17 @@ class WebToolRegistryTest {
             listOf("qrcode", "video_downloader", "photo_frame",
                 "video_to_gif", "ninegrid", "gifreverse", "decibel",
                 "wifi_signal", "fileshare", "metal_detector", "battery_info",
-                "gnss_sky", "lol", "pubg", "fangdai"),
+                "gnss_sky", "lol", "pubg", "yanzhi"),
             merged
         )
     }
 
     @Test fun `web tools can be reordered by user like any tool`() {
         val defaultIds = listOf("video_downloader", "qrcode") + WebToolRegistry.ids
-        // 用户把 fangdai 排到最前
-        val saved = listOf("fangdai", "lol", "video_downloader")
+        // 用户把 yanzhi 排到最前
+        val saved = listOf("yanzhi", "lol", "video_downloader")
         val merged = ToolOrder.reconcile(defaultIds, saved)
-        assertEquals(listOf("fangdai", "lol", "video_downloader", "qrcode", "pubg"), merged)
+        assertEquals(listOf("yanzhi", "lol", "video_downloader", "qrcode", "pubg"), merged)
     }
 
     @Test fun `dropping a web tool removes it from result set`() {

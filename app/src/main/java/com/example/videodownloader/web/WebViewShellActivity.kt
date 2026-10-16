@@ -13,6 +13,8 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.webkit.MimeTypeMap
+import android.webkit.ValueCallback
+import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebSettings
@@ -49,6 +51,18 @@ class WebViewShellActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityWebShellBinding
     private var toolId: String = "lol"
+    private var pendingFileCallback: ValueCallback<Array<Uri>>? = null
+    private val yanzhiModels: YanzhiModelManager by lazy { YanzhiModelManager(applicationContext) }
+    @Volatile private var yanzhiDownloadRunning = false
+
+    private val fileChooserLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        val callback = pendingFileCallback ?: return@registerForActivityResult
+        pendingFileCallback = null
+        val uris = WebChromeClient.FileChooserParams.parseResult(result.resultCode, result.data)
+        callback.onReceiveValue(uris)
+    }
 
     // API 26–28 写公共相册需要运行时申请 WRITE_EXTERNAL_STORAGE
     private var storagePermissionContinuation: ((Boolean) -> Unit)? = null
@@ -140,6 +154,12 @@ class WebViewShellActivity : AppCompatActivity() {
                 val urlStr = url.toString()
                 // appassets 源：/assets/<tool>/... 与对外友好路径 /<tool>/... 都映射到本地 assets
                 if (WebRoutePolicy.isAssetOrigin(urlStr)) {
+                    if (toolId == "yanzhi") {
+                        val modelName = url.pathSegments.lastOrNull()
+                            ?.substringBefore('?')
+                            ?.takeIf { name -> YanzhiModelManager.SPECS.any { it.fileName == name } }
+                        if (modelName != null) return serveYanzhiModel(modelName)
+                    }
                     val assetPath = WebRoutePolicy.resolveAssetPath(url.path)
                     if (assetPath != null) return serveAsset(assetPath)
                 }
@@ -160,7 +180,36 @@ class WebViewShellActivity : AppCompatActivity() {
         }
 
         // window.open / target=_blank：内部页在外壳内打开，外链交浏览器
-        binding.webView.webChromeClient = object : android.webkit.WebChromeClient() {
+        binding.webView.webChromeClient = object : WebChromeClient() {
+            override fun onShowFileChooser(
+                webView: WebView?,
+                filePathCallback: ValueCallback<Array<Uri>>?,
+                fileChooserParams: FileChooserParams?
+            ): Boolean {
+                pendingFileCallback?.onReceiveValue(null)
+                pendingFileCallback = filePathCallback
+                val intent = runCatching { fileChooserParams?.createIntent() }
+                    .getOrNull()
+                    ?.apply {
+                        addCategory(Intent.CATEGORY_OPENABLE)
+                        type = fileChooserParams?.acceptTypes
+                            ?.firstOrNull { it.isNotBlank() && it != "*/*" }
+                            ?: "image/*"
+                    }
+                    ?: Intent(Intent.ACTION_GET_CONTENT).apply {
+                        addCategory(Intent.CATEGORY_OPENABLE)
+                        type = "image/*"
+                    }
+                return runCatching {
+                    fileChooserLauncher.launch(intent)
+                    true
+                }.getOrElse {
+                    pendingFileCallback?.onReceiveValue(null)
+                    pendingFileCallback = null
+                    false
+                }
+            }
+
             override fun onCreateWindow(
                 view: WebView,
                 isDialog: Boolean,
@@ -208,6 +257,23 @@ class WebViewShellActivity : AppCompatActivity() {
         }
     }
 
+    private fun serveYanzhiModel(fileName: String): WebResourceResponse {
+        val file = yanzhiModels.modelFile(fileName)
+        return if (file != null && file.isFile) {
+            WebResourceResponse("application/onnx", null, file.inputStream()).apply {
+                setStatusCodeAndReasonPhrase(200, "OK")
+                responseHeaders = mapOf(
+                    "Content-Length" to file.length().toString(),
+                    "Cache-Control" to "private, max-age=31536000, immutable"
+                )
+            }
+        } else {
+            WebResourceResponse("text/plain", "utf-8", null).apply {
+                setStatusCodeAndReasonPhrase(404, "Model not installed")
+            }
+        }
+    }
+
     /** 把 appassets 请求映射到本地 assets 文件。 */
     private fun serveAsset(assetPath: String): WebResourceResponse {
         return try {
@@ -241,6 +307,8 @@ class WebViewShellActivity : AppCompatActivity() {
             "csv" -> "text/csv"
             "mp4" -> "video/mp4"
             "wasm" -> "application/wasm"
+            "onnx" -> "application/onnx"
+            "task" -> "application/octet-stream"
             else -> "application/octet-stream"
         }
     }
@@ -486,6 +554,48 @@ class WebViewShellActivity : AppCompatActivity() {
         toast(R.string.web_shell_copied)
     }
 
+    private fun notifyYanzhiModelState(
+        state: String,
+        loaded: Long,
+        total: Long,
+        currentFile: String = "",
+        message: String = ""
+    ) {
+        val script = "window.onNativeModelDownloadState&&window.onNativeModelDownloadState(" +
+            JSONObject.quote(state) + "," + loaded + "," + total + "," +
+            JSONObject.quote(currentFile) + "," + JSONObject.quote(message) + ");"
+        runOnUiThread { binding.webView.evaluateJavascript(script, null) }
+    }
+
+    private fun startYanzhiModelDownload(): Boolean {
+        if (toolId != "yanzhi") return false
+        if (yanzhiModels.isReady()) {
+            notifyYanzhiModelState("ready", YanzhiModelManager.TOTAL_BYTES, YanzhiModelManager.TOTAL_BYTES, message = "模型已保存在本机")
+            return true
+        }
+        if (yanzhiDownloadRunning) return true
+        yanzhiDownloadRunning = true
+        lifecycleScope.launch {
+            try {
+                yanzhiModels.downloadAll { progress ->
+                    notifyYanzhiModelState(
+                        "downloading",
+                        progress.loaded,
+                        progress.total,
+                        progress.currentFile,
+                        progress.message
+                    )
+                }
+                notifyYanzhiModelState("ready", YanzhiModelManager.TOTAL_BYTES, YanzhiModelManager.TOTAL_BYTES, message = "模型已下载并保存在本机")
+            } catch (t: Throwable) {
+                notifyYanzhiModelState("error", yanzhiModels.installedBytes(), YanzhiModelManager.TOTAL_BYTES, message = t.message ?: "模型下载失败")
+            } finally {
+                yanzhiDownloadRunning = false
+            }
+        }
+        return true
+    }
+
     // ---------------- 导航 ----------------
 
     private fun openExternal(url: String) {
@@ -542,6 +652,22 @@ class WebViewShellActivity : AppCompatActivity() {
 
         @android.webkit.JavascriptInterface
         fun isReady(): Boolean = true
+
+        /** 颜值模型是否已完整下载到 APP 私有目录。 */
+        @android.webkit.JavascriptInterface
+        fun isYanzhiModelReady(): Boolean = toolId == "yanzhi" && yanzhiModels.isReady()
+
+        /** 返回已持久化模型字节数，供页面首屏显示真实状态。 */
+        @android.webkit.JavascriptInterface
+        fun yanzhiModelInstalledBytes(): Long = if (toolId == "yanzhi") yanzhiModels.installedBytes() else 0L
+
+        /** 用户主动触发三路模型下载；已在下载时复用同一任务。 */
+        @android.webkit.JavascriptInterface
+        fun downloadYanzhiModels(): Boolean = startYanzhiModelDownload()
+
+        /** 把 PNG 图片保存到相册并复制图片本身到系统剪贴板。 */
+        @android.webkit.JavascriptInterface
+        fun copyImage(base64Data: String, fileName: String) = onCopyImage(fileName, base64Data)
 
         /**
          * 原生全文档截图（替代页面 html-to-image，避免 WebView 下错位）。

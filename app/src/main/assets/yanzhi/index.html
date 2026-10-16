@@ -1,0 +1,1358 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Cache-Control" content="no-cache,no-store,must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>颜值实验室 · 本地人脸美学分析</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%23173b38'/%3E%3Cpath d='M18 20c7-8 21-8 28 0v17c0 10-7 17-14 17s-14-7-14-17z' fill='none' stroke='%23f3d8d1' stroke-width='4'/%3E%3Cpath d='M23 32h5m8 0h5M27 42c3 2 7 2 10 0' fill='none' stroke='%23d9655c' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+button,input,select{font-family:inherit}
+body{background:#eef2f5;font-family:"PingFang SC","Microsoft YaHei","Segoe UI",sans-serif;color:#1c2b36}
+.top{min-height:86px;background:linear-gradient(90deg,#0f3d57,#14688f 60%,#1e88b5);color:#fff;
+  display:flex;align-items:center;padding:0 30px;justify-content:space-between;flex-wrap:wrap;gap:6px}
+.top h1{margin:0;font-size:24px;letter-spacing:1px}
+.top .ptag{display:block;margin-top:5px;font-size:12px;opacity:.92;font-weight:400}
+.top .r{font-size:12px;opacity:.92;text-align:right;line-height:1.7}
+.ver-badge{display:inline-block;font-size:11px;font-weight:600;color:#fff;background:#0f766e;border-radius:10px;padding:2px 8px}
+.wrap{padding:12px;display:flex;flex-direction:column;gap:12px;max-width:1300px;margin:0 auto}
+.card{background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 3px 14px rgba(20,50,70,.1)}
+.ct{min-height:42px;display:flex;align-items:center;gap:10px;padding:9px 16px;color:#fff;
+  font-size:15px;font-weight:800;flex-wrap:wrap;background:linear-gradient(90deg,#0f3d57,#17688f)}
+.ct small{font-weight:400;font-size:11px;opacity:.9}
+.cbody{padding:16px}
+
+/* 上传 */
+.drop,.drop *{-webkit-user-select:none!important;user-select:none!important;-webkit-touch-callout:none!important}
+.drop{border:2px dashed #bcd2dd;border-radius:12px;background:#f8fbfc;cursor:pointer;
+  transition:border-color .15s,background .15s;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+.drop:hover,.drop.over{border-color:#1e88b5;background:#f0f8fb}
+.drop-inner{padding:34px 18px;text-align:center}
+.drop-inner svg{width:52px;height:52px;color:#1e88b5}
+.drop-inner p{margin:12px 0 4px;font-size:15px;font-weight:700;color:#33414f}
+.drop-inner .sub{font-size:12px;color:#8a97a4;font-weight:400;margin:0}
+.status{margin-top:12px;font-size:13px;color:#5d6b77;min-height:18px}
+.status.err{color:#c62828}
+.status.ok{color:#0f766e}
+.spin{display:inline-block;width:13px;height:13px;border:2px solid #bcd2dd;border-top-color:#1e88b5;
+  border-radius:50%;vertical-align:-2px;margin-right:7px;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* 结果布局 */
+.result-grid{display:grid;grid-template-columns:1fr 1fr;gap:0}
+.photo-col{padding:16px;border-right:1px solid #edf1f4}
+.report-col{padding:16px}
+.canvas-wrap{position:relative;width:100%;border-radius:10px;overflow:hidden;background:#11232e;line-height:0}
+.canvas-wrap img{max-width:100%;height:auto;display:block;margin:0 auto}
+.canvas-wrap canvas{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.analysis-overlay{position:absolute;inset:0;display:none;align-items:center;justify-content:center;padding:18px;background:rgba(17,35,46,.55);color:#fff;line-height:1.5;text-align:center;font-size:14px;font-weight:800;z-index:3}
+.analysis-overlay.show{display:flex}.analysis-panel{width:min(320px,86%);padding:14px 16px;border-radius:12px;background:rgba(16,47,44,.9);box-shadow:0 8px 28px rgba(0,0,0,.2)}.analysis-title{display:flex;align-items:center;justify-content:center}.analysis-overlay .spin{flex:none;border-color:rgba(255,255,255,.45);border-top-color:#fff;margin-right:9px}.model-progress{display:none;height:7px;margin-top:12px;border-radius:99px;overflow:hidden;background:rgba(255,255,255,.2)}.model-progress.show{display:block}.model-progress i{display:block;width:0;height:100%;border-radius:inherit;background:#fff;transition:width .15s ease}.model-progress-meta{display:none;margin-top:7px;color:#d8e4df;font-size:11px;font-weight:500;font-variant-numeric:tabular-nums}.model-progress-meta.show{display:block}
+.layers{display:flex;flex-wrap:wrap;gap:7px;margin-top:11px}
+.lyr{border:1.5px solid #d5dee5;background:#fff;color:#5d6b77;font-size:11.5px;font-weight:700;
+  border-radius:20px;padding:5px 12px;cursor:pointer}
+.lyr .ld{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;vertical-align:1px}
+.lyr.on{border-color:#1e88b5;color:#17688f;background:#f0f8fb}
+.rebtn{margin-left:auto;border:1.5px solid #d5dee5;background:#fff;color:#5d6b77;font-size:12px;font-weight:700;
+  border-radius:8px;padding:6px 14px;cursor:pointer}
+.rebtn:hover{background:#f3f7f9}
+
+/* 总分 */
+.total-box{display:flex;align-items:center;gap:16px;padding:6px 4px 14px;border-bottom:1px solid #eef2f5}
+.ring{position:relative;width:96px;height:96px;flex:none}
+.ring svg{transform:rotate(-90deg)}
+.ring .num{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.ring .num b{font-size:28px;font-weight:900;line-height:1;color:#17688f}
+.ring .num span{font-size:10px;color:#8a97a4;margin-top:3px}
+.grade{font-size:19px;font-weight:900;color:#1c2b36}
+.grade-sub{font-size:12px;color:#8a97a4;margin-top:5px;line-height:1.6}
+
+/* 分项 */
+.metrics{padding:12px 2px 6px;display:flex;flex-direction:column;gap:11px}
+.mt .mt-top{display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:5px}
+.mt .mt-name{font-weight:700;color:#33414f}
+.mt .mt-val{color:#8a97a4;font-weight:700}
+.mt .bar{height:8px;background:#edf1f4;border-radius:5px;overflow:hidden}
+.mt .bar i{display:block;height:100%;border-radius:5px;
+  background:linear-gradient(90deg,#14688f,#1e88b5);width:0;transition:width .6s ease}
+
+/* 评语 */
+.comments{margin-top:6px;display:flex;flex-direction:column;gap:8px}
+.cm{display:flex;gap:9px;font-size:12.5px;line-height:1.6;color:#37474f;
+  background:#f5f9fb;border-radius:9px;padding:9px 11px;border-left:3px solid #1e88b5}
+.cm .cm-ico{flex:none;width:17px;height:17px;color:#1e88b5;margin-top:1px}
+.cm.warn{background:#fdf6ec;border-left-color:#e8a13c}
+.cm.warn .cm-ico{color:#e8a13c}
+
+.foot{max-width:1300px;margin:0 auto;padding:6px 16px 22px;font-size:11px;color:#93a1ad;line-height:1.7}
+.foot b{color:#7a8a96}
+
+@media (max-width:820px){
+  .result-grid{grid-template-columns:1fr}
+  .photo-col{border-right:0;border-bottom:1px solid #edf1f4}
+  .top{padding:14px 18px}
+  .top h1{font-size:20px}
+  .top .r{text-align:left}
+}
+/* ===== v4 视觉覆盖：审美实验室 ===== */
+:root{--paper:#f5f1ea;--surface:#fffdf8;--ink:#173b38;--text:#243431;--muted:#74817d;--coral:#d9655c;--coral-soft:#f3d8d1;--line:#ddd8ce;--gold:#c69b4b}
+body{background:var(--paper);color:var(--text)}
+.top{min-height:104px;background:var(--ink);padding:24px max(22px,calc((100vw - 1260px)/2));gap:18px;border-bottom:6px solid var(--coral)}
+.top h1{font-size:27px;letter-spacing:.5px}.top .ptag{margin-top:8px;font-size:13px;color:#d8e4df}.ver-badge{display:inline-flex;color:var(--ink);background:#f5df9d;border-radius:999px;padding:6px 12px}
+.wrap{padding:20px 16px;gap:18px}.card{background:var(--surface);border:1px solid var(--line);border-radius:18px;box-shadow:0 12px 35px rgba(31,49,45,.07)}
+.ct{min-height:52px;padding:13px 20px;color:var(--ink);background:#fffaf2;border-bottom:1px solid var(--line)}.ct small{color:var(--muted)}.cbody{padding:20px}
+.drop{border:1.5px dashed #b7b0a4;border-radius:14px;background:#fbf8f1}.drop:hover,.drop.over{border-color:var(--coral);background:#fff5f1}.drop-inner{padding:42px 18px}.drop-inner svg{width:50px;height:50px;color:var(--coral)}.drop-inner p{font-size:17px;color:var(--ink)}.drop-inner .sub,.status{font-size:13px;color:var(--muted)}
+.result-grid{grid-template-columns:minmax(0,1.02fr) minmax(430px,.98fr)}.photo-col{padding:20px;border-color:var(--line);background:#faf7f0}.report-col{padding:20px}.canvas-wrap{border-radius:14px;background:#182927;border:1px solid #d3cdc3}
+.layers{gap:8px;margin-top:12px}.lyr{border:1px solid #cfc8bc;background:#fffdf8;color:#596662;font-size:12px;border-radius:999px;padding:7px 12px;min-height:36px}.lyr.on{border-color:var(--coral);color:#a8453e;background:#fff1ed}.rebtn{border:1px solid var(--ink);background:var(--ink);color:#fff;border-radius:999px;padding:7px 14px;min-height:36px}
+.total-box{gap:20px;padding:18px;border:1px solid #e5bdb6;background:var(--coral-soft);border-radius:16px;margin-bottom:18px}.ring{width:112px;height:112px}.ring svg{width:112px;height:112px}.ring .num b{font-size:38px;color:var(--ink);font-variant-numeric:tabular-nums}.ring .num span{font-size:11px;color:#7e615e}.score-eyebrow{font-size:12px;color:#8d534e;font-weight:750;margin-bottom:5px}.grade{font-size:24px;color:var(--ink)}.grade-sub{font-size:13px;color:#725f5b;max-width:310px}
+.sec-head{display:flex;justify-content:space-between;gap:12px;align-items:end;margin:18px 2px 10px}.sec-t{font-size:15px;color:var(--ink);margin:0}.sec-note{font-size:11px;color:var(--muted)}
+.metrics{padding:0;display:block}.radar-wrap{position:relative;max-width:430px;margin:0 auto;padding:8px 0 2px}.radar-svg{display:block;width:100%;height:auto;overflow:visible}.radar-grid{fill:none;stroke:#ddd8ce;stroke-width:1}.radar-axis{stroke:#e6e0d7;stroke-width:1}.radar-area{fill:rgba(217,101,92,.22);stroke:#d9655c;stroke-width:2.2}.radar-dot{fill:#d9655c;stroke:#fffdf8;stroke-width:2}.radar-label{fill:#243431;font-size:11px;font-weight:800}.radar-value{fill:#d9655c;font-size:12px;font-weight:900;font-variant-numeric:tabular-nums}.radar-note{text-align:center;color:var(--muted);font-size:10.5px;margin-top:2px}
+.cm{border-left:0;background:#f4f6f3;border-radius:11px;padding:10px 12px}.cm .cm-ico{color:#32715e}.cm.warn{border-left:0;background:#fff4df}.foot{color:#827e75}.foot b{color:#5e5a53}
+@media(max-width:880px){.result-grid{grid-template-columns:1fr}.photo-col{border-right:0;border-bottom:1px solid var(--line)}.top{padding:20px 18px}.top h1{font-size:23px}.report-col,.photo-col{padding:14px}}
+@media(max-width:500px){.wrap{padding:12px 10px}.card{border-radius:14px}.top{min-height:98px;align-items:flex-start;flex-direction:column;gap:12px}.top h1{font-size:22px}.drop-inner{padding:34px 14px}.total-box{padding:14px;gap:14px}.ring,.ring svg{width:96px;height:96px}.grade{font-size:21px}.radar-wrap{max-width:360px}.sec-note{display:none}}
+.model-card{margin-bottom:14px;padding:16px;border:1px solid #d6d0c5;border-radius:14px;background:#f7f3ea}.model-card.ready{border-color:#8eb7a8;background:#edf7f2}.model-card.error{border-color:#d99b94;background:#fff0ed}.model-row{display:flex;align-items:center;justify-content:space-between;gap:14px}.model-copy{min-width:0}.model-title{font-weight:900;color:var(--ink);font-size:16px}.model-desc{margin-top:5px;color:var(--muted);font-size:12px;line-height:1.55}.model-download-btn{flex:none;border:0;border-radius:999px;min-height:42px;padding:0 17px;background:var(--ink);color:#fff;font-weight:850;font-size:13px}.model-download-btn:disabled{opacity:.58}.model-progress-standalone{height:8px;margin-top:13px;border-radius:99px;overflow:hidden;background:#ddd8ce}.model-progress-standalone i{display:block;width:0;height:100%;background:var(--coral);transition:width .15s ease}.model-meta{margin-top:7px;color:#6f7874;font-size:11px;font-variant-numeric:tabular-nums}.drop.locked{cursor:not-allowed;opacity:.56}.drop.locked:hover{border-color:#b7b0a4;background:#fbf8f1}@media(max-width:500px){.model-row{align-items:flex-start;flex-direction:column}.model-download-btn{width:100%}}
+@media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;animation-duration:.01ms!important;transition-duration:.01ms!important}}
+/* 分享海报 */
+.share-wrap{margin-top:16px;display:flex;justify-content:flex-end}
+.share-btn,.poster-action{min-height:46px;border:0;border-radius:999px;padding:0 20px;font-weight:800;font-size:14px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:8px}
+.share-btn{background:var(--coral);color:#fff;box-shadow:0 8px 20px rgba(217,101,92,.22)}
+.share-btn:hover{background:#c9544c}.share-btn svg{width:18px;height:18px}
+.poster-modal{position:fixed;inset:0;z-index:99;background:rgba(16,30,28,.72);display:none;align-items:center;justify-content:center;padding:18px}
+.poster-modal.show{display:flex}.poster-dialog{width:min(520px,100%);max-height:94vh;background:var(--surface);border-radius:18px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.28);display:flex;flex-direction:column}
+.poster-head{padding:14px 16px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;gap:12px}
+.poster-head strong{color:var(--ink);font-size:16px}.poster-close{width:44px;height:44px;border:0;border-radius:50%;background:#eee9e1;color:var(--ink);font-size:25px;cursor:pointer;line-height:1}
+.poster-preview{background:#e8e2d8;padding:14px;overflow:auto;min-height:0}.poster-preview canvas{display:block;width:100%;height:auto;background:#fff;box-shadow:0 6px 24px rgba(35,52,48,.14)}
+.poster-actions{padding:14px 16px;display:grid;grid-template-columns:1fr 1fr;gap:10px;border-top:1px solid var(--line)}
+.poster-action.primary{background:var(--ink);color:#fff}.poster-action.secondary{background:var(--coral-soft);color:#8d3f39}.poster-tip{grid-column:1/-1;min-height:18px;text-align:center;font-size:12px;color:var(--muted)}
+.wx-save{position:fixed;inset:0;z-index:120;background:rgba(16,30,28,.78);display:none;align-items:center;justify-content:center;padding:12px}.wx-save.show{display:flex}.wx-card{width:min(460px,100%);max-height:96vh;overflow:auto;background:var(--surface);border-radius:16px;padding:14px;text-align:center}.wx-tip{background:#f1f6f3;color:#23604f;font-weight:800;font-size:15px;border-radius:11px;padding:11px;margin-bottom:12px}.wx-poster-img{display:block;width:100%;height:auto;border-radius:10px;-webkit-touch-callout:default;user-select:auto}.wx-back{width:100%;min-height:46px;margin-top:12px;border:1px solid var(--line);border-radius:999px;background:#fff;color:var(--ink);font-weight:800;font-size:14px}
+@media(max-width:500px){.share-wrap{justify-content:stretch}.share-btn{width:100%}.poster-modal{padding:8px}.poster-dialog{max-height:97vh;border-radius:14px}.poster-actions{padding:10px;gap:8px}.poster-action{padding:0 12px;font-size:13px}}
+</style>
+</head>
+<body>
+<header class="top">
+  <div>
+    <h1>颜值实验室</h1>
+    <span class="ptag">照片仅在你的设备上分析，不会上传服务器</span>
+  </div>
+  <div class="r">
+    <span class="ver-badge">六维雷达 · v92</span>
+  </div>
+</header>
+
+<main class="wrap">
+  <!-- 上传 -->
+  <section class="card" id="uploadCard">
+    <div class="ct">上传照片</div>
+    <div class="cbody">
+      <div class="model-card" id="appModelCard">
+        <div class="model-row">
+          <div class="model-copy"><div class="model-title" id="appModelTitle">审美模型尚未下载</div><div class="model-desc" id="appModelDesc">三路模型约 64.1 MB，不包含在安装包中。仅需下载一次，之后长期保存在本机并可离线分析。</div></div>
+          <button class="model-download-btn" id="appModelDownload" type="button">下载模型</button>
+        </div>
+        <div class="model-progress-standalone"><i id="appModelProgressBar"></i></div>
+        <div class="model-meta" id="appModelMeta">等待手动下载</div>
+      </div>
+      <div class="drop locked" id="drop">
+        <div class="drop-inner">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="17 8 12 3 7 8"/>
+            <line x1="12" y1="3" x2="12" y2="15"/>
+          </svg>
+          <p>点击或拖拽，上传一张正脸照片</p>
+          <p class="sub" id="uploadHint">请先下载审美模型；支持 JPG / PNG / WebP</p>
+        </div>
+      </div>
+      <input type="file" id="file" accept="image/*" hidden>
+      <div class="status" id="status"></div>
+    </div>
+  </section>
+
+  <!-- 结果 -->
+  <section class="card" id="resultCard" style="display:none">
+    <div class="ct">分析结果 <small>测量线为几何参考，非专业医学结论</small></div>
+    <div class="result-grid">
+      <div class="photo-col">
+        <div class="canvas-wrap" id="canvasWrap">
+          <img id="img" alt="人脸照片">
+          <canvas id="draw"></canvas>
+          <div class="analysis-overlay" id="analysisOverlay"><div class="analysis-panel"><div class="analysis-title"><span class="spin"></span><span id="analysisOverlayText">图片已上传，正在分析…</span></div><div class="model-progress" id="modelProgress"><i id="modelProgressBar"></i></div><div class="model-progress-meta" id="modelProgressMeta"></div></div></div>
+        </div>
+        <div class="layers" id="layers"></div>
+      </div>
+      <div class="report-col" id="reportCol">
+        <div class="total-box">
+          <div class="ring">
+            <svg width="96" height="96" viewBox="0 0 96 96">
+              <circle cx="48" cy="48" r="42" fill="none" stroke="#eaded8" stroke-width="8"/>
+              <circle id="ringArc" cx="48" cy="48" r="42" fill="none" stroke="#d9655c" stroke-width="8"
+                stroke-linecap="round" stroke-dasharray="263.9" stroke-dashoffset="263.9"/>
+            </svg>
+            <div class="num"><b id="totalNum">--</b><span>颜值指数</span></div>
+          </div>
+          <div>
+            <div class="score-eyebrow">综合评价 <span id="fusionBadge" style="display:none;font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;margin-left:6px"></span></div>
+            <div class="grade" id="grade">--</div>
+            <div class="grade-sub" id="gradeSub"></div>
+            <div id="intervalBox" style="display:none;margin-top:6px;font-size:12px;color:#8a97a4"></div>
+          </div>
+        </div>
+        <div class="sec-head"><div class="sec-t">六项颜值雷达</div><div class="sec-note">越靠近外圈，表示该项在参考样本中相对更突出</div></div>
+        <div class="metrics" id="metrics"></div>
+        <div class="sec-head"><div class="sec-t">分析评语</div></div>
+        <div class="comments" id="comments"></div>
+        <div class="share-wrap">
+          <button class="share-btn" id="shareBtn" type="button">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.6 13.5 6.8 4M15.4 6.5 8.6 10.5"/></svg>
+            生成分享海报
+          </button>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<div class="poster-modal" id="posterModal" role="dialog" aria-modal="true" aria-labelledby="posterTitle">
+  <div class="poster-dialog">
+    <div class="poster-head"><strong id="posterTitle">分享海报预览</strong><button class="poster-close" id="posterClose" type="button" aria-label="关闭">×</button></div>
+    <div class="poster-preview"><canvas id="posterCanvas" width="1080" height="1440"></canvas></div>
+    <div class="poster-actions">
+      <button class="poster-action primary" id="savePoster" type="button">保存图片</button>
+      <button class="poster-action secondary" id="copyPoster" type="button">复制到剪贴板</button>
+      <div class="poster-tip" id="posterTip">PNG 海报包含原图与本次分析结果</div>
+    </div>
+  </div>
+</div>
+
+<div class="wx-save" id="wxSaveModal">
+  <div class="wx-card">
+    <div class="wx-tip">长按下方海报，选择“保存图片”即可存入相册</div>
+    <img class="wx-poster-img" id="wxPosterImg" alt="颜值分析分享海报">
+    <button class="wx-back" id="wxSaveClose" type="button">返回</button>
+  </div>
+</div>
+
+<footer class="foot">
+  <b>说明：</b>照片与推理全程只在本机进行，<b>不会上传服务器</b>。APP 安装包不包含三路审美模型；首次使用时由你点击按钮下载约 64.1 MB，完成后模型长期保存在本机，后续无需重复下载并可离线分析。综合分由三路深度模型融合后，经 5,500 张严格 OOF 参考分布进行连续校准；人脸关键点仅用于姿态、测量线和六项几何参考。采用<b>连续颜值标尺</b>：20–30 普通偏下、30–40 大众自然、40–50 普通耐看、50–60 中等偏上、60–70 好看、70–80 小美、80–90 顶美、90+ 明星级。结果为娱乐性质美学参考；极端侧脸、广角和夸张表情建议用正脸照复核。请仅上传本人或已获授权的照片。
+</footer>
+
+<!-- MediaPipe（IIFE 隔离，导出 window.__MP__） -->
+<script src="assets/vision_bundle_browser.js"></script>
+<script src="assets/cvResizeArea.js?v=20261016a"></script>
+<!-- 冻结 HistGB 几何模型 -->
+<script src="model/model_histgb.js?v=20261016a"></script>
+<script src="model/geo_extract_contract.js?v=20261016a"></script>
+<script>
+/* ============================================================
+   颜值打分主逻辑（方案 A · 几何规则）
+   ============================================================ */
+const { FaceLandmarker, FilesetResolver } = window.__MP__;
+const MP_VERSION = "0.10.14";
+const WASM_URL = new URL("assets/wasm", location.href).href.replace(/\/$/,"");
+const DEBUG = new URLSearchParams(location.search).has('debug');
+
+/* 关键点索引 */
+const I = {
+  hair:10, chin:152, glabella:9, nasion:168,
+  ntip:1, nbase:2, nbridge:6,
+  lin:133, lout:33, ltop:159, lbot:145, liris:468,
+  rin:362, rout:263, rtop:386, rbot:374, riris:473,
+  lbrow:105, rbrow:334,
+  ml:61, mr:291, mtop:0, mbot:14,
+  nl:48, nr:278,
+  fl:234, fr:454,
+  jl:172, jr:397,
+  cl:116, cr:345
+};
+const OVAL = [10,338,297,332,284,251,389,356,454,323,361,288,397,365,379,378,400,377,152,148,176,149,150,136,172,58,132,93,234,127,162,21,54,103,67,109];
+const SYM_PAIRS = [
+  [133,362],[33,263],[468,473],[105,334],[61,291],[48,278],[172,397],[234,454],[116,345]
+];
+
+const clamp = (x,a,b) => Math.max(a, Math.min(b, x));
+const dist = (a,b) => Math.hypot(a.x-b.x, a.y-b.y);
+function mean(a){ return a.reduce((s,x)=>s+x,0)/a.length; }
+function std(a){ const m=mean(a); return Math.sqrt(mean(a.map(x=>(x-m)*(x-m)))); }
+function rotatePt(p,cx,cy,ang){
+  const c=Math.cos(ang), s=Math.sin(ang), x=p.x-cx, y=p.y-cy;
+  return { x:cx+x*c-y*s, y:cy+x*s+y*c, z:p.z };
+}
+function faceShapeName(fr){
+  if(fr>0.90) return "圆形/方形脸";
+  if(fr>0.82) return "方圆脸";
+  if(fr>0.74) return "鹅蛋脸";
+  if(fr>0.66) return "瓜子/椭圆脸";
+  return "长形脸";
+}
+
+let landmarker=null, landmarkerPromise=null, busy=false;
+const $ = id => document.getElementById(id);
+
+/* ==== ORT INT8 深度模型 + 融合 + ECDF percentile ==== */
+let ortSession=null, fusionParams=null, calibrationData=null, percentileData=null, ortProvider='wasm', ortLoading=null, modelDownloadActive=false;
+function ensureOrtLib(){
+  if (window.ort) return Promise.resolve();
+  if (ortLoading) return ortLoading;
+  ortLoading = new Promise((resolve,reject)=>{
+    const s=document.createElement('script'); s.src='assets/ort/ort.min.js';
+    s.onload=resolve; s.onerror=()=>{ortLoading=null;reject(new Error('ORT runtime load failed'));};
+    document.head.appendChild(s);
+  });
+  return ortLoading;
+}
+/* ==== V4: 3-ResNet Ensemble (huber FP32 + nima/rank QDQ) ==== */
+let ortSessions = {};
+const MODEL_SPECS = [
+  {name:'huber',path:'model/corrected_huber_fp32.onnx?v=20261016c',bytes:44700306},
+  {name:'nima',path:'model/nima_qdq.onnx?v=20261016c',bytes:11236888},
+  {name:'rank',path:'model/rank_qdq.onnx?v=20261016c',bytes:11236813}
+];
+function formatMiB(bytes){return (bytes/1048576).toFixed(bytes>=10485760?1:2)+' MB';}
+function setModelProgress(loaded,total,label){
+  const wrap=$("modelProgress"),bar=$("modelProgressBar"),meta=$("modelProgressMeta");
+  if(!wrap||!bar||!meta)return;
+  const pct=total>0?Math.max(0,Math.min(100,loaded/total*100)):0;
+  wrap.classList.add("show");meta.classList.add("show");bar.style.width=pct.toFixed(1)+"%";
+  meta.textContent=(label?label+" · ":"")+Math.floor(pct)+"% · "+formatMiB(loaded)+" / "+formatMiB(total);
+}
+function hideModelProgress(){
+  const wrap=$("modelProgress"),meta=$("modelProgressMeta");
+  if(wrap)wrap.classList.remove("show");if(meta)meta.classList.remove("show");
+}
+const MODEL_CACHE_NAME='yanzhi-models-v1';
+const IS_APP_YANZHI=!!(window.NativeBridge&&typeof NativeBridge.isYanzhiModelReady==='function');
+async function cacheModelBuffer(spec,onProgress){
+  if(IS_APP_YANZHI){
+    if(!NativeBridge.isYanzhiModelReady())throw new Error('请先点击“下载模型”并等待完成');
+    return await fetchArrayBufferWithProgress(spec,(loaded,total)=>onProgress(loaded,total,'读取本机模型'));
+  }
+  const request=new Request(spec.path,{credentials:'same-origin'});
+  if('caches' in window){
+    try{
+      const cache=await caches.open(MODEL_CACHE_NAME),cached=await cache.match(request);
+      if(cached){
+        setStatus("正在从本地缓存读取 "+spec.name.toUpperCase()+" 模型…");
+        const buffer=await cached.arrayBuffer();
+        if(buffer.byteLength===spec.bytes){onProgress(buffer.byteLength,spec.bytes,'本地缓存');return buffer;}
+        await cache.delete(request);
+      }
+    }catch(e){console.warn('model cache read failed',e);}
+  }
+  const buffer=await fetchArrayBufferWithProgress(spec,(loaded,total)=>onProgress(loaded,total,'模型下载'));
+  if('caches' in window){
+    try{
+      setStatus("正在保存 "+spec.name.toUpperCase()+" 模型到本地缓存…");
+      const cache=await caches.open(MODEL_CACHE_NAME);
+      await cache.put(request,new Response(buffer.slice(0),{headers:{'Content-Type':'application/octet-stream','Content-Length':String(buffer.byteLength)}}));
+    }catch(e){console.warn('model cache write failed',e);}
+  }
+  return buffer;
+}
+async function fetchArrayBufferWithProgress(spec,onProgress){
+  const resp=await fetch(spec.path);
+  if(!resp.ok)throw new Error(spec.name+' model download failed: '+resp.status);
+  const expected=spec.bytes;
+  if(!resp.body||!resp.body.getReader){const data=await resp.arrayBuffer();onProgress(data.byteLength,expected);return data;}
+  const reader=resp.body.getReader();let out=new Uint8Array(expected),loaded=0;
+  for(;;){
+    const {done,value}=await reader.read();if(done)break;
+    if(loaded+value.byteLength>out.byteLength){const grown=new Uint8Array(loaded+value.byteLength);grown.set(out);out=grown;}
+    out.set(value,loaded);loaded+=value.byteLength;onProgress(loaded,expected);
+  }
+  return loaded===out.byteLength?out.buffer:out.buffer.slice(0,loaded);
+}
+async function prepareOrtBuffers(){
+  const pending=MODEL_SPECS.filter(s=>!ortSessions[s.name]);
+  const total=pending.reduce((s,x)=>s+x.bytes,0);let completed=0;const prepared=[];
+  modelDownloadActive=true;setStatus("正在检查本地模型缓存…");setModelProgress(0,total,"准备模型");
+  try{
+    for(const spec of pending){
+      const buffer=await cacheModelBuffer(spec,(loaded,_expected,label)=>setModelProgress(completed+loaded,total,label));
+      completed+=buffer.byteLength;setModelProgress(completed,total,"模型文件已就绪");prepared.push({spec,buffer});
+    }
+    return prepared;
+  }finally{modelDownloadActive=false;}
+}
+async function initOrtSessions(prepared){
+  if(Object.keys(ortSessions).length>=3)return ortSessions;
+  await ensureOrtLib();
+  let index=0;
+  for(const {spec,buffer} of prepared){
+    index++;setStatus("正在初始化审美模型 "+index+" / "+prepared.length+"…");
+    ortSessions[spec.name]=await ort.InferenceSession.create(buffer,{executionProviders:['wasm'],graphOptimizationLevel:'all'});
+  }
+  setModelProgress(MODEL_SPECS.reduce((s,x)=>s+x.bytes,0),MODEL_SPECS.reduce((s,x)=>s+x.bytes,0),"审美模型已就绪");
+  return ortSessions;
+}
+async function loadFusionParams(){
+  if (fusionParams) return fusionParams;
+  fusionParams = await fetch('model/fusion_params.web.json?v=20261016a').then(r=>r.json());
+  return fusionParams;
+}
+async function loadCalibration(){
+  if (calibrationData) return calibrationData;
+  calibrationData = await fetch('model/calibration_lookup.json?v=20261016a').then(r=>r.json());
+  return calibrationData;
+}
+async function loadPercentile(){
+  if (percentileData) return percentileData;
+  percentileData = await fetch('model/score_display_v91.json?v=20261016v91').then(r=>r.json());
+  return percentileData;
+}
+/* V91: final fuser3 native score -> strict 5500 OOF empirical percentile. */
+function crowdPercentile(nativeScore){
+  const nodes = percentileData && percentileData.nodes_p0_to_p100_step_0_1;
+  const x = Math.max(1.0, Math.min(5.0, Number(nativeScore)));
+  if(!nodes || nodes.length<2) return Math.max(0,Math.min(100,15+(x-1)/4*80));
+  if(x<=nodes[0]) return 0;
+  const last=nodes.length-1;
+  if(x>=nodes[last]) return 100;
+  let lo=0, hi=last;
+  while(hi-lo>1){const mid=(lo+hi)>>1;if(nodes[mid]<=x)lo=mid;else hi=mid;}
+  const t=(x-nodes[lo])/(nodes[hi]-nodes[lo]||1);
+  return Math.max(0,Math.min(100,(lo+t)/10));
+}
+function aestheticScoreFromPercentile(percentile){
+  const anchors=(percentileData && percentileData.aesthetic_anchors)||[[0,5],[10,15],[20,22],[30,30],[40,40],[50,50],[60,58],[70,66],[80,75],[90,85],[95,90],[99,97],[100,100]];
+  const p=Math.max(0,Math.min(100,Number(percentile)));
+  if(p<=anchors[0][0]) return anchors[0][1];
+  for(let i=1;i<anchors.length;i++){
+    if(p<=anchors[i][0]){
+      const [p0,s0]=anchors[i-1], [p1,s1]=anchors[i];
+      return s0+(p-p0)/(p1-p0||1)*(s1-s0);
+    }
+  }
+  return anchors[anchors.length-1][1];
+}
+function interpolateAnchors(x,anchors){
+  if(x<=anchors[0][0]) return anchors[0][1];
+  for(let i=1;i<anchors.length;i++){
+    if(x<=anchors[i][0]){
+      const [x0,y0]=anchors[i-1], [x1,y1]=anchors[i];
+      return y0+(x-x0)/(x1-x0||1)*(y1-y0);
+    }
+  }
+  return anchors[anchors.length-1][1];
+}
+function percentileScore(nativeScore){
+  const pScore=aestheticScoreFromPercentile(crowdPercentile(nativeScore));
+  const baseAnchors=(percentileData&&percentileData.native_baseline_anchors)||[[1,5],[1.5,22],[2,35],[2.5,45],[3,55],[3.5,65],[4,75],[4.5,88],[5,100]];
+  const base=interpolateAnchors(Math.max(1,Math.min(5,Number(nativeScore))),baseAnchors);
+  // Preserve the intuitive low/mid continuum, while allowing true OOF upper-tail rank to open 80–100.
+  const tailWeight=Math.max(0,Math.min(1,(base-55)/25));
+  return Math.max(5,Math.min(100,base+tailWeight*Math.max(0,pScore-base)));
+}
+function finalDisplayScore(nativeScore,scores){
+  const base=percentileScore(nativeScore), crowd=crowdPercentile(nativeScore);
+  if(!scores||crowd>=12) return base;
+  const geometry=[scores.sym,scores.third,scores.fifth,scores.eye,scores.feat,scores.jaw].filter(Number.isFinite);
+  const weak=geometry.filter(v=>v<20).length;
+  const severe=geometry.filter(v=>v<8).length;
+  // Only release the lower tail when deep rank and several independent geometric signals agree.
+  const evidence=Math.max(0,Math.min(1,(weak-1)/2+severe*0.15));
+  const tail=Math.max(0,Math.min(1,(12-crowd)/8));
+  const target=aestheticScoreFromPercentile(crowd);
+  return Math.max(5,Math.min(100,base-(base-target)*evidence*tail));
+}
+function calibrateScore(nativeScore){
+  if (!calibrationData || !calibrationData.grid) return Math.max(0, Math.min(93.75, (nativeScore-1)/4*100));
+  const grid = calibrationData.grid;
+  const x = Math.max(1.0, Math.min(5.0, nativeScore));
+  let lo=0, hi=grid.length-1;
+  if (x<=grid[0].native) return grid[0].user_calibrated;
+  if (x>=grid[grid.length-1].native) return grid[grid.length-1].user_calibrated;
+  while(hi-lo>1){ const mid=(lo+hi)>>1; if(grid[mid].native<=x) lo=mid; else hi=mid; }
+  const t=(x-grid[lo].native)/(grid[hi].native-grid[lo].native||1);
+  return Math.max(0, Math.min(93.75, grid[lo].user_calibrated+t*(grid[hi].user_calibrated-grid[lo].user_calibrated)));
+}
+/* ==== 冻结 HistGB 几何模型特征提取器（移植 train_v3.py feat86_from_mp） ==== */
+function computeGeoFeats(norm, natW, natH){
+  // Frozen geo contract (geo_extract_contract.js, verified by recovery agent)
+  return window.GeoContract.computeGeoFeats(norm, natW, natH);
+}
+async function runEnsembleInference(imgEl, landmarks){
+  const sessions = ortSessions;
+  if(Object.keys(sessions).length<3)throw new Error('审美模型尚未初始化完成');
+  const natW = imgEl.naturalWidth, natH = imgEl.naturalHeight;
+  let xsMin=1, xsMax=0, ysMin=1, ysMax=0;
+  for (const lm of landmarks) {
+    if (lm.x<xsMin) xsMin=lm.x; if (lm.x>xsMax) xsMax=lm.x;
+    if (lm.y<ysMin) ysMin=lm.y; if (lm.y>ysMax) ysMax=lm.y;
+  }
+  const pw = (xsMax-xsMin)*0.3, ph = (ysMax-ysMin)*0.3;
+  let x1 = Math.max(0, Math.floor((xsMin-pw)*natW));
+  let y1 = Math.max(0, Math.floor((ysMin-ph)*natH));
+  let x2 = Math.min(natW, Math.floor((xsMax+pw)*natW));
+  let y2 = Math.min(natH, Math.floor((ysMax+ph)*natH));
+  const cropW = x2-x1, cropH = y2-y1;
+  const c = document.createElement('canvas');
+  c.width = cropW; c.height = cropH;
+  const ctx = c.getContext('2d');
+  ctx.drawImage(imgEl, x1, y1, cropW, cropH, 0, 0, cropW, cropH);
+  const cropData = ctx.getImageData(0, 0, cropW, cropH).data;
+  const srcRGB = new Uint8Array(cropW * cropH * 3);
+  for (let i = 0, j = 0; i < cropData.length; i += 4, j += 3) {
+    srcRGB[j] = cropData[i]; srcRGB[j+1] = cropData[i+1]; srcRGB[j+2] = cropData[i+2];
+  }
+  const resized224 = window.cvResizeArea ? window.cvResizeArea.resizeArea224(srcRGB, cropW, cropH) : null;
+  if (!resized224) throw new Error('cvResizeArea not loaded');
+  const mean = [0.485, 0.456, 0.406], std = [0.229, 0.224, 0.225];
+  const input = new Float32Array(3*224*224);
+  for (let y=0; y<224; y++) for (let x=0; x<224; x++) {
+    const i = (y*224+x)*3;
+    input[0*224*224 + y*224 + x] = (resized224[i]/255 - mean[0]) / std[0];
+    input[1*224*224 + y*224 + x] = (resized224[i+1]/255 - mean[1]) / std[1];
+    input[2*224*224 + y*224 + x] = (resized224[i+2]/255 - mean[2]) / std[2];
+  }
+  const tensor = new ort.Tensor('float32', input, [1,3,224,224]);
+  const preds = {};
+  for (const [name, session] of Object.entries(sessions)) {
+    const r = await session.run({[session.inputNames[0]]: tensor});
+    preds[name] = r[session.outputNames[0]].data[0];
+  }
+  window.__debugDeep = { bbox:[x1,y1,x2,y2], cropW, cropH, preds };
+  return preds;
+}
+/* ==== V4: fuser3 三通道加权融合（冻结） ==== */
+const FUSER3 = {
+  coef: { huber: 0.2885522, nima: 0.2490440, rank: 0.4663826 },
+  intercept: -0.0228566,
+  half80: 0.3481,
+  half90: 0.4583
+};
+function fuse3ch(preds){
+  let fused = FUSER3.intercept;
+  fused += FUSER3.coef.huber * preds.huber;
+  fused += FUSER3.coef.nima * preds.nima;
+  fused += FUSER3.coef.rank * preds.rank;
+  if(!isFinite(fused)) throw new Error('fuse3ch output NaN');
+  const vals = [preds.huber, preds.nima, preds.rank];
+  const spread = Math.max(...vals) - Math.min(...vals);
+  const finalScore = Math.max(1, Math.min(5, fused));
+  if(!Number.isFinite(finalScore) || !Number.isFinite(spread)) throw new Error('fuse3ch non-finite output');
+  return { finalScore, spread, interval80: FUSER3.half80, interval90: FUSER3.half90 };
+}
+/* ==== V90: aspect calibration — 6维 ECDF percentile lookup ==== */
+const ASPECT_CALIB = {"sym":{"direction":"high_is_better","desc":"\u5bf9\u79f0\u5ea6:roll\u6276\u6b63\u540e9\u5bf9SYM_PAIRS\u4e2d\u70b9\u53ef\u503e\u659c\u4e2d\u7ebf\u56de\u5f52\u6b8b\u5dee/faceW","p5":-0.0329,"p25":-0.0117,"p50":-0.0053,"p75":-0.0026,"p95":-0.0013,"nodes_p0_to_p100":[-0.084591,-0.049971,-0.042332,-0.037595,-0.034552,-0.032852,-0.0306,-0.028921,-0.027109,-0.02559,-0.024292,-0.023181,-0.021751,-0.020788,-0.019898,-0.018818,-0.017768,-0.016993,-0.016199,-0.015526,-0.014662,-0.013977,-0.013382,-0.01276,-0.012218,-0.011721,-0.011283,-0.010662,-0.010314,-0.010009,-0.00965,-0.009342,-0.009015,-0.008689,-0.008355,-0.008104,-0.007829,-0.007586,-0.007366,-0.007138,-0.006941,-0.00675,-0.006582,-0.006393,-0.0062,-0.006021,-0.005839,-0.005666,-0.005533,-0.005371,-0.005256,-0.005109,-0.005016,-0.004868,-0.004733,-0.004605,-0.004487,-0.004379,-0.004264,-0.004136,-0.004018,-0.003911,-0.003795,-0.003679,-0.00358,-0.003475,-0.003371,-0.003275,-0.003199,-0.003129,-0.003029,-0.002946,-0.002862,-0.002773,-0.002697,-0.002631,-0.002561,-0.002501,-0.002446,-0.002369,-0.002294,-0.002224,-0.002163,-0.0021,-0.002041,-0.001976,-0.001897,-0.001829,-0.001769,-0.001719,-0.001639,-0.001574,-0.001515,-0.001462,-0.001396,-0.001311,-0.00123,-0.001141,-0.001026,-0.000865,-0.000254]},"third":{"direction":"high_is_better","desc":"\u4e09\u5ead:roll\u6276\u6b63\u540e|\u4e2d\u5ead/\u4e0b\u5ead-0.82|","p5":-0.2161,"p25":-0.1175,"p50":-0.0678,"p75":-0.0312,"p95":-0.007,"nodes_p0_to_p100":[-0.811184,-0.353541,-0.279385,-0.246185,-0.230203,-0.216109,-0.202675,-0.194968,-0.187873,-0.18051,-0.173384,-0.167889,-0.162113,-0.157279,-0.1526,-0.148188,-0.144438,-0.141033,-0.13702,-0.133731,-0.13097,-0.128562,-0.12577,-0.123086,-0.120372,-0.117495,-0.114295,-0.111626,-0.109551,-0.106665,-0.104811,-0.102425,-0.100235,-0.098228,-0.09641,-0.094405,-0.092301,-0.089826,-0.087999,-0.08627,-0.084514,-0.082328,-0.08075,-0.07883,-0.077459,-0.075562,-0.074012,-0.072341,-0.070836,-0.06929,-0.067757,-0.066101,-0.06439,-0.062973,-0.060973,-0.059305,-0.058052,-0.056468,-0.055236,-0.053516,-0.052183,-0.050564,-0.049283,-0.04765,-0.046288,-0.044621,-0.043063,-0.041926,-0.040705,-0.039275,-0.037852,-0.036546,-0.035159,-0.033827,-0.032576,-0.031186,-0.030123,-0.028946,-0.027341,-0.026173,-0.024975,-0.023761,-0.022355,-0.020906,-0.019622,-0.018409,-0.017081,-0.016109,-0.014998,-0.013764,-0.012567,-0.011421,-0.010171,-0.009451,-0.008449,-0.007006,-0.005631,-0.004521,-0.002801,-0.001348,-2e-05]},"fifth":{"direction":"high_is_better","desc":"\u4e94\u773c:roll\u6276\u6b63\u540e\u4e94\u6bb5\u8bef\u5dee","p5":-0.2753,"p25":-0.1657,"p50":-0.1312,"p75":-0.1069,"p95":-0.0776,"nodes_p0_to_p100":[-0.566767,-0.380996,-0.338271,-0.304702,-0.290344,-0.275291,-0.262912,-0.253503,-0.245499,-0.235422,-0.228235,-0.220737,-0.215264,-0.209346,-0.202635,-0.198386,-0.193837,-0.189337,-0.185139,-0.181998,-0.178455,-0.175223,-0.172372,-0.170238,-0.167488,-0.165669,-0.163472,-0.161364,-0.15928,-0.156878,-0.154473,-0.152936,-0.151232,-0.149893,-0.148261,-0.146964,-0.145864,-0.144768,-0.143434,-0.142614,-0.141504,-0.140487,-0.139359,-0.137997,-0.136825,-0.135747,-0.134834,-0.133758,-0.132815,-0.132053,-0.131171,-0.130379,-0.129679,-0.128804,-0.127764,-0.126736,-0.125723,-0.124534,-0.123511,-0.122626,-0.121779,-0.120759,-0.119775,-0.118551,-0.11781,-0.116931,-0.116103,-0.114981,-0.114038,-0.113046,-0.112142,-0.111142,-0.110207,-0.109285,-0.108037,-0.106868,-0.105867,-0.105044,-0.103986,-0.102898,-0.10175,-0.100475,-0.099256,-0.098156,-0.096819,-0.095567,-0.094289,-0.093211,-0.091828,-0.090333,-0.088783,-0.087336,-0.085427,-0.083232,-0.080138,-0.077624,-0.074248,-0.070525,-0.065448,-0.057754,-0.009505]},"eye":{"direction":"high_is_better","desc":"\u773c\u90e8:\u773c\u9ad8/\u9762\u5bbd","p5":0.048,"p25":0.0584,"p50":0.0657,"p75":0.0734,"p95":0.0864,"nodes_p0_to_p100":[0.003995,0.039374,0.042774,0.04518,0.046883,0.048012,0.049027,0.049762,0.050474,0.051303,0.051963,0.052586,0.053081,0.053619,0.054161,0.054543,0.054964,0.055383,0.055722,0.056159,0.056545,0.056979,0.057392,0.057722,0.058089,0.05842,0.058833,0.059217,0.0596,0.059849,0.06021,0.060564,0.060825,0.061057,0.061351,0.061639,0.061995,0.062281,0.062565,0.062885,0.063097,0.063396,0.063647,0.063858,0.064087,0.06438,0.064654,0.064955,0.065189,0.065438,0.065692,0.065945,0.066241,0.06649,0.06679,0.067055,0.067427,0.067629,0.067958,0.068221,0.068545,0.068774,0.06916,0.069387,0.069732,0.070026,0.070284,0.07068,0.070971,0.07134,0.071653,0.071969,0.072308,0.072661,0.073051,0.073423,0.073868,0.074221,0.074655,0.075107,0.075545,0.076028,0.076538,0.076934,0.077532,0.077935,0.078502,0.079069,0.079617,0.080224,0.081068,0.082032,0.082863,0.083907,0.085082,0.08642,0.088313,0.090348,0.092547,0.097318,0.11842]},"feat":{"direction":"high_is_better","desc":"\u4e94\u5b98:\u9f3b\u5bbd/\u76ee\u95f4\u8ddd\u4e0e\u5634\u5bbd/\u77b3\u8ddd\u504f\u5dee","p5":-0.4997,"p25":-0.2608,"p50":-0.1523,"p75":-0.092,"p95":-0.038,"nodes_p0_to_p100":[-0.883404,-0.641254,-0.591549,-0.551041,-0.525817,-0.499731,-0.479559,-0.458655,-0.442124,-0.429721,-0.416631,-0.405155,-0.393175,-0.382262,-0.368751,-0.357974,-0.349539,-0.34089,-0.330316,-0.321413,-0.309209,-0.298844,-0.287457,-0.278114,-0.269062,-0.260752,-0.252645,-0.247383,-0.242716,-0.235691,-0.230743,-0.225097,-0.220228,-0.215189,-0.210032,-0.205615,-0.200942,-0.197189,-0.193139,-0.18865,-0.184945,-0.180745,-0.176665,-0.173623,-0.17043,-0.166508,-0.163544,-0.160941,-0.157941,-0.154813,-0.152335,-0.149275,-0.146473,-0.143137,-0.140081,-0.136966,-0.134511,-0.132042,-0.129853,-0.127612,-0.124865,-0.122808,-0.120287,-0.118067,-0.11617,-0.113584,-0.1112,-0.109289,-0.107134,-0.104857,-0.102291,-0.100588,-0.098832,-0.096896,-0.094193,-0.091972,-0.089856,-0.086973,-0.084953,-0.082776,-0.080577,-0.078062,-0.075654,-0.073349,-0.070982,-0.068375,-0.066283,-0.062909,-0.060037,-0.057367,-0.054481,-0.051828,-0.048274,-0.045339,-0.041272,-0.038047,-0.034489,-0.030339,-0.025217,-0.017004,-0.003276]},"jaw":{"direction":"high_is_better","desc":"\u4e0b\u988c:roll\u6276\u6b63\u540e|\u4e0b\u988c\u6536\u675f-0.78|","p5":-0.0525,"p25":-0.0311,"p50":-0.0178,"p75":-0.0081,"p95":-0.0015,"nodes_p0_to_p100":[-0.100316,-0.067605,-0.061929,-0.058427,-0.05558,-0.052477,-0.050385,-0.04855,-0.046966,-0.045564,-0.044107,-0.042808,-0.04164,-0.040827,-0.039799,-0.038967,-0.037991,-0.037127,-0.036353,-0.035365,-0.034736,-0.034127,-0.033398,-0.03269,-0.031862,-0.031111,-0.030512,-0.029747,-0.028999,-0.028365,-0.027767,-0.026997,-0.026448,-0.02588,-0.025376,-0.024886,-0.02437,-0.023844,-0.023395,-0.022969,-0.022487,-0.02207,-0.021555,-0.021072,-0.020632,-0.020105,-0.019587,-0.019115,-0.018691,-0.018235,-0.01779,-0.017315,-0.016931,-0.016385,-0.015991,-0.015505,-0.015078,-0.014637,-0.014211,-0.013874,-0.013471,-0.013083,-0.01268,-0.012303,-0.011954,-0.011519,-0.011088,-0.010668,-0.010365,-0.010022,-0.009707,-0.009358,-0.009079,-0.008768,-0.008384,-0.008073,-0.007735,-0.007401,-0.007062,-0.006697,-0.006344,-0.005992,-0.005731,-0.005357,-0.005084,-0.004719,-0.004417,-0.004072,-0.003816,-0.003563,-0.003156,-0.002826,-0.002491,-0.002162,-0.001856,-0.001518,-0.001209,-0.000903,-0.000654,-0.000351,-1.2e-05]}}; // v2 hash=e7732d681f3f9873 roll-fixed 101-node continuous
+function lookupAspectPct(key, signedRaw){
+  // V90.1: 连续线性插值 ECDF lookup（0-100，端点 clamp，ties 自然插值）
+  const t = ASPECT_CALIB[key].nodes_p0_to_p100;
+  if(signedRaw <= t[0]) return 0;
+  if(signedRaw >= t[t.length-1]) return 100;
+  for(let i=0;i<t.length-1;i++){
+    if(signedRaw >= t[i] && signedRaw <= t[i+1]){
+      const frac = (signedRaw - t[i]) / (t[i+1] - t[i]);
+      return i + frac;  // i ranges 0..99, so pct ranges 0..100
+    }
+  }
+  return 50; // fallback
+}
+function aspectLabel(pct){
+  if(pct < 20) return "偏弱";
+  if(pct < 40) return "普通";
+  if(pct < 60) return "中等";
+  if(pct < 80) return "较好";
+  return "突出";
+}
+/* 细分项保留几何排序与弱项；当其显著高于综合分时统一收缩，避免误导。 */
+function aspectDisplayScore(rawPct, overallPct){
+  const raw=clamp(Number(rawPct)||0,0,100), overall=clamp(Number(overallPct)||0,0,100);
+  return Math.round(raw<=overall ? raw : overall + 0.5*(raw-overall));
+}
+function getDisplayAspectScores(scores,overallPct){
+  const out={};
+  METRIC_LABELS.forEach(([k])=>{out[k]=aspectDisplayScore(scores[k],overallPct);});
+  return out;
+}
+/* ==== V4: 3D pose from facial matrix ==== */
+function eulerFromMatrix(matrix){
+  if (!matrix || !matrix.data || matrix.data.length < 16) return { valid:false };
+  const d = matrix.data;
+  const R = [[d[0],d[4],d[8]],[d[1],d[5],d[9]],[d[2],d[6],d[10]]];
+  let sy = Math.max(-1, Math.min(1, -R[2][0]));
+  const yaw = Math.asin(sy) * 180/Math.PI;
+  const pitch = Math.atan2(R[2][1], R[2][2]) * 180/Math.PI;
+  const roll = -Math.atan2(R[1][0], R[0][0]) * 180/Math.PI;
+  return { yawDeg:yaw, pitchDeg:pitch, rollDeg:roll, valid:true };
+}
+function gate3d(pose){
+  if(!pose.valid) return { tier:'medium', reasons:['matrix_missing'] };
+  const reasons = [];
+  let tier = 'high';
+  if(Math.abs(pose.yawDeg) > 32) { reasons.push('yaw_reject'); tier='reject'; }
+  else if(Math.abs(pose.yawDeg) > 18) { reasons.push('yaw_warn'); tier='medium'; }
+  if(Math.abs(pose.pitchDeg) > 35) { reasons.push('pitch_reject'); tier='reject'; }
+  else if(Math.abs(pose.pitchDeg) > 20) { reasons.push('pitch_warn'); tier = tier==='reject'?'reject':'medium'; }
+  if(Math.abs(pose.rollDeg) > 35) { reasons.push('roll_warn'); tier = tier==='reject'?'reject':'medium'; }
+  else if(Math.abs(pose.rollDeg) > 15) { reasons.push('roll_notice'); tier = tier==='reject'?'reject':'medium'; }
+  return { tier, reasons };
+}
+
+async function ensureLandmarker(){
+  if(landmarker) return landmarker;
+  if(landmarkerPromise) return landmarkerPromise;
+  landmarkerPromise=(async()=>{
+    const fileset=await FilesetResolver.forVisionTasks(WASM_URL);
+    // Fixed CPU delegate: deterministic output, matches training pipeline
+    landmarker=await FaceLandmarker.createFromOptions(fileset,{
+      baseOptions:{modelAssetPath:"assets/face_landmarker.task",delegate:"CPU"},
+      runningMode:"IMAGE",numFaces:1,
+      outputFacialTransformationMatrixes:true
+    });
+    return landmarker;
+  })();
+  try{return await landmarkerPromise;}catch(e){landmarkerPromise=null;throw e;}
+}
+
+/* ---------- 上传交互 ---------- */
+const drop=$("drop"), fileInput=$("file"), status=$("status"), img=$("img");
+let appModelReady=!IS_APP_YANZHI;
+const appModelCard=$("appModelCard"),appModelTitle=$("appModelTitle"),appModelDesc=$("appModelDesc"),appModelDownload=$("appModelDownload"),appModelProgressBar=$("appModelProgressBar"),appModelMeta=$("appModelMeta"),uploadHint=$("uploadHint");
+function updateAppModelUi(state,loaded,total,currentFile,message){
+  if(!IS_APP_YANZHI){if(appModelCard)appModelCard.style.display='none';appModelReady=true;drop.classList.remove('locked');return;}
+  const safeTotal=Number(total)||MODEL_SPECS.reduce((s,x)=>s+x.bytes,0),safeLoaded=Math.max(0,Number(loaded)||0),pct=safeTotal>0?Math.min(100,safeLoaded/safeTotal*100):0;
+  appModelProgressBar.style.width=pct.toFixed(1)+'%';
+  appModelMeta.textContent=Math.floor(pct)+'% · '+formatMiB(safeLoaded)+' / '+formatMiB(safeTotal)+(currentFile?' · '+currentFile:'');
+  appModelCard.classList.toggle('ready',state==='ready');appModelCard.classList.toggle('error',state==='error');
+  if(state==='ready'){
+    appModelReady=true;appModelTitle.textContent='审美模型已保存在本机';appModelDesc.textContent='三路模型已就绪，之后进入本功能不会重复下载，可直接离线分析。';appModelDownload.textContent='已下载';appModelDownload.disabled=true;drop.classList.remove('locked');uploadHint.textContent='支持 JPG / PNG / WebP；照片只在本机分析';
+  }else if(state==='downloading'){
+    appModelReady=false;appModelTitle.textContent=message||'正在下载审美模型';appModelDesc.textContent='请保持应用在前台。下载支持断点续传，失败后可继续。';appModelDownload.textContent='下载中';appModelDownload.disabled=true;drop.classList.add('locked');uploadHint.textContent='模型下载完成后即可选择照片';
+  }else if(state==='error'){
+    appModelReady=false;appModelTitle.textContent='模型下载未完成';appModelDesc.textContent=message||'网络连接中断，请点击重试；已下载的部分会继续保留。';appModelDownload.textContent='继续下载';appModelDownload.disabled=false;drop.classList.add('locked');uploadHint.textContent='请先完成模型下载';
+  }else{
+    appModelReady=false;appModelTitle.textContent='审美模型尚未下载';appModelDesc.textContent='三路模型约 64.1 MB，不包含在安装包中。仅需下载一次，之后长期保存在本机并可离线分析。';appModelDownload.textContent='下载模型';appModelDownload.disabled=false;drop.classList.add('locked');uploadHint.textContent='请先下载审美模型；支持 JPG / PNG / WebP';
+  }
+}
+window.onNativeModelDownloadState=function(state,loaded,total,currentFile,message){updateAppModelUi(state,loaded,total,currentFile,message);};
+if(IS_APP_YANZHI){
+  try{const ready=NativeBridge.isYanzhiModelReady(),installed=Number(NativeBridge.yanzhiModelInstalledBytes?NativeBridge.yanzhiModelInstalledBytes():0);updateAppModelUi(ready?'ready':'missing',installed,MODEL_SPECS.reduce((s,x)=>s+x.bytes,0),'','');}catch(e){updateAppModelUi('error',0,MODEL_SPECS.reduce((s,x)=>s+x.bytes,0),'','无法读取本机模型状态');}
+}else updateAppModelUi('ready',0,0,'','');
+appModelDownload.addEventListener('click',()=>{if(!IS_APP_YANZHI)return;if(appModelReady)return;updateAppModelUi('downloading',0,MODEL_SPECS.reduce((s,x)=>s+x.bytes,0),'','正在启动下载');try{if(!NativeBridge.downloadYanzhiModels())throw new Error('无法启动模型下载');}catch(e){updateAppModelUi('error',0,MODEL_SPECS.reduce((s,x)=>s+x.bytes,0),'',e.message);}});
+function clearUploadSelection(e){
+  if(e&&e.type==="selectstart") e.preventDefault();
+  const sel=window.getSelection&&window.getSelection();
+  if(sel&&sel.removeAllRanges) sel.removeAllRanges();
+  return false;
+}
+drop.addEventListener("selectstart",clearUploadSelection);
+drop.addEventListener("pointerdown",clearUploadSelection,{passive:true});
+drop.addEventListener("touchstart",clearUploadSelection,{passive:true});
+drop.addEventListener("mousedown",clearUploadSelection);
+drop.addEventListener("click", () => { clearUploadSelection(); if(!appModelReady){setStatus('请先下载约 64.1 MB 审美模型，下载一次后长期保存在本机','err');return;} fileInput.click(); });
+fileInput.addEventListener("change", e=>{ if(e.target.files[0]) handleFile(e.target.files[0]); });
+["dragover","dragenter"].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();if(appModelReady)drop.classList.add("over");}));
+["dragleave"].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove("over");}));
+drop.addEventListener("drop", e=>{
+  e.preventDefault(); drop.classList.remove("over");
+  if(!appModelReady){setStatus('请先完成审美模型下载','err');return;}
+  if(e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
+});
+function setStatus(msg,cls){
+  status.textContent=msg||""; status.className="status"+(cls?" "+cls:"");
+  const overlay=$("analysisOverlay"), overlayText=$("analysisOverlayText");
+  if(overlayText && msg) overlayText.textContent=msg;
+  if(overlay && (cls==="ok" || cls==="err")){overlay.classList.remove("show");hideModelProgress();}
+}
+function handleFile(file){
+  if(busy) return;
+  if(!appModelReady){setStatus("请先完成审美模型下载","err");return;}
+  const name=(file.name||"").toLowerCase();
+  if(!file.type.startsWith("image/")){setStatus("请选择图片文件（JPG / PNG / WebP）","err");return;}
+  if(/\.(heic|heif)$/.test(name)||/heic|heif/.test(file.type)){
+    setStatus("当前浏览器不能稳定读取 HEIC/HEIF，请先在相册中导出为 JPG 或 PNG","err");return;
+  }
+  if(file.size>35*1024*1024){setStatus("图片超过 35MB，请压缩或截屏后再上传","err");return;}
+  const url=URL.createObjectURL(file);
+  img.onload=()=>{
+    /* 先确认上传成功并立即展示原图，再异步加载模型/推理。 */
+    $("resultCard").style.display="block";
+    $("reportCol").style.display="none";
+    $("layers").innerHTML="";
+    const previewCanvas=$("draw"); previewCanvas.width=0; previewCanvas.height=0;
+    $("analysisOverlay").classList.add("show");
+    $("analysisOverlayText").textContent="图片已上传，正在分析…";
+    setStatus("图片已上传，正在加载分析模型…");
+    $("resultCard").scrollIntoView({behavior:"smooth",block:"start"});
+    requestAnimationFrame(()=>runAnalysis());
+  };
+  img.onerror=()=>{URL.revokeObjectURL(url);setStatus("图片解码失败，请改用 JPG / PNG / WebP，或将原图截屏后上传","err");};
+  setStatus("正在读取图片…");
+  img.src=url;
+}
+
+async function createAnalysisImage(){
+  // Full resolution detection: draw image to canvas for MediaPipe
+  const c = document.createElement('canvas');
+  c.width = img.naturalWidth; c.height = img.naturalHeight;
+  c.getContext('2d', {alpha:false}).drawImage(img, 0, 0);
+  return c;
+}
+
+function timeoutPromise(ms,message){
+  return new Promise((_,reject)=>setTimeout(()=>reject(new Error(message)),ms));
+}
+async function waitWithElapsed(promise,label,timeoutMs=45000){
+  const started=performance.now();let timer=setInterval(()=>{
+    const sec=Math.max(1,Math.floor((performance.now()-started)/1000));
+    const suffix=sec>=20?"，请保持页面在前台":"";
+    setStatus(label+"（已等待 "+sec+" 秒"+suffix+"）…");
+  },1000);
+  try{return await Promise.race([promise,timeoutPromise(timeoutMs,label+"超时")]);}finally{clearInterval(timer);}
+}
+async function ensureLandmarkerWithRetry(){
+  try{return await waitWithElapsed(ensureLandmarker(),"正在初始化人脸检测组件");}
+  catch(first){
+    landmarkerPromise=null;landmarker=null;
+    setStatus("人脸检测初始化中断，正在自动重试一次…");
+    return await waitWithElapsed(ensureLandmarker(),"正在重新初始化人脸检测组件",30000);
+  }
+}
+
+/* ---------- 检测主流程 ---------- */
+async function runAnalysis(){
+  busy=true;
+  const runId=Date.now();
+  window.__debugGeo={runId, ts:new Date().toISOString(), loaded:null, featCount:null, finite:null, rawReturn:null, assignedPredGeo:null, fuseInputPredGeo:null, error:null};
+  window.__lastData=null;
+  try{
+    const preparedPromise=prepareOrtBuffers();
+    await Promise.all([loadFusionParams(), loadCalibration(), loadPercentile()]);
+    const prepared=await preparedPromise;
+    setStatus("模型文件已就绪，正在初始化人脸检测组件…");
+    const lm=await ensureLandmarkerWithRetry();
+    await initOrtSessions(prepared);
+    hideModelProgress();
+    // Startup self-check: verify frozen modules loaded correctly
+    if (typeof predictRaw !== 'function') throw new Error('model_histgb.js not loaded');
+    if (!window.GeoContract || typeof window.GeoContract.computeGeoFeats !== 'function') throw new Error('geo_extract_contract.js not loaded');
+    if (!window.cvResizeArea || typeof window.cvResizeArea.resizeArea224 !== 'function') throw new Error('cvResizeArea.js not loaded');
+    if (!fusionParams || !fusionParams.dynamic_fuser) throw new Error('fusion_params.web.json not loaded');
+    setStatus("正在优化图片并检测人脸关键点…");
+    await new Promise(r=>requestAnimationFrame(r));
+    const analysisImage=await createAnalysisImage();
+    const res=lm.detect(analysisImage);
+    if(!res.faceLandmarks || !res.faceLandmarks.length){
+      setStatus("没有检测到清晰人脸：请使用单人、无遮挡、五官完整的照片","err");busy=false;return;
+    }
+    const norm=res.faceLandmarks[0];
+    const natW=img.naturalWidth,natH=img.naturalHeight;
+    const P0=norm.map(l=>({x:l.x*natW,y:l.y*natH,z:l.z}));
+    const roll=Math.atan2(P0[I.chin].x-P0[I.hair].x, P0[I.chin].y-P0[I.hair].y);
+    const cx=P0[I.ntip].x, cy=P0[I.ntip].y;
+    const P=P0.map(p=>rotatePt(p,cx,cy,roll));
+    const data=measure(P,P0,natW,natH,norm,roll);
+    data.roll=roll;data.rotCx=cx;data.rotCy=cy;
+    /* 冻结 HistGB 几何模型：predictRaw 必须成功，禁止静默回退规则版 */
+    try {
+      const geoFeats=computeGeoFeats(norm,natW,natH);
+      const geoFeatCount=Object.keys(geoFeats).length;
+      const geoLoaded=(typeof predictRaw==='function');
+      if(!geoLoaded) throw new Error('predictRaw not defined');
+      const geoRaw=predictRaw(geoFeats);
+      if(!isFinite(geoRaw)||geoRaw<1||geoRaw>5) throw new Error('geoRaw out of range: '+geoRaw);
+      data.predGeo=geoRaw;
+      window.__debugGeo={runId, ts:new Date().toISOString(), loaded:geoLoaded, featCount:geoFeatCount, finite:isFinite(geoRaw), rawReturn:geoRaw, assignedPredGeo:data.predGeo, fuseInputPredGeo:data.predGeo, error:null};
+      if(DEBUG){
+        const FEATS = window.GeoContract.FEATURES || [];
+        window.__debugGeo.featsArr = FEATS.map(k => geoFeats[k] !== undefined ? geoFeats[k] : null);
+        window.__debugGeo.keyFeatures = {mouth_open:geoFeats.mouth_open, pose_yaw:geoFeats.pose_yaw, geom_conf:geoFeats.geom_conf, face_scale:geoFeats.face_scale, mp_face_w:geoFeats.mp_face_w, mp_face_h:geoFeats.mp_face_h};
+        (async () => {
+          try {
+            const str = JSON.stringify(window.__debugGeo.featsArr);
+            const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+            window.__debugGeo.featsSha256 = Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+          } catch(e) { window.__debugGeo.featsSha256 = 'error:'+e.message; }
+        })();
+      }
+    } catch(e) {
+      window.__debugGeo.error=e.message+'\n'+(e.stack||'');
+      setStatus("冻结几何模型加载失败："+e.message,"err");busy=false;return;
+    }
+    /* 深度模型推理 + 融合 + 校准 */
+    setStatus("正在运行深度模型推理…");
+    let fusion=null;
+    try {
+      const preds = await runEnsembleInference(img, norm);
+      // 3D pose from facial transformation matrix
+      const matrix = res.facialTransformationMatrixes ? res.facialTransformationMatrixes[0] : null;
+      const pose = eulerFromMatrix(matrix);
+      const gate = gate3d(pose);
+      window.__debug3d = { yawDeg: pose.yawDeg, pitchDeg: pose.pitchDeg, rollDeg: pose.rollDeg, valid: pose.valid, tier: gate.tier, reasons: gate.reasons };
+      // fuser3: 三通道加权融合
+      const fused = fuse3ch(preds);
+      const crowdPct = crowdPercentile(fused.finalScore);
+      const aestheticScore = finalDisplayScore(fused.finalScore,data.scores);
+      fusion = { finalScore: fused.finalScore, pct: aestheticScore, crowdPct, spread: fused.spread, tier: gate.tier, reasons: gate.reasons, pose, interval80: fused.interval80, interval90: fused.interval90 };
+      window.__debugFusion = { preds, fused: fused.finalScore, spread: fused.spread, aestheticScore, crowdPct, tier: gate.tier, pose };
+      if(!Number.isFinite(fusion.finalScore)) throw new Error('finalScore non-finite');
+    } catch(e) {
+      setStatus("深度模型推理失败："+e.message,"err");busy=false;return;
+    }
+    data.fusion = fusion;
+    // V91: main score is monotonic aesthetic mapping; crowd percentile stays separate.
+    data.crowdPercentileRaw = crowdPercentile(fusion.finalScore);
+    data.crowdPercentile = Math.round(data.crowdPercentileRaw);
+    data.percentileRaw = finalDisplayScore(fusion.finalScore,data.scores);
+    data.percentile = Math.round(data.percentileRaw);
+    data.labelCal = calibrateScore(fusion.finalScore);
+    data.totalRaw = data.percentileRaw;
+    data.total = data.percentile; // display integer
+    window.__lastData=data;
+    /* 先显示结果以拿到真实显示尺寸，再绘制测量线 */
+    $("resultCard").style.display="block";
+    $("reportCol").style.display="block";
+    await new Promise(r=>requestAnimationFrame(r));
+    await new Promise(r=>requestAnimationFrame(r));
+    const cw=img.clientWidth, ch=img.clientHeight;
+    const canvas=$("draw"); canvas.width=cw; canvas.height=ch;
+    data.cw=cw; data.ch=ch;
+    buildLayers();
+    drawLines(data);
+    render(data);
+    setStatus("分析完成","ok");
+    $("resultCard").scrollIntoView({behavior:"smooth"});
+  }catch(e){
+    console.error(e);
+    const msg=e&&e.message?e.message:String(e||"");
+    if(/fetch|wasm|network|Failed to load|createFromOptions/i.test(msg))
+      setStatus("本地人脸模型加载失败，请刷新重试；若仍失败，请清理浏览器缓存或换用最新版 Chrome/Edge","err");
+    else if(/memory|allocation|out of bounds/i.test(msg))
+      setStatus("设备内存不足，请关闭其他页面或先将图片截屏/压缩后重试","err");
+    else setStatus("分析失败："+msg,"err");
+  }finally{busy=false;}
+}
+
+/* ---------- 人脸区域亮度 ---------- */
+function faceLuminance(norm){
+  const nw=img.naturalWidth, nh=img.naturalHeight;
+  const c=document.createElement("canvas");
+  const sc=Math.min(1, 480/Math.max(nw,nh));
+  c.width=Math.max(1,Math.round(nw*sc)); c.height=Math.max(1,Math.round(nh*sc));
+  const cx=c.getContext("2d");
+  cx.drawImage(img,0,0,c.width,c.height);
+  let x0=1,y0=1,x1=0,y1=0;
+  OVAL.forEach(k=>{x0=Math.min(x0,norm[k].x);y0=Math.min(y0,norm[k].y);
+    x1=Math.max(x1,norm[k].x);y1=Math.max(y1,norm[k].y);});
+  const w=Math.max(1,Math.round((x1-x0)*c.width)), h=Math.max(1,Math.round((y1-y0)*c.height));
+  const px=cx.getImageData(Math.round(x0*c.width),Math.round(y0*c.height),w,h).data;
+  let sum=0,n=0;
+  for(let i=0;i<px.length;i+=4){ sum+=(0.299*px[i]+0.587*px[i+1]+0.114*px[i+2])/255; n++; }
+  return sum/n;
+}
+
+/* ---------- 几何测量与评分 ---------- */
+function measure(P,P0,natW,natH,norm,roll){
+  /* 偏航角 yaw */
+  const dl=P[I.lin].x-P[I.fl].x, dr=P[I.fr].x-P[I.rin].x;
+  const yawRatio=(dl-dr)/((dl+dr)/2); // normalized, for fuser quality
+  const yawDeg=clamp(yawRatio*55,-60,60); // degrees, UI only
+  /* 对称度：各对称点的中点应落在同一条（可倾斜的）中线上，
+     用线性回归拟合中线，衡量中点的横向离散度（对侧脸角度鲁棒） */
+  const _faceW=P[I.fr].x-P[I.fl].x;
+  const mids=SYM_PAIRS.map(([a,b])=>({x:(P[a].x+P[b].x)/2, y:(P[a].y+P[b].y)/2}));
+  const mX=mean(mids.map(m=>m.x)), mY=mean(mids.map(m=>m.y));
+  let bNum=0,bDen=0;
+  mids.forEach(m=>{ bNum+=(m.y-mY)*(m.x-mX); bDen+=(m.y-mY)*(m.y-mY); });
+  const b=bDen>0?bNum/bDen:0, a=mX-b*mY;
+  const asym=mean(mids.map(m=>Math.abs(m.x-(a+b*m.y))))/_faceW;
+  /* 三庭（以鼻根 nasion 为分界） */
+  const yHair=P[I.hair].y, yBrow=P[I.nasion].y;
+  const yNose=P[I.nbase].y, yChin=P[I.chin].y;
+  const thirds=[yBrow-yHair,yNose-yBrow,yChin-yNose];
+  const tCv=std(thirds)/mean(thirds);
+  /* 五眼 */
+  const fL=P[I.fl].x, fR=P[I.fr].x, faceW=fR-fL;
+  const segs=[
+    P[I.lout].x-fL,
+    P[I.lin].x-P[I.lout].x,
+    P[I.rin].x-P[I.lin].x,
+    P[I.rout].x-P[I.rin].x,
+    fR-P[I.rout].x
+  ];
+  const ideal=faceW/5;
+  const fErr=mean(segs.map(s=>Math.abs(s-ideal)))/ideal;
+  /* 眼睛 */
+  const lEyeW=dist(P[I.lin],P[I.lout]), rEyeW=dist(P[I.rin],P[I.rout]);
+  const lEyeH=dist(P[I.ltop],P[I.lbot]), rEyeH=dist(P[I.rtop],P[I.rbot]);
+  const eyeW=(lEyeW+rEyeW)/2, eyeH=(lEyeH+rEyeH)/2;
+  const eyeRatio=eyeW/eyeH;
+  const eyeSize=eyeW/faceW, eyeOpen=eyeH/faceW;
+  const tiltL=Math.atan2(P[I.lin].y-P[I.lout].y,Math.abs(P[I.lout].x-P[I.lin].x))*180/Math.PI;
+  const tiltR=Math.atan2(P[I.rin].y-P[I.rout].y,Math.abs(P[I.rout].x-P[I.rin].x))*180/Math.PI;
+  const tilt=(tiltL+tiltR)/2;
+  /* 鼻/嘴 */
+  const noseRatio=dist(P[I.nl],P[I.nr])/dist(P[I.lin],P[I.rin]);
+  const mouthRatio=dist(P[I.ml],P[I.mr])/dist(P[I.liris],P[I.riris]);
+  /* 脸型/下颌 */
+  const faceH=dist(P[I.hair],P[I.chin]);
+  const faceRatio=faceW/faceH;
+  const jlL=dist(P[I.jl],P[I.chin]), jlR=dist(P[I.jr],P[I.chin]);
+  const jawSym=Math.abs(jlL-jlR)/((jlL+jlR)/2);
+  const upperH=Math.abs(P[I.nasion].y-P[I.mtop].y);
+  const fwhr=faceW/upperH;
+  /* 亮度 */
+  const lum=faceLuminance(norm);
+  const faceSize=faceW/natW;
+
+  /* ===== v5 双审美通道 =====
+     柔和精致型：眼部神采、五官精致度、下颌收束；
+     英气硬朗型：对称、横纵比例、鼻嘴结构、适度宽下颌。
+     两套通道独立计算后择优，避免用单一“大眼小脸”模板评价所有人。 */
+  const sSym=clamp(82-asym*140,60,84);
+  /* 稳健纵向比例：只比较中庭/下庭，不使用易受发型和刘海影响的发际线 */
+  const midLower=thirds[1]/Math.max(thirds[2],1e-6);
+  const sThird=clamp(84-Math.abs(midLower-0.82)*45,68,84);
+  const sFifth=clamp(82-Math.max(0,fErr-0.12)*140,60,84);
+
+  /* 柔和精致通道 */
+  const sEyeOpen=clamp(56+(Math.min(eyeOpen,0.102)-0.065)*1000,50,96);
+  const sEyeShape=clamp(94-Math.max(0,2.08-eyeRatio)*140,50,94);
+  const sEyeTilt=clamp(93-Math.max(0,6-tilt)*7-Math.max(0,tilt-13)*7,55,95);
+  const sSoftEye=0.6*sEyeOpen+0.18*sEyeShape+0.22*sEyeTilt;
+  const sNose=clamp(89-Math.max(0,noseRatio-0.95)*180-Math.max(0,0.82-noseRatio)*100,50,94);
+  const sMouth=clamp(86-Math.abs(mouthRatio-0.78)*75,55,94);
+  const sSoftFeat=0.68*sNose+0.32*sMouth;
+
+  /* 下颌收束度与五官集中度 */
+  const jawTaper=(P[I.jr].x-P[I.jl].x)/Math.max(faceW,1e-6);
+  const featureConcentration=Math.abs(P[I.mtop].y-P[I.nasion].y)/Math.max(faceH,1e-6);
+  const sSoftJaw=clamp(92-Math.abs(jawTaper-0.78)*180,62,92);
+
+  /* 英气硬朗通道：允许更窄眼裂、更宽鼻型和适度方阔下颌 */
+  const sHardEye=clamp(88-Math.abs(eyeRatio-3.2)*12-Math.max(0,Math.abs(tilt)-12)*3,62,90);
+  const sHardNose=clamp(88-Math.abs(noseRatio-1.05)*100,60,90);
+  const sHardMouth=clamp(86-Math.abs(mouthRatio-0.78)*60,60,88);
+  const sHardFeat=0.6*sHardNose+0.4*sHardMouth;
+  const sHardJaw=clamp(92-Math.abs(jawTaper-0.86)*180,62,92);
+
+  const softBonus=Math.min(7,
+    clamp((0.42-featureConcentration)*120,0,7)+
+    clamp((Math.min(sSoftEye,sSoftFeat)-82)*1.2,0,5));
+  const softRaw=0.08*sSym+0.06*sThird+0.06*sFifth+0.34*sSoftEye+0.28*sSoftFeat+0.18*sSoftJaw+softBonus;
+  const hardRaw=0.20*sSym+0.15*sThird+0.15*sFifth+0.15*sHardEye+0.20*sHardFeat+0.15*sHardJaw;
+  const useSoft=softRaw>=hardRaw;
+  const beautyStyle=useSoft?"精致柔和型":"英气硬朗型";
+  const sEye=useSoft?sSoftEye:sHardEye;
+  const sFeat=useSoft?sSoftFeat:sHardFeat;
+  const sJaw=useSoft?sSoftJaw:sHardJaw;
+
+  /* 照片条件只影响可信度，不直接扣颜值 */
+  const qYaw=clamp(100-Math.abs(yawDeg)*3,30,100);
+  const qSize=clamp(100-Math.abs(faceSize-0.6)*130,40,100);
+  const qLight=clamp(100-Math.abs(lum-0.55)*160,30,100);
+  const sQ=0.4*qYaw+0.3*qSize+0.3*qLight;
+  /* V90: 六维用 SCUT5500 ECDF percentile lookup（同源 raw measure） */
+  const symRaw = -asym;
+  const thirdRaw = -Math.abs(midLower - 0.82);
+  const fifthRaw = -fErr;
+  const eyeRaw = eyeOpen;
+  const featRaw = -(Math.abs(noseRatio - 0.95) + Math.abs(mouthRatio - 0.78));
+  const jawRaw = -Math.abs(jawTaper - 0.78);
+  const scores={
+    sym: lookupAspectPct('sym', symRaw),
+    third: lookupAspectPct('third', thirdRaw),
+    fifth: lookupAspectPct('fifth', fifthRaw),
+    eye: lookupAspectPct('eye', eyeRaw),
+    feat: lookupAspectPct('feat', featRaw),
+    jaw: lookupAspectPct('jaw', jawRaw),
+    q: sQ
+  };
+  const rawBeauty=clamp(Math.max(softRaw,hardRaw),0,100);
+
+  /* 严格颜值标尺：40–50 大众，60 好看，70 小美，80 顶美，90 明星级 */
+  const anchors=[[0,0],[65,18],[70,25],[74,36],[77,43],[80,50],[83,60],[86,80],[90,90],[94,96],[100,100]];
+  let calibrated=0;
+  for(let i=1;i<anchors.length;i++){
+    if(rawBeauty<=anchors[i][0]){
+      const [x0,y0]=anchors[i-1], [x1,y1]=anchors[i];
+      calibrated=y0+(rawBeauty-x0)*(y1-y0)/(x1-x0);
+      break;
+    }
+  }
+  const total=Math.round(clamp(calibrated,0,100));
+  const predGeo=1+total/100*4; // 0-100 -> 1-5 native scale
+
+  const tSum=thirds.reduce((a,b)=>a+b,0);
+  // Frozen tier gate: high=dynamic, medium/low=deep-only
+  const rollDeg=roll*180/Math.PI;
+  let warnings=[];
+  if(Math.abs(yawDeg)>20) warnings.push("large_yaw");
+  if(Math.abs(rollDeg)>10) warnings.push("large_roll");
+  if(Math.abs(yawDeg)>30) warnings.push("low_confidence");
+  let tier="high";
+  if(warnings.includes("low_confidence")||warnings.includes("large_roll")) tier="low";
+  else if(warnings.includes("large_yaw")) tier="medium";
+  return {
+    P,P0,natW,natH,scores,total,predGeo,warnings,tier,
+    vals:{
+      yawDeg, yawRatio, roll:rollDeg,
+      thirdPct:thirds.map(t=>t/tSum),
+      segPct:segs.map(s=>s/faceW),
+      eyeRatio, tilt, noseRatio, mouthRatio,
+      faceRatio, faceShape:faceShapeName(faceRatio),
+      fwhr, lum, faceSize,
+      asym, eyeSize, eyeOpen,
+      jawTaper, featureConcentration, beautyStyle,
+      softRaw, hardRaw, rawBeauty
+    }
+  };
+}
+/* ---------- 测量线 ---------- */
+const LAYER_COLORS={oval:"#67e8f9",mid:"#ffd43b",third:"#51cf66",fifth:"#cc5de8",
+  eye:"#22d3ee",feat:"#ffa94d",sym:"#ff5d8f"};
+let layerState={oval:true,mid:true,third:true,fifth:true,eye:true,feat:true,sym:true};
+let lastData=null;
+
+function buildLayers(){
+  const defs=[["oval","轮廓"],["mid","中线"],["third","三庭"],["fifth","五眼"],
+    ["eye","眼睛"],["feat","鼻嘴"],["sym","对称"]];
+  const box=$("layers"); box.innerHTML="";
+  defs.forEach(([k,name])=>{
+    const b=document.createElement("button");
+    b.className="lyr"+(layerState[k]?" on":"");
+    b.innerHTML='<span class="ld" style="background:'+LAYER_COLORS[k]+'"></span>'+name;
+    b.onclick=()=>{ layerState[k]=!layerState[k]; b.classList.toggle("on"); drawLines(lastData); };
+    box.appendChild(b);
+  });
+  const re=document.createElement("button");
+  re.className="rebtn"; re.textContent="重新上传";
+  re.onclick=()=>{
+    $("resultCard").style.display="none"; fileInput.value="";
+    window.scrollTo({top:0,behavior:"smooth"});
+    setTimeout(()=>fileInput.click(),350);
+  };
+  box.appendChild(re);
+}
+
+function drawLines(data){
+  lastData=data;
+  const {P,P0,cw,ch,natW,natH,roll,rotCx,rotCy}=data;
+  const sx=cw/natW, sy=ch/natH;
+  const X=p=>p.x*sx, Y=p=>p.y*sy;
+  /* P 是评分用的扶正坐标；P0 是原图坐标。构造于 P 的辅助线必须逆旋转回 P0。 */
+  const U=p=>rotatePt(p,rotCx,rotCy,-roll);
+  const ctx=$("draw").getContext("2d");
+  ctx.clearRect(0,0,cw,ch);
+  ctx.lineCap="round";ctx.lineJoin="round";
+  const on=k=>layerState[k];
+  const line=(a,b)=>{ctx.beginPath();ctx.moveTo(X(a),Y(a));ctx.lineTo(X(b),Y(b));ctx.stroke();};
+
+  if(on("oval")){
+    ctx.strokeStyle=LAYER_COLORS.oval;ctx.lineWidth=2.5;ctx.beginPath();
+    OVAL.forEach((k,i)=>{const p=P0[k];if(i===0)ctx.moveTo(X(p),Y(p));else ctx.lineTo(X(p),Y(p));});
+    ctx.closePath();ctx.stroke();
+  }
+  if(on("mid")){
+    ctx.strokeStyle=LAYER_COLORS.mid;ctx.lineWidth=2;ctx.setLineDash([7,6]);
+    line(P0[I.hair],P0[I.chin]);ctx.setLineDash([]);
+  }
+  if(on("third")){
+    ctx.strokeStyle=LAYER_COLORS.third;ctx.lineWidth=2.5;
+    [P[I.nasion].y,P[I.nbase].y].forEach(y=>line(U({x:P[I.fl].x,y}),U({x:P[I.fr].x,y})));
+  }
+  if(on("fifth")){
+    ctx.strokeStyle=LAYER_COLORS.fifth;ctx.lineWidth=2.5;
+    const xs=[P[I.fl].x,P[I.lout].x,P[I.lin].x,P[I.rin].x,P[I.rout].x,P[I.fr].x];
+    const y0=P[I.lbot].y+10/sy,y1=y0+13/sy;
+    xs.forEach(x=>line(U({x,y:y0}),U({x,y:y1})));
+    line(U({x:xs[0],y:y0+6/sy}),U({x:xs[5],y:y0+6/sy}));
+  }
+  if(on("eye")){
+    ctx.strokeStyle=LAYER_COLORS.eye;ctx.lineWidth=2.5;
+    [[I.lin,I.lout],[I.rin,I.rout]].forEach(([a,b])=>line(P0[a],P0[b]));
+    [I.liris,I.riris].forEach(k=>{ctx.fillStyle=LAYER_COLORS.eye;ctx.beginPath();ctx.arc(X(P0[k]),Y(P0[k]),3.5,0,7);ctx.fill();});
+  }
+  if(on("feat")){
+    ctx.strokeStyle=LAYER_COLORS.feat;ctx.lineWidth=2.5;
+    line(P0[I.nl],P0[I.nr]);line(P0[I.ml],P0[I.mr]);
+  }
+  if(on("sym")){
+    ctx.strokeStyle=LAYER_COLORS.sym;ctx.lineWidth=1.8;ctx.setLineDash([4,4]);
+    SYM_PAIRS.forEach(([a,b])=>line(P0[a],P0[b]));ctx.setLineDash([]);
+  }
+}
+
+/* ---------- 报告渲染 ---------- */
+const METRIC_LABELS=[["sym","对称度","左右五官的整体均衡"],["third","纵向比例","不依赖发际线的中庭/下庭比例"],["fifth","五眼","眼宽与眼距的横向比例"],["eye","眼睛","按柔和或硬朗通道评价"],
+  ["feat","五官比例","鼻嘴尺度与五官集中度"],["jaw","下颌轮廓","按柔和或硬朗脸型评价"]];
+const METRIC_ADVICE={
+  sym:"左右五官略有不对称，轻微的不对称很正常，拍摄角度也会影响",
+  third:"中庭与下庭比例略有差异，已使用不依赖发际线的稳健口径",
+  fifth:"眼距或眼宽比例略偏离标准，可由妆容、刘海调整",
+  eye:"眼睛条件还有提升空间，眼线、睫毛能增强神采",
+  feat:"鼻嘴比例略可优化，整体协调比单一标准更重要",
+  jaw:"脸型轮廓可通过发型与拍摄角度修饰",
+  q:"照片质量一般，建议自然光、平视、正脸、五官清晰重拍"
+};
+
+/* ==== V91: display score and real OOF percentile ==== */
+function gradeFromPct(pct){
+  // 9级称号，按未取整原值判定
+  if(pct < 20) return ["颜值表现偏低","仅代表本次测量结果，不给人下定义"];
+  if(pct < 30) return ["普通偏下","部分比例不占优势，但不代表真实审美结论"];
+  if(pct < 40) return ["大众自然","正常普通颜值，整体自然顺眼"];
+  if(pct < 50) return ["普通耐看","有个人亮点，属于日常耐看型"];
+  if(pct < 60) return ["中等偏上","比大众脸更耐看，具有个人特色"];
+  if(pct < 70) return ["好看","已经高于大多数人的日常观感"];
+  if(pct < 80) return ["小美","明显好看，上镜有优势"];
+  if(pct < 90) return ["顶美","在人群中属于非常亮眼的少数"];
+  return ["明星级","五官辨识度和精致度都非常突出"];
+}
+function intervalToPct(nativeCenter, halfRaw){
+  // Both uncertainty endpoints pass through the same OOF ECDF + aesthetic mapping.
+  const lo = percentileScore(nativeCenter - halfRaw);
+  const hi = percentileScore(nativeCenter + halfRaw);
+  return [lo, hi];
+}
+
+function addComment(box,warn,text){
+  const c=document.createElement("div"); c.className="cm"+(warn?" warn":"");
+  const icon=warn
+    ? '<svg class="cm-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>'
+    : '<svg class="cm-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>';
+  c.innerHTML=icon+"<span>"+text+"</span>";
+  box.appendChild(c);
+}
+
+function buildComments(data){
+  const {scores,vals}=data;
+  const box=$("comments"); box.innerHTML="";
+  const displayScores=getDisplayAspectScores(scores,data.totalRaw ?? data.total);
+  const entries=METRIC_LABELS.filter(([k])=>k!=="q").map(([k,l])=>[k,l,displayScores[k]]).sort((a,b)=>b[2]-a[2]);
+  const top=entries[0], low=entries[entries.length-1];
+  const overall=data.totalRaw ?? data.total;
+  if(overall<20){
+    addComment(box,false,"本次多个指标同时处于参考样本低位，因此综合分相应较低；结果仅代表这张照片。");
+  }else{
+    addComment(box,false, top[2]>=78
+      ? "亮点："+top[1]+"表现突出（"+Math.round(top[2])+"），是整张脸的加分项。"
+      : "整体五官协调自然，给人舒服耐看的感觉。");
+  }
+  addComment(box,false,"建议："+METRIC_ADVICE[low[0]]+"。");
+  const pose=data.fusion&&data.fusion.pose;
+  const yaw3d=pose&&pose.valid?Math.abs(pose.yawDeg):0;
+  if(vals.segPct.some(s=>s<0)||(pose&&pose.valid&&yaw3d>28))
+    addComment(box,true,"照片偏转较大，当前结果参考性有限，建议正脸平视镜头复核。");
+  else if(pose&&pose.valid&&yaw3d>14)
+    addComment(box,true,"面部有一定偏转（约 "+Math.round(yaw3d)+"°），使用正脸照测量会更稳定。");
+  if(vals.lum<0.32) addComment(box,true,"照片整体偏暗，建议到光线均匀明亮的地方重拍。");
+  else if(vals.lum>0.78) addComment(box,true,"照片略微过曝，建议避免强光直射。");
+  if(vals.faceSize<0.35) addComment(box,true,"人脸在画面中占比较小，建议靠近拍摄让五官更清晰。");
+  else if(vals.faceSize>0.92) addComment(box,true,"人脸离镜头过近，建议稍微拉远，避免广角变形。");
+}
+
+function radarPoint(index,value,cx,cy,r,count=6){
+  const angle=-Math.PI/2+index*Math.PI*2/count,scale=clamp(value,0,100)/100;
+  return [cx+Math.cos(angle)*r*scale,cy+Math.sin(angle)*r*scale];
+}
+function renderRadar(container,scores){
+  const items=METRIC_LABELS.map(([k,label])=>({label,value:Math.round(scores[k])}));
+  const cx=210,cy=166,r=108,count=items.length;
+  const polygon=value=>items.map((_,i)=>radarPoint(i,value,cx,cy,r,count).map(v=>v.toFixed(1)).join(',')).join(' ');
+  const axes=items.map((_,i)=>{const p=radarPoint(i,100,cx,cy,r,count);return `<line class="radar-axis" x1="${cx}" y1="${cy}" x2="${p[0].toFixed(1)}" y2="${p[1].toFixed(1)}"/>`;}).join('');
+  const labels=items.map((item,i)=>{
+    const p=radarPoint(i,134,cx,cy,r,count),c=Math.cos(-Math.PI/2+i*Math.PI*2/count);
+    const anchor=c>.25?'start':c<-.25?'end':'middle';
+    return `<text x="${p[0].toFixed(1)}" y="${(p[1]-3).toFixed(1)}" text-anchor="${anchor}" class="radar-label">${item.label}<tspan x="${p[0].toFixed(1)}" dy="15" class="radar-value">${item.value}</tspan></text>`;
+  }).join('');
+  const points=items.map((item,i)=>radarPoint(i,item.value,cx,cy,r,count).map(v=>v.toFixed(1)).join(',')).join(' ');
+  const dots=items.map((item,i)=>{const p=radarPoint(i,item.value,cx,cy,r,count);return `<circle class="radar-dot" cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="4"/>`;}).join('');
+  container.innerHTML=`<div class="radar-wrap"><svg class="radar-svg" viewBox="0 0 420 330" role="img" aria-label="六项颜值雷达图">${[20,40,60,80,100].map(v=>`<polygon class="radar-grid" points="${polygon(v)}"/>`).join('')}${axes}<polygon class="radar-area" points="${points}"/>${dots}${labels}</svg><div class="radar-note">六项为几何相对表现，不等同于综合颜值分</div></div>`;
+}
+
+function render(data){
+  const {scores,total,vals}=data;
+  const circ=2*Math.PI*42;
+  const arc=$("ringArc");
+  arc.style.transition="stroke-dashoffset .9s ease";
+  arc.setAttribute("stroke-dasharray",circ.toFixed(1));
+  arc.setAttribute("stroke-dashoffset",circ.toFixed(1));
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{
+    arc.setAttribute("stroke-dashoffset",(circ*(1-clamp(total,0,100)/100)).toFixed(1));
+  }));
+  // V91: grade uses continuous aesthetic score; crowd rank is a separate fact.
+  const totalRaw = data.totalRaw ?? total;
+  $("totalNum").textContent=total;
+  const [g,gs]=gradeFromPct(totalRaw);
+  const crowd=Math.round(data.crowdPercentileRaw ?? data.crowdPercentile ?? 0);
+  $("grade").textContent=g; $("gradeSub").textContent="超过约"+crowd+"%的参考样本 · "+gs;
+  // V90: 低可信显示 --，不显示精确分
+  const badge=$("fusionBadge"), ib=$("intervalBox");
+  if(data.fusion && data.fusion.tier==='reject'){
+    $("totalNum").textContent='--';
+    badge.style.display='inline-block';
+    badge.textContent='建议重拍'; badge.style.background='#c62828'; badge.style.color='#fff';
+    ib.style.display='none';
+  } else if(data.fusion && data.fusion.tier==='medium'){
+    badge.style.display='inline-block';
+    badge.textContent='结果仅供参考'; badge.style.background='#f0a500'; badge.style.color='#fff';
+    ib.style.display='none';
+  } else {
+    badge.style.display='none';
+    ib.style.display='none';
+  }
+
+  const m=$("metrics");
+  // 六维雷达与海报共用同一组收缩后的显示分数。
+  const displayScores=getDisplayAspectScores(scores,totalRaw);
+  renderRadar(m,displayScores);
+  buildComments(data);
+}
+
+/* ---------- 分享海报 ---------- */
+const posterModal=$("posterModal"),posterCanvas=$("posterCanvas"),posterTip=$("posterTip");
+const isWechat=/MicroMessenger/i.test(navigator.userAgent);
+let qrLibPromise=null;
+function ensureQrLib(){
+  if(window.qrcode) return Promise.resolve();
+  if(qrLibPromise) return qrLibPromise;
+  qrLibPromise=new Promise((resolve,reject)=>{
+    const s=document.createElement("script");s.src="vendor/qrcode.min.js";s.async=true;
+    s.onload=resolve;s.onerror=()=>{qrLibPromise=null;reject(new Error("二维码组件加载失败"));};document.head.appendChild(s);
+  });
+  return qrLibPromise;
+}
+function loadCanvasImage(src){return new Promise((resolve,reject)=>{const im=new Image();im.onload=()=>resolve(im);im.onerror=reject;im.src=src;});}
+function roundedRect(ctx,x,y,w,h,r){
+  r=Math.min(r,w/2,h/2);ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath();
+}
+function fitInside(sw,sh,x,y,w,h){
+  const scale=Math.min(w/sw,h/sh), dw=sw*scale, dh=sh*scale;
+  return {x:x+(w-dw)/2,y:y+(h-dh)/2,w:dw,h:dh};
+}
+function drawPosterRadar(ctx,scores,cx,cy,r){
+  const items=METRIC_LABELS.map(([k,label])=>({label,value:Math.round(scores[k])})),count=items.length;
+  ctx.save();ctx.lineJoin="round";
+  [20,40,60,80,100].forEach(level=>{
+    const pts=items.map((_,i)=>radarPoint(i,level,cx,cy,r,count));ctx.beginPath();
+    pts.forEach((p,i)=>i?ctx.lineTo(p[0],p[1]):ctx.moveTo(p[0],p[1]));ctx.closePath();ctx.strokeStyle="#ddd8ce";ctx.lineWidth=1;ctx.stroke();
+  });
+  items.forEach((_,i)=>{const p=radarPoint(i,100,cx,cy,r,count);ctx.beginPath();ctx.moveTo(cx,cy);ctx.lineTo(p[0],p[1]);ctx.strokeStyle="#e6e0d7";ctx.stroke();});
+  const pts=items.map((item,i)=>radarPoint(i,item.value,cx,cy,r,count));ctx.beginPath();pts.forEach((p,i)=>i?ctx.lineTo(p[0],p[1]):ctx.moveTo(p[0],p[1]));ctx.closePath();ctx.fillStyle="rgba(217,101,92,.24)";ctx.fill();ctx.strokeStyle="#d9655c";ctx.lineWidth=3;ctx.stroke();
+  pts.forEach(p=>{ctx.beginPath();ctx.arc(p[0],p[1],4,0,Math.PI*2);ctx.fillStyle="#d9655c";ctx.fill();});
+  ctx.font='700 17px "Microsoft YaHei",sans-serif';items.forEach((item,i)=>{const p=radarPoint(i,132,cx,cy,r,count),a=-Math.PI/2+i*Math.PI*2/count,c=Math.cos(a);ctx.textAlign=c>.25?"left":c<-.25?"right":"center";ctx.fillStyle="#5c6864";ctx.fillText(item.label+" "+item.value,p[0],p[1]+6);});ctx.restore();
+}
+function buildPosterBrief(data){
+  if(data.fusion&&data.fusion.tier==='reject') return "拍摄角度影响较大 · 建议正脸平视复核";
+  const shown=getDisplayAspectScores(data.scores,data.totalRaw??data.total);
+  const entries=METRIC_LABELS.filter(([k])=>k!=="q").map(([k,label])=>({label,value:shown[k]})).sort((a,b)=>b.value-a.value);
+  const top=entries[0],low=entries[entries.length-1];
+  const lowName=(data.totalRaw??data.total)<20?"低位":"相对弱项";
+  return "亮点："+top.label+" "+top.value+" · "+lowName+"："+low.label+" "+low.value;
+}
+async function drawPoster(){
+  const data=window.__lastData;if(!data)return false;
+  const ctx=posterCanvas.getContext("2d"),W=1080,H=1380;
+  posterCanvas.width=W;posterCanvas.height=H;
+  ctx.fillStyle="#f5f1ea";ctx.fillRect(0,0,W,H);
+  ctx.fillStyle="#173b38";ctx.fillRect(0,0,W,132);
+  ctx.fillStyle="#d9655c";ctx.fillRect(0,132,W,8);
+  ctx.fillStyle="#ffffff";ctx.font='800 48px "Microsoft YaHei",sans-serif';ctx.fillText("颜值实验室",64,76);
+  ctx.fillStyle="#d8e4df";ctx.font='400 22px "Microsoft YaHei",sans-serif';ctx.fillText("照片仅在你的设备上分析，不会上传服务器",64,112);
+
+  /* 原图完整等比呈现 */
+  roundedRect(ctx,52,168,976,620,30);ctx.fillStyle="#e8e2d8";ctx.fill();ctx.save();roundedRect(ctx,52,168,976,620,30);ctx.clip();
+  const box=fitInside(img.naturalWidth,img.naturalHeight,52,168,976,620);
+  ctx.fillStyle="#263b38";ctx.fillRect(52,168,976,620);ctx.drawImage(img,box.x,box.y,box.w,box.h);ctx.restore();
+
+  /* 紧凑结果卡：综合分 + 六维雷达 */
+  roundedRect(ctx,52,816,976,330,30);ctx.fillStyle="#fffdf8";ctx.fill();
+  const totalShow = data.fusion && data.fusion.tier==='reject' ? '--' : String(data.total);
+  ctx.fillStyle="#173b38";ctx.font='900 110px "Microsoft YaHei",sans-serif';ctx.fillText(totalShow,82,946);
+  ctx.fillStyle="#74817d";ctx.font='600 22px "Microsoft YaHei",sans-serif';ctx.fillText("颜值指数 / 100",88,986);
+  const grade=gradeFromPct(data.totalRaw ?? data.total)[0];
+  ctx.fillStyle="#d9655c";ctx.font='900 42px "Microsoft YaHei",sans-serif';ctx.fillText(grade,82,1060);
+  const brief=buildPosterBrief(data);
+  ctx.fillStyle="#173b38";ctx.font='700 22px "Microsoft YaHei",sans-serif';ctx.fillText(brief,82,1104);
+  const crowd=Math.round(data.crowdPercentileRaw ?? data.crowdPercentile ?? 0);
+  ctx.fillStyle="#74817d";ctx.font='500 18px "Microsoft YaHei",sans-serif';ctx.fillText("超过约 "+crowd+"% 的参考样本",82,1134);
+  const posterScores=getDisplayAspectScores(data.scores,data.totalRaw??data.total);
+  drawPosterRadar(ctx,posterScores,760,978,100);
+
+  /* 页脚与二维码 */
+  ctx.fillStyle="#a09a90";ctx.font='500 19px "Microsoft YaHei",sans-serif';
+  ctx.fillText("godweiyang.com/yanzhi",82,1248);
+  ctx.fillText("上传正脸照，测测你的颜值指数",82,1282);
+  try{
+    await ensureQrLib();
+    const qr=window.qrcode(0,"M");qr.addData("https://godweiyang.com/yanzhi/");qr.make();
+    const qrImg=await loadCanvasImage(qr.createDataURL(8,4));
+    roundedRect(ctx,850,1168,168,168,16);ctx.fillStyle="#ffffff";ctx.fill();
+    ctx.imageSmoothingEnabled=false;ctx.drawImage(qrImg,864,1182,140,140);ctx.imageSmoothingEnabled=true;
+    ctx.fillStyle="#74817d";ctx.font='600 16px "Microsoft YaHei",sans-serif';ctx.textAlign="center";
+    ctx.fillText("扫码测测你的颜值",934,1354);ctx.textAlign="left";
+  }catch(e){
+    console.warn("二维码生成失败，保留普通海报",e);
+  }
+  return true;
+}
+async function openPoster(){
+  const btn=$("shareBtn"),old=btn.innerHTML;btn.disabled=true;btn.textContent="正在生成海报…";
+  try{
+    if(!await drawPoster())return;
+    if(isWechat){
+      $("wxPosterImg").src=posterCanvas.toDataURL("image/png",1);
+      $("wxSaveModal").classList.add("show");document.body.style.overflow="hidden";
+    }else{
+      posterTip.textContent="PNG 海报包含原图、分析结果和扫码入口";
+      posterModal.classList.add("show");document.body.style.overflow="hidden";
+    }
+  }catch(e){
+    posterTip.textContent=e.message||"海报生成失败，请重试";
+  }finally{btn.disabled=false;btn.innerHTML=old;}
+}
+function closePoster(){posterModal.classList.remove("show");document.body.style.overflow="";}
+function closeWxSaver(){$("wxSaveModal").classList.remove("show");document.body.style.overflow="";}
+function posterBlob(){return new Promise((resolve,reject)=>posterCanvas.toBlob(b=>b?resolve(b):reject(new Error("海报生成失败")),"image/png",1));}
+async function savePosterImage(){
+  try{
+    const fileName="颜值实验室-"+window.__lastData.total+"分.png";
+    if(window.NativeBridge&&typeof NativeBridge.saveFile==='function'){
+      NativeBridge.saveFile(posterCanvas.toDataURL("image/png",1),fileName,"image/png");posterTip.textContent="图片已保存到手机相册";return;
+    }
+    const blob=await posterBlob(),url=URL.createObjectURL(blob),a=document.createElement("a");
+    a.href=url;a.download=fileName;document.body.appendChild(a);a.click();a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),1500);posterTip.textContent="图片已保存/下载，请到相册或下载目录查看";
+  }catch(e){posterTip.textContent=e.message||"保存失败，请长按预览图保存";}
+}
+async function copyPosterImage(){
+  try{
+    if(window.NativeBridge&&typeof NativeBridge.copyImage==='function'){
+      NativeBridge.copyImage(posterCanvas.toDataURL("image/png",1),"颜值实验室-海报.png");posterTip.textContent="海报已复制到剪贴板";return;
+    }
+    if(!navigator.clipboard||typeof ClipboardItem==="undefined") throw new Error("当前浏览器不支持复制图片");
+    const blob=await posterBlob();await navigator.clipboard.write([new ClipboardItem({"image/png":blob})]);
+    posterTip.textContent="海报已复制到剪贴板";
+  }catch(e){posterTip.textContent=(e.message||"复制失败")+"，可使用“保存图片”";}
+}
+$("shareBtn").addEventListener("click",openPoster);$("posterClose").addEventListener("click",closePoster);
+$("savePoster").addEventListener("click",savePosterImage);$("copyPoster").addEventListener("click",copyPosterImage);
+posterModal.addEventListener("click",e=>{if(e.target===posterModal)closePoster();});
+$("wxSaveClose").addEventListener("click",closeWxSaver);
+$("wxSaveModal").addEventListener("click",e=>{if(e.target===$("wxSaveModal"))closeWxSaver();});
+document.addEventListener("keydown",e=>{
+  if(e.key!=="Escape")return;
+  if(posterModal.classList.contains("show"))closePoster();
+  if($("wxSaveModal").classList.contains("show"))closeWxSaver();
+});
+/* 请求持久站点存储，降低浏览器回收模型缓存的概率。 */
+window.addEventListener('load',()=>{
+  if(location.protocol==='file:')return;
+  if(navigator.storage&&navigator.storage.persist){navigator.storage.persist().catch(()=>{});}
+});
+/* Service Worker 仅用于网站版；APP 通过本地 assets 和原生模型目录提供资源。 */
+if(!IS_APP_YANZHI && 'serviceWorker' in navigator && location.protocol !== 'file:'){
+  window.addEventListener('load',()=>{
+    navigator.serviceWorker.register('sw.js').catch(e=>console.warn('SW failed:',e));
+  });
+}
+if(!IS_APP_YANZHI){
+  window.addEventListener('offline',()=>setStatus('当前离线：模型已缓存时可继续分析，否则请联网后刷新','err'));
+  window.addEventListener('online',()=>setStatus('网络已恢复','ok'));
+}
+</script>
+</body>
+</html>

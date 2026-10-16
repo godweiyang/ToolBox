@@ -11,7 +11,7 @@ class WebRoutePolicyTest {
     @Test fun `appassets origin stays in app including cross tool nav`() {
         val home = "https://appassets.androidplatform.net/assets/lol/index.html"
         val cross = "https://appassets.androidplatform.net/assets/pubg/index.html"
-        val sub = "https://appassets.androidplatform.net/assets/fangdai/app.js"
+        val sub = "https://appassets.androidplatform.net/assets/yanzhi/model/score_display_v91.json"
         assertEquals(WebRoutePolicy.Decision.ALLOW_IN_APP, WebRoutePolicy.decide(home))
         assertEquals(WebRoutePolicy.Decision.ALLOW_IN_APP, WebRoutePolicy.decide(cross))
         assertEquals(WebRoutePolicy.Decision.ALLOW_IN_APP, WebRoutePolicy.decide(sub))
@@ -67,8 +67,8 @@ class WebRoutePolicyTest {
         assertEquals("lol/index.html", WebRoutePolicy.resolveAssetPath("/lol/"))
         assertEquals("lol/index.html", WebRoutePolicy.resolveAssetPath("/lol"))
         assertEquals("pubg/arena.html", WebRoutePolicy.resolveAssetPath("/pubg/arena.html"))
-        assertEquals("fangdai/index.html", WebRoutePolicy.resolveAssetPath("/fangdai/"))
-        assertEquals("fangdai/js/app.js", WebRoutePolicy.resolveAssetPath("/fangdai/js/app.js"))
+        assertEquals("yanzhi/index.html", WebRoutePolicy.resolveAssetPath("/yanzhi/"))
+        assertEquals("yanzhi/model/score_display_v91.json", WebRoutePolicy.resolveAssetPath("/yanzhi/model/score_display_v91.json"))
     }
 
     @Test fun `unknown top level alias is not resolved`() {

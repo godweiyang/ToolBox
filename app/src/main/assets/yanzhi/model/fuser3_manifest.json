@@ -1,0 +1,40 @@
+{
+  "bundle_id": "selected_fuser3_B_locked",
+  "locked_at": "2026-10-16",
+  "decision": "B first-valid: 三 ResNet Ridge, 不含 mobile",
+  "models": {
+    "pred_corrected_huber": {
+      "file": "corrected_huber_fp32.onnx",
+      "sha256": "813653e99df89cf6",
+      "precision": "FP32"
+    },
+    "pred_multitask_nima": {
+      "file": "nima_qdq.onnx",
+      "sha256": "96708cbd9dfa2481",
+      "precision": "INT8_QDQ"
+    },
+    "pred_multitask_rank_cons_tail": {
+      "file": "rank_qdq.onnx",
+      "sha256": "a3c6d1405cc15f86",
+      "precision": "INT8_QDQ"
+    }
+  },
+  "fuser": {
+    "features": ["pred_corrected_huber", "pred_multitask_nima", "pred_multitask_rank_cons_tail"],
+    "coef": {
+      "pred_corrected_huber": 0.2886,
+      "pred_multitask_nima": 0.249,
+      "pred_multitask_rank_cons_tail": 0.4664
+    },
+    "intercept": -0.0229,
+    "half80_mean": 0.348,
+    "nested_OOF": { "P": 0.9072, "MAE": 0.2196, "RMSE": 0.2895 }
+  },
+  "consistency": {
+    "challenge22_max_pct_vs_4ch": 7.8,
+    "low_max_27.6<normal_min_50.5": true,
+    "holdout4_pct_range": [2.0, 4.9],
+    "gate_flips": 0
+  },
+  "no_mobile_by_design": true
+}

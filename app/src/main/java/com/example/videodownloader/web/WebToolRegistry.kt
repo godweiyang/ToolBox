@@ -37,6 +37,13 @@ object WebToolRegistry {
             descRes = R.string.tool_pubg_desc,
             iconRes = android.R.drawable.ic_menu_compass,
             iconBgRes = R.drawable.icon_grad_pubg
+        ),
+        Spec(
+            id = "yanzhi",
+            titleRes = R.string.tool_yanzhi_title,
+            descRes = R.string.tool_yanzhi_desc,
+            iconRes = android.R.drawable.ic_menu_camera,
+            iconBgRes = R.drawable.icon_grad_yanzhi
         )
     )
 

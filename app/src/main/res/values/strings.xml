@@ -357,6 +357,8 @@
     <string name="tool_lol_desc">LOL 战绩 / 出装查询（本地离线页）</string>
     <string name="tool_pubg_title">PUBG 工具箱</string>
     <string name="tool_pubg_desc">PUBG 战绩 / 数据查询（本地离线页）</string>
+    <string name="tool_yanzhi_title">颜值实验室</string>
+    <string name="tool_yanzhi_desc">本地人脸美学分析 · 三模型融合 · 六维雷达</string>
 
     <!-- Web 外壳通用文案 -->
     <string name="web_shell_back">返回</string>
