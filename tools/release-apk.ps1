@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
   ToolBox APK 一键双发布：GitHub Release（检查更新 + 下载源）+ Gitee Release（国内下载镜像）。
 
@@ -42,6 +42,24 @@ $ErrorActionPreference = 'Stop'
 $RepoRoot = Split-Path -Parent $PSScriptRoot
 Set-Location $RepoRoot
 
+# 执行 gh/node 等原生命令：PowerShell 5.1 在 Stop 模式下会把原生命令的 stderr
+# 文本误判为终止错误，这里统一合并 stdout/stderr、按退出码判定，避免脚本中途崩掉。
+function Invoke-Native {
+    param(
+        [Parameter(Mandatory = $true)][scriptblock]$Block,
+        [string]$FailMessage = '原生命令执行失败'
+    )
+    $prevEAP = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        & $Block 2>&1 | ForEach-Object { $_.ToString() } | ForEach-Object { Write-Host "    $_" }
+        $code = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $prevEAP
+    }
+    if ($code -ne 0) { throw "$FailMessage（exit $code）" }
+}
+
 $GiteeOwner = 'godweiyang'
 $GiteeRepo  = 'storage'
 $GiteeTag   = "toolbox-$Tag"
@@ -56,20 +74,15 @@ Write-Host "    Gitee tag : $GiteeTag"
 
 # ---------- 0. 前置检查 ----------
 if (-not (Test-Path $Apk)) { throw "APK 不存在：$Apk" }
-$gh = Get-Command gh -ErrorAction SilentlyContinue
-if (-not $gh) { throw "未找到 gh CLI，请先安装并 gh auth login。" }
-if (-not $env:GITEE_TOKEN) {
-    throw "未设置环境变量 GITEE_TOKEN（Gitee 私人令牌，projects 权限）。"
-}
-$node = Get-Command node -ErrorAction SilentlyContinue
-if (-not $node) { throw "未找到 node（用于上传 Gitee 附件）。" }
+if (-not (Get-Command gh -ErrorAction SilentlyContinue)) { throw "未找到 gh CLI，请先安装并 gh auth login。" }
+if (-not $env:GITEE_TOKEN) { throw "未设置环境变量 GITEE_TOKEN（Gitee 私人令牌，projects 权限）。" }
+if (-not (Get-Command node -ErrorAction SilentlyContinue)) { throw "未找到 node（用于上传 Gitee 附件）。" }
 
 # ---------- 可选：先构建 ----------
 if ($Build) {
     if (-not $env:JAVA_HOME) { throw "开启 -Build 时需要设置 JAVA_HOME（例如 C:\jdk17）。" }
     Write-Host "==> 构建 release APK ..." -ForegroundColor Cyan
-    & .\gradlew.bat assembleRelease --console=plain
-    if ($LASTEXITCODE -ne 0) { throw "gradlew assembleRelease 失败" }
+    Invoke-Native -Block { & .\gradlew.bat assembleRelease --console=plain } -FailMessage 'gradlew assembleRelease 失败'
     Copy-Item '.\app\build\outputs\apk\release\app-release.apk' $Apk -Force
     Write-Host "    已复制为 $ApkName" -ForegroundColor Green
 }
@@ -91,19 +104,23 @@ SHA256: $sha
 
 # ---------- 1. GitHub Release ----------
 Write-Host "==> [1/2] GitHub Release ..." -ForegroundColor Cyan
-gh release view $Tag --repo godweiyang/ToolBox 2>$null | Out-Null
-if ($LASTEXITCODE -eq 0) {
-    Write-Host "    Release $Tag 已存在，改为上传 / 覆盖附件 ..." -ForegroundColor DarkGray
-    gh release upload $Tag $Apk --repo godweiyang/ToolBox --clobber
+$prevEAP = $ErrorActionPreference
+$ErrorActionPreference = 'Continue'
+& gh release view $Tag --repo godweiyang/ToolBox 2>&1 | Out-Null
+$releaseExists = ($LASTEXITCODE -eq 0)
+$ErrorActionPreference = $prevEAP
+
+if ($releaseExists) {
+    Write-Host "    Release $Tag 已存在，上传 / 覆盖附件 ..." -ForegroundColor DarkGray
+    Invoke-Native -Block { & gh release upload $Tag $Apk --repo godweiyang/ToolBox --clobber } -FailMessage 'GitHub 附件上传失败'
 } else {
     $ghArgs = @('release', 'create', $Tag, $Apk,
         '--repo', 'godweiyang/ToolBox',
         '--title', "ToolBox $Tag",
         '--notes', $Notes)
     if ($Prerelease) { $ghArgs += '--prerelease' }
-    & gh @ghArgs
+    Invoke-Native -Block { & gh @ghArgs } -FailMessage 'GitHub Release 创建失败'
 }
-if ($LASTEXITCODE -ne 0) { throw "GitHub Release 发布失败（exit $LASTEXITCODE）" }
 $ghUrl = "https://github.com/godweiyang/ToolBox/releases/download/$Tag/$ApkName"
 Write-Host "    GitHub 附件：$ghUrl" -ForegroundColor Green
 
@@ -116,8 +133,7 @@ $giteeArgs = @($giteeScript,
     '--body', $Notes,
     '--file', $Apk)
 if ($Prerelease) { $giteeArgs += '--prerelease' }
-& node @giteeArgs
-if ($LASTEXITCODE -ne 0) { throw "Gitee 附件上传失败（exit $LASTEXITCODE）" }
+Invoke-Native -Block { & node @giteeArgs } -FailMessage 'Gitee 附件上传失败'
 $giteeUrl = "https://gitee.com/$GiteeOwner/$GiteeRepo/releases/download/$GiteeTag/$ApkName"
 
 Write-Host ""
