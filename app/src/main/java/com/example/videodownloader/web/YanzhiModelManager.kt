@@ -22,14 +22,17 @@ internal class YanzhiModelManager(context: Context) {
         val bytes: Long,
         val sha256Prefix: String
     ) {
-        val urls: List<String> = listOf(
-            // 国内首选：Gitee Release 附件（匿名可下、速度快）。该源不支持 Range，
-            // 遇到 200 会自动整文件重下；中途失败再切到下面支持 Range 的源续传。
-            "https://gitee.com/godweiyang/storage/releases/download/${YanzhiModelManager.GITEE_MODEL_TAG}/$fileName",
-            // 国外/兜底：GitHub Pages 与 raw.githubusercontent
-            "https://godweiyang.com/yanzhi/model/$fileName",
-            "https://raw.githubusercontent.com/godweiyang/blog-source-code/master/source/yanzhi/model/$fileName"
-        )
+        val urls: List<String> = buildList {
+            // 国内首选：gh-proxy 加速代理公开仓库 storage 的 Release 附件（匿名可下、支持 Range
+            // 续传），多个公共域名互为备份，任一失败自动切下一个。
+            for (prefix in YanzhiModelManager.GH_PROXY_PREFIXES) {
+                add(prefix + YanzhiModelManager.GITHUB_STORAGE_RELEASE + "/" + fileName)
+            }
+            // 国内直连备选：Gitee Release 附件。该源不支持 Range，遇到 200 会自动整文件重下。
+            add("https://gitee.com/godweiyang/storage/releases/download/${YanzhiModelManager.GITEE_MODEL_TAG}/$fileName")
+            // 最终兜底：GitHub Pages（godweiyang.com 同源静态资源）
+            add("https://godweiyang.com/yanzhi/model/$fileName")
+        }
     }
 
     data class Progress(
@@ -40,11 +43,21 @@ internal class YanzhiModelManager(context: Context) {
     )
 
     companion object {
-        const val VERSION = "v1"
-        // Gitee 国内镜像的 Release tag，随模型版本（VERSION）联动
+        // v2：三路审美模型全部为 int8 QDQ（合计约 32MB，v1 的 huber 为 fp32 合计约 64MB），
+        // 量化后 pearson 0.99995、均分差 0.22，打分几乎无损。
+        const val VERSION = "v2"
+        // Gitee / GitHub 公开仓库 storage 的 Release tag，随模型版本（VERSION）联动
         const val GITEE_MODEL_TAG = "yanzhi-models-" + VERSION
+        const val GITHUB_STORAGE_RELEASE =
+            "https://github.com/godweiyang/storage/releases/download/" + GITEE_MODEL_TAG
+        // 已实测可匿名下载且支持 Range 的 gh-proxy 加速域名（按可用性排序）
+        val GH_PROXY_PREFIXES = listOf(
+            "https://gh-proxy.org/",
+            "https://gh-proxy.cc/",
+            "https://gh-proxy.com/"
+        )
         val SPECS = listOf(
-            ModelSpec("corrected_huber_fp32.onnx", 44_700_306L, "813653e99df89cf6"),
+            ModelSpec("corrected_huber_qdq.onnx", 11_236_812L, "e3fe18ed48522682"),
             ModelSpec("nima_qdq.onnx", 11_236_888L, "96708cbd9dfa2481"),
             ModelSpec("rank_qdq.onnx", 11_236_813L, "a3c6d1405cc15f86")
         )

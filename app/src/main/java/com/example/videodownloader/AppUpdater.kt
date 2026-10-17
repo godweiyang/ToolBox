@@ -20,9 +20,18 @@ internal object AppUpdater {
     // Gitee Release tag 约定为 toolbox-<GitHub tag>，附件名与 GitHub 一致 ToolBox-<tag>.apk。
     private const val GITEE_OWNER = "godweiyang"
     private const val GITEE_REPO = "storage"
+    // 国内首选：gh-proxy 加速代理 GitHub Release 附件（匿名可下、支持 Range 续传），
+    // 多个公共域名互为备份，任一失败自动切下一个。
+    private val GH_PROXY_PREFIXES = listOf(
+        "https://gh-proxy.org/",
+        "https://gh-proxy.cc/",
+        "https://gh-proxy.com/"
+    )
     private const val ATTEMPTS_PER_SOURCE = 2
     private fun giteeApkUrl(tag: String) =
         "https://gitee.com/$GITEE_OWNER/$GITEE_REPO/releases/download/toolbox-$tag/ToolBox-$tag.apk"
+    private fun ghProxyApkUrls(apkUrl: String): List<String> =
+        GH_PROXY_PREFIXES.map { it + apkUrl }
 
     private const val PROGRESS_INTERVAL_MS = 200L
 
@@ -96,10 +105,11 @@ internal object AppUpdater {
 
     /**
      * 下载 APK 到缓存目录。
-     * - 下载源顺序：Gitee 国内镜像（快、匿名可下，但不支持 Range）→ GitHub（支持 Range）；
+     * - 下载源顺序：gh-proxy 加速代理 GitHub（国内快、匿名可下、支持 Range，多域名互备）
+     *   → Gitee 国内镜像（不支持 Range）→ GitHub 直连（兜底）；
      * - 每个源最多 [ATTEMPTS_PER_SOURCE] 轮；换源时删除残文件整文件重下，避免跨源拼接；
-     * - 同一源内移动网络中断/读超时：GitHub 基于 HTTP Range 从 .part 断点续传，Gitee 不支持
-     *   Range 会自动整文件重下；
+     * - 同一源内移动网络中断/读超时：gh-proxy/GitHub 基于 HTTP Range 从 .part 断点续传，
+     *   Gitee 不支持 Range 会自动整文件重下；
      * - onProgress 约每 200ms 回调一次：copied 已下载字节、total 总字节（-1 表示未知，
      *   此时 UI 应显示不确定进度条）、speedBps 瞬时速度（字节/秒）。
      */
@@ -109,7 +119,9 @@ internal object AppUpdater {
         handle: DownloadHandle = DownloadHandle(),
         onProgress: (copied: Long, total: Long, speedBps: Long) -> Unit
     ): File {
-        val candidates = listOfNotNull(info.giteeUrl, info.apkUrl).distinct()
+        val proxied = info.apkUrl?.let { ghProxyApkUrls(it) }.orEmpty()
+        val candidates =
+            (proxied + listOfNotNull(info.giteeUrl, info.apkUrl)).distinct()
         check(candidates.isNotEmpty()) { "no apk asset" }
         val dir = File(context.cacheDir, "updates").apply { mkdirs() }
         val target = dir.resolve("ToolBox-${info.tag}.apk")

@@ -148,7 +148,7 @@ body{background:var(--paper);color:var(--text)}
     <div class="cbody">
       <div class="model-card" id="appModelCard">
         <div class="model-row">
-          <div class="model-copy"><div class="model-title" id="appModelTitle">审美模型尚未下载</div><div class="model-desc" id="appModelDesc">三路模型约 64.1 MB，不包含在安装包中。仅需下载一次，之后长期保存在本机并可离线分析。</div></div>
+          <div class="model-copy"><div class="model-title" id="appModelTitle">审美模型尚未下载</div><div class="model-desc" id="appModelDesc">三路模型约 32.1 MB，不包含在安装包中。仅需下载一次，之后长期保存在本机并可离线分析。</div></div>
           <button class="model-download-btn" id="appModelDownload" type="button">下载模型</button>
         </div>
         <div class="model-progress-standalone"><i id="appModelProgressBar"></i></div>
@@ -235,7 +235,7 @@ body{background:var(--paper);color:var(--text)}
 </div>
 
 <footer class="foot">
-  <b>说明：</b>照片与推理全程只在本机进行，<b>不会上传服务器</b>。APP 安装包不包含三路审美模型；首次使用时由你点击按钮下载约 64.1 MB，完成后模型长期保存在本机，后续无需重复下载并可离线分析。综合分由三路深度模型融合后，经 5,500 张严格 OOF 参考分布进行连续校准；人脸关键点仅用于姿态、测量线和六项几何参考。采用<b>连续颜值标尺</b>：20–30 普通偏下、30–40 大众自然、40–50 普通耐看、50–60 中等偏上、60–70 好看、70–80 小美、80–90 顶美、90+ 明星级。结果为娱乐性质美学参考；极端侧脸、广角和夸张表情建议用正脸照复核。请仅上传本人或已获授权的照片。
+  <b>说明：</b>照片与推理全程只在本机进行，<b>不会上传服务器</b>。APP 安装包不包含三路审美模型；首次使用时由你点击按钮下载约 32.1 MB，完成后模型长期保存在本机，后续无需重复下载并可离线分析。综合分由三路深度模型融合后，经 5,500 张严格 OOF 参考分布进行连续校准；人脸关键点仅用于姿态、测量线和六项几何参考。采用<b>连续颜值标尺</b>：20–30 普通偏下、30–40 大众自然、40–50 普通耐看、50–60 中等偏上、60–70 好看、70–80 小美、80–90 顶美、90+ 明星级。结果为娱乐性质美学参考；极端侧脸、广角和夸张表情建议用正脸照复核。请仅上传本人或已获授权的照片。
 </footer>
 
 <!-- MediaPipe（IIFE 隔离，导出 window.__MP__） -->
@@ -311,12 +311,12 @@ function ensureOrtLib(){
   });
   return ortLoading;
 }
-/* ==== V4: 3-ResNet Ensemble (huber FP32 + nima/rank QDQ) ==== */
+/* ==== V4: 3-ResNet Ensemble (huber/nima/rank all int8 QDQ) ==== */
 let ortSessions = {};
 const MODEL_SPECS = [
-  {name:'huber',path:'model/corrected_huber_fp32.onnx?v=20261016c',bytes:44700306},
-  {name:'nima',path:'model/nima_qdq.onnx?v=20261016c',bytes:11236888},
-  {name:'rank',path:'model/rank_qdq.onnx?v=20261016c',bytes:11236813}
+  {name:'huber',path:'model/corrected_huber_qdq.onnx?v=20261018a',bytes:11236812},
+  {name:'nima',path:'model/nima_qdq.onnx?v=20261018a',bytes:11236888},
+  {name:'rank',path:'model/rank_qdq.onnx?v=20261018a',bytes:11236813}
 ];
 function formatMiB(bytes){return (bytes/1048576).toFixed(bytes>=10485760?1:2)+' MB';}
 function setModelProgress(loaded,total,label){
@@ -330,7 +330,7 @@ function hideModelProgress(){
   const wrap=$("modelProgress"),meta=$("modelProgressMeta");
   if(wrap)wrap.classList.remove("show");if(meta)meta.classList.remove("show");
 }
-const MODEL_CACHE_NAME='yanzhi-models-v1';
+const MODEL_CACHE_NAME='yanzhi-models-v2';
 const IS_APP_YANZHI=!!(window.NativeBridge&&typeof NativeBridge.isYanzhiModelReady==='function');
 async function cacheModelBuffer(spec,onProgress){
   if(IS_APP_YANZHI){
@@ -632,7 +632,7 @@ function updateAppModelUi(state,loaded,total,currentFile,message){
   }else if(state==='error'){
     appModelReady=false;appModelTitle.textContent='模型下载未完成';appModelDesc.textContent=message||'网络连接中断，请点击重试；已下载的部分会继续保留。';appModelDownload.textContent='继续下载';appModelDownload.disabled=false;drop.classList.add('locked');uploadHint.textContent='请先完成模型下载';
   }else{
-    appModelReady=false;appModelTitle.textContent='审美模型尚未下载';appModelDesc.textContent='三路模型约 64.1 MB，不包含在安装包中。仅需下载一次，之后长期保存在本机并可离线分析。';appModelDownload.textContent='下载模型';appModelDownload.disabled=false;drop.classList.add('locked');uploadHint.textContent='请先下载审美模型；支持 JPG / PNG / WebP';
+    appModelReady=false;appModelTitle.textContent='审美模型尚未下载';appModelDesc.textContent='三路模型约 32.1 MB，不包含在安装包中。仅需下载一次，之后长期保存在本机并可离线分析。';appModelDownload.textContent='下载模型';appModelDownload.disabled=false;drop.classList.add('locked');uploadHint.textContent='请先下载审美模型；支持 JPG / PNG / WebP';
   }
 }
 window.onNativeModelDownloadState=function(state,loaded,total,currentFile,message){updateAppModelUi(state,loaded,total,currentFile,message);};
@@ -650,7 +650,7 @@ drop.addEventListener("selectstart",clearUploadSelection);
 drop.addEventListener("pointerdown",clearUploadSelection,{passive:true});
 drop.addEventListener("touchstart",clearUploadSelection,{passive:true});
 drop.addEventListener("mousedown",clearUploadSelection);
-drop.addEventListener("click", () => { clearUploadSelection(); if(!appModelReady){setStatus('请先下载约 64.1 MB 审美模型，下载一次后长期保存在本机','err');return;} fileInput.click(); });
+drop.addEventListener("click", () => { clearUploadSelection(); if(!appModelReady){setStatus('请先下载约 32.1 MB 审美模型，下载一次后长期保存在本机','err');return;} fileInput.click(); });
 fileInput.addEventListener("change", e=>{ if(e.target.files[0]) handleFile(e.target.files[0]); });
 ["dragover","dragenter"].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();if(appModelReady)drop.classList.add("over");}));
 ["dragleave"].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove("over");}));

@@ -8,7 +8,8 @@
     GitHub 附件名   : ToolBox-<Tag>.apk 例如 ToolBox-v1.9.59.apk
     Gitee  tag      : toolbox-<Tag>    例如 toolbox-v1.9.59
     Gitee  附件名   : ToolBox-<Tag>.apk
-  检查更新始终走 GitHub；APP 内下载优先走 Gitee、失败回退 GitHub。
+  检查更新始终走 GitHub；APP 内下载优先走 gh-proxy 加速代理（多域名互备）、
+  失败回退 Gitee 镜像、最后 GitHub 直连。
 
   前置：
     1. gh CLI 已登录（gh auth login，账号 godweiyang）；
@@ -141,5 +142,5 @@ Write-Host "==> 双发布完成：" -ForegroundColor Green
 Write-Host "    GitHub : $ghUrl"
 Write-Host "    Gitee  : $giteeUrl"
 Write-Host ""
-Write-Host "    注意：仍在旧版本（不含 Gitee 逻辑）的用户，升级到 $Tag 这一次仍走 GitHub；"
-Write-Host "          安装 $Tag 之后的后续版本才会优先走 Gitee。" -ForegroundColor Yellow
+Write-Host "    注意：仍在更旧版本（不含国内加速逻辑）的用户，升级到 $Tag 这一次仍走原逻辑；"
+Write-Host "          安装 $Tag 后，模型与 APK 下载均优先走 gh-proxy、回退 Gitee。" -ForegroundColor Yellow
