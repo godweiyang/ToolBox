@@ -15,6 +15,10 @@ local.properties
 # 随仓库附带的大体积 SDK / 工具包（不应进版本库）
 sdk/
 tools/
+# 发布脚本为小体积文本，纳入版本库（tools/ 下的大文件仍忽略）
+!tools/
+!tools/*.ps1
+!tools/*.mjs
 
 # IntelliJ / Android Studio
 *.iml

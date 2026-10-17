@@ -15,7 +15,15 @@ internal object AppUpdater {
     const val RELEASES_PAGE = "https://github.com/godweiyang/ToolBox/releases/latest"
     private const val LATEST_API = "https://api.github.com/repos/godweiyang/ToolBox/releases/latest"
     private const val DOWNLOAD_BASE = "https://github.com/godweiyang/ToolBox/releases/download"
-    private const val MAX_DOWNLOAD_ATTEMPTS = 4
+
+    // 国内镜像：APK 同时发布到 Gitee 仓库 godweiyang/storage 的 Release。
+    // Gitee Release tag 约定为 toolbox-<GitHub tag>，附件名与 GitHub 一致 ToolBox-<tag>.apk。
+    private const val GITEE_OWNER = "godweiyang"
+    private const val GITEE_REPO = "storage"
+    private const val ATTEMPTS_PER_SOURCE = 2
+    private fun giteeApkUrl(tag: String) =
+        "https://gitee.com/$GITEE_OWNER/$GITEE_REPO/releases/download/toolbox-$tag/ToolBox-$tag.apk"
+
     private const val PROGRESS_INTERVAL_MS = 200L
 
     /** 下载取消句柄：cancel() 同时中断网络请求，阻塞中的连接/读取会立即抛异常。 */
@@ -68,7 +76,7 @@ internal object AppUpdater {
             val page = root.get("html_url")?.asString?.takeIf { it.startsWith("https://") }
                 ?: RELEASES_PAGE
             return ReleaseInfo(tag, root.get("name")?.asString ?: tag,
-                root.get("body")?.asString.orEmpty(), page, apk)
+                root.get("body")?.asString.orEmpty(), page, apk, giteeApkUrl(tag))
         }
     }
 
@@ -82,13 +90,16 @@ internal object AppUpdater {
             val tag = response.request.url.pathSegments.lastOrNull().orEmpty()
             require(tag.startsWith("v") && AppVersions.compare(tag, "0") > 0) { "missing release tag" }
             val apk = "$DOWNLOAD_BASE/$tag/ToolBox-$tag.apk"
-            return ReleaseInfo(tag, tag, "", page, apk)
+            return ReleaseInfo(tag, tag, "", page, apk, giteeApkUrl(tag))
         }
     }
 
     /**
      * 下载 APK 到缓存目录。
-     * - 移动网络中断/读超时：最多 4 轮尝试，基于 HTTP Range 从 .part 断点续传，不重头开始；
+     * - 下载源顺序：Gitee 国内镜像（快、匿名可下，但不支持 Range）→ GitHub（支持 Range）；
+     * - 每个源最多 [ATTEMPTS_PER_SOURCE] 轮；换源时删除残文件整文件重下，避免跨源拼接；
+     * - 同一源内移动网络中断/读超时：GitHub 基于 HTTP Range 从 .part 断点续传，Gitee 不支持
+     *   Range 会自动整文件重下；
      * - onProgress 约每 200ms 回调一次：copied 已下载字节、total 总字节（-1 表示未知，
      *   此时 UI 应显示不确定进度条）、speedBps 瞬时速度（字节/秒）。
      */
@@ -98,33 +109,39 @@ internal object AppUpdater {
         handle: DownloadHandle = DownloadHandle(),
         onProgress: (copied: Long, total: Long, speedBps: Long) -> Unit
     ): File {
-        val url = requireNotNull(info.apkUrl) { "no apk asset" }
+        val candidates = listOfNotNull(info.giteeUrl, info.apkUrl).distinct()
+        check(candidates.isNotEmpty()) { "no apk asset" }
         val dir = File(context.cacheDir, "updates").apply { mkdirs() }
         val target = dir.resolve("ToolBox-${info.tag}.apk")
         val part = dir.resolve("ToolBox-${info.tag}.apk.part")
 
         var lastError: Exception? = null
-        for (attempt in 1..MAX_DOWNLOAD_ATTEMPTS) {
+        for ((sourceIndex, url) in candidates.withIndex()) {
             if (handle.cancelled) throw java.util.concurrent.CancellationException("download cancelled")
-            try {
-                streamOnce(url, part, handle, onProgress)
-                require(part.length() > 1024L) { "downloaded apk is empty" }
-                part.inputStream().use { input ->
-                    val magic = ByteArray(4)
-                    require(input.read(magic) == 4 &&
-                        magic.contentEquals(byteArrayOf(0x50, 0x4B, 0x03, 0x04))) {
-                        "download is not an apk archive"
-                    }
-                }
-                if (target.exists()) target.delete()
-                check(part.renameTo(target)) { "rename apk failed" }
-                return target
-            } catch (e: java.util.concurrent.CancellationException) {
-                throw e
-            } catch (e: Exception) {
+            // 换源：删除上一源的残文件，让新源从完整文件开始（Gitee 不支持 Range，也不跨源拼接）
+            if (sourceIndex > 0 && part.exists()) part.delete()
+            for (attempt in 1..ATTEMPTS_PER_SOURCE) {
                 if (handle.cancelled) throw java.util.concurrent.CancellationException("download cancelled")
-                lastError = e
-                if (attempt < MAX_DOWNLOAD_ATTEMPTS) interruptibleSleep(1500L * attempt, handle)
+                try {
+                    streamOnce(url, part, handle, onProgress)
+                    require(part.length() > 1024L) { "downloaded apk is empty" }
+                    part.inputStream().use { input ->
+                        val magic = ByteArray(4)
+                        require(input.read(magic) == 4 &&
+                            magic.contentEquals(byteArrayOf(0x50, 0x4B, 0x03, 0x04))) {
+                            "download is not an apk archive"
+                        }
+                    }
+                    if (target.exists()) target.delete()
+                    check(part.renameTo(target)) { "rename apk failed" }
+                    return target
+                } catch (e: java.util.concurrent.CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    if (handle.cancelled) throw java.util.concurrent.CancellationException("download cancelled")
+                    lastError = e
+                    if (attempt < ATTEMPTS_PER_SOURCE) interruptibleSleep(1500L * attempt, handle)
+                }
             }
         }
         throw lastError ?: IllegalStateException("download failed")
@@ -194,6 +211,11 @@ internal object AppUpdater {
                         }
                     }
                 }
+            }
+            // 完整性校验：已知总长度（200 的 Content-Length 或 206 的 Content-Range）时，
+            // 字节数不符（中途断流/截断）直接判失败，交给重试或换源
+            if (total > 0 && copied != total) {
+                throw java.io.IOException("download size mismatch: $copied/$total")
             }
             onProgress(copied, total, 0L)
         }

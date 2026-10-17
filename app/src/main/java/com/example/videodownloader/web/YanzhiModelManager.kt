@@ -23,7 +23,10 @@ internal class YanzhiModelManager(context: Context) {
         val sha256Prefix: String
     ) {
         val urls: List<String> = listOf(
-            "https://cdn.jsdelivr.net/gh/godweiyang/blog-source-code@master/source/yanzhi/model/$fileName",
+            // 国内首选：Gitee Release 附件（匿名可下、速度快）。该源不支持 Range，
+            // 遇到 200 会自动整文件重下；中途失败再切到下面支持 Range 的源续传。
+            "https://gitee.com/godweiyang/storage/releases/download/${YanzhiModelManager.GITEE_MODEL_TAG}/$fileName",
+            // 国外/兜底：GitHub Pages 与 raw.githubusercontent
             "https://godweiyang.com/yanzhi/model/$fileName",
             "https://raw.githubusercontent.com/godweiyang/blog-source-code/master/source/yanzhi/model/$fileName"
         )
@@ -38,6 +41,8 @@ internal class YanzhiModelManager(context: Context) {
 
     companion object {
         const val VERSION = "v1"
+        // Gitee 国内镜像的 Release tag，随模型版本（VERSION）联动
+        const val GITEE_MODEL_TAG = "yanzhi-models-" + VERSION
         val SPECS = listOf(
             ModelSpec("corrected_huber_fp32.onnx", 44_700_306L, "813653e99df89cf6"),
             ModelSpec("nima_qdq.onnx", 11_236_888L, "96708cbd9dfa2481"),

@@ -5,7 +5,9 @@ internal data class ReleaseInfo(
     val title: String,
     val notes: String,
     val pageUrl: String,
-    val apkUrl: String?
+    val apkUrl: String?,
+    /** 国内 Gitee 镜像附件直链，下载时优先于 [apkUrl]；为 null 时仅用 GitHub。 */
+    val giteeUrl: String? = null
 )
 
 /** SemVer-like comparison for v1.9.26 / 1.10 / 2.0.0-beta tags. */
