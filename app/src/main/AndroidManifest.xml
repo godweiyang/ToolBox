@@ -119,6 +119,11 @@
             android:exported="false"
             android:configChanges="orientation|screenSize|keyboardHidden" />
 
+        <activity
+            android:name=".web.AmenityActivity"
+            android:exported="false"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
+
         <!-- 分享成品图 -->
         <provider
             android:name="androidx.core.content.FileProvider"

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="tool_amenity_title">小区对比</string>
+    <string name="tool_amenity_desc">贝壳资料与高德配套，多户型聚合为小区专项和综合分</string>
+    <string name="amenity_score">评分</string>
+    <string name="amenity_map">贝壳地图</string>
+    <string name="amenity_profile">贝壳详情</string>
+    <string name="amenity_connecting">正在启动内嵌小区服务…</string>
+</resources>

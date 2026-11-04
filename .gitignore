@@ -1,3 +1,7 @@
+# 小区模块测试只提交源码
+app/src/main/python/amenity/__pycache__/
+tools/amenity-tests/__pycache__/
+
 # Gradle
 .gradle/
 build/
