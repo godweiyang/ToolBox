@@ -124,6 +124,10 @@
             android:exported="false"
             android:configChanges="orientation|screenSize|keyboardHidden" />
 
+        <activity
+            android:name=".WorkEncouragerActivity"
+            android:exported="false" />
+
         <!-- 分享成品图 -->
         <provider
             android:name="androidx.core.content.FileProvider"

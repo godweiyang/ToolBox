@@ -13,8 +13,8 @@ android {
         applicationId = "com.example.videodownloader"
         minSdk = 26
         targetSdk = 34
-        versionCode = 90
-        versionName = "1.9.62"
+        versionCode = 91
+        versionName = "1.9.63"
 
         // Chaquopy 内嵌 CPython：lol 本地服务（server.py）在 app 进程内运行，
         // 纯标准库无需 pip；只打主流真机 ABI 控制体积

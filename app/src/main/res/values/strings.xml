@@ -369,4 +369,19 @@
     <string name="web_shell_download_via_page">正在由页面处理下载…</string>
     <string name="web_shell_blocked">该链接已被安全策略拦截</string>
     <string name="web_shell_no_handler">没有可打开该链接的应用（本地服务可能未安装）</string>
+
+    <!-- 上班鼓励器 -->
+    <string name="tool_shangban_title">上班鼓励器</string>
+    <string name="tool_shangban_desc">把今天的工资换算成日常物件，看还要多久能赚回来</string>
+    <string name="tool_shangban_settings">设置</string>
+    <string name="tool_shangban_save">保存</string>
+    <string name="tool_shangban_salary_label">税前月薪（元）</string>
+    <string name="tool_shangban_start_label">上班时间（HH:mm）</string>
+    <string name="tool_shangban_end_label">下班时间（HH:mm）</string>
+    <string name="tool_shangban_working">上班中</string>
+    <string name="tool_shangban_earned_today">今日已赚</string>
+    <string name="tool_shangban_month">本月累计</string>
+    <string name="tool_shangban_month_note">已过的日子按满勤补算。本月只计已赚，不含亏损。</string>
+    <string name="tool_shangban_timer_off">关闭计时器</string>
+    <string name="tool_shangban_timer_on">开启计时器</string>
 </resources>

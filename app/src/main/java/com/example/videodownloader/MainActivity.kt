@@ -506,6 +506,14 @@ class MainActivity : AppCompatActivity() {
             iconRes = android.R.drawable.ic_menu_myplaces,
             iconBgRes = R.drawable.icon_grad_fangdai,
             launcher = { ctx -> Intent(ctx, com.example.videodownloader.web.AmenityActivity::class.java) }
+        ),
+        Tool(
+            id = "shangban",
+            title = getString(R.string.tool_shangban_title),
+            desc = getString(R.string.tool_shangban_desc),
+            iconRes = android.R.drawable.ic_menu_recent_history,
+            iconBgRes = R.drawable.icon_grad_shangban,
+            launcher = { ctx -> Intent(ctx, WorkEncouragerActivity::class.java) }
         )
     ).let { base ->
         // 三个离线 Web 工具（lol / pubg / fangdai），共用 WebView 外壳
