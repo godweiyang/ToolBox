@@ -219,6 +219,7 @@ table.cmp tfoot td{font-size:15px;font-weight:900;border-bottom:0}
 .hs-btn.primary{background:linear-gradient(90deg,#14688f,#1e88b5);border-color:transparent;color:#fff;box-shadow:0 2px 8px rgba(20,104,143,.24)}
 .hs-btn.primary:hover{filter:brightness(1.06)}
 .hs-btn[hidden]{display:none}
+.housing-tools.hs-live .hs-aux{display:none}
 .housing-install{font-size:14px;line-height:1.7;margin:8px 0 14px;color:#46545f}
 @media(max-width:640px){.hs-state{flex:1 1 100%}.housing-tools{gap:7px}.hs-btn{flex:1 1 0;padding:8px 10px}}.housing-install summary{cursor:pointer;color:#14688f;font-weight:700}.housing-install a{color:#14688f}
 .beike-pane{margin:8px 14px 14px;padding:12px;border:1px solid #dbe6ec;border-radius:8px;background:#fbfdfe;font-size:13px;line-height:1.7}
@@ -253,7 +254,7 @@ table.cmp tfoot td{font-size:15px;font-weight:900;border-bottom:0}
   <div class="card">
     <div class="ct">选择小区<small>输入名称后点下拉项；可展开补录小区本体信息（选填）</small></div>
     <div class="cbody">
-      <div class="housing-tools"><span class="hs-state"><span class="hs-dot wait" id="housingDot"></span><span id="housingSvc">正在检测本机贝壳服务…</span></span><button type="button" class="hs-btn primary" id="housingConnect">连接贝壳</button><a class="hs-btn" id="housingStart" href="amenity://start">启动服务</a><a class="hs-btn" id="housingDownload" href="/medias/files/amenity_service.exe">下载服务</a><a class="hs-btn" id="housingMacIntel" href="/medias/files/amenity_service_mac_intel.zip" hidden>Mac Intel 版</a></div>
+      <div class="housing-tools"><span class="hs-state"><span class="hs-dot wait" id="housingDot"></span><span id="housingSvc">正在检测本机贝壳服务…</span></span><button type="button" class="hs-btn primary" id="housingConnect">连接贝壳</button><a class="hs-btn hs-aux" id="housingStart" href="amenity://start">启动服务</a><a class="hs-btn hs-aux" id="housingDownload" href="/medias/files/amenity_service.exe">下载服务</a><a class="hs-btn" id="housingMacIntel" href="/medias/files/amenity_service_mac_intel.zip" hidden>Mac Intel 版</a></div>
       <details class="housing-install"><summary>安装方式与各平台下载</summary><p><a href="/medias/files/amenity_service.exe">Windows</a> · <a href="/medias/files/amenity_service_android.apk">Android 7.0 及以上</a> · <a href="/medias/files/amenity_service_mac_arm64.zip">Mac Apple Silicon</a> · <a href="/medias/files/amenity_service_mac_intel.zip">Mac Intel</a></p><p>Windows 双击即用，浏览器首次允许本机访问即可；Mac 打开 amenity_service.app（未签名，需在「隐私与安全性」中允许）；Android 安装后点「启动」，在 App 内的地图与详情页登录后自动连接，无需额外操作。</p><p>服务只在本机 127.0.0.1:17532 运行。贝壳资料只在本人已登录的页面内读取公开小区与挂牌信息，遇到登录、验证码或拒绝访问不会绕过；缺少的资料显示为缺失，不计零分。</p></details>
       <div id="commList"></div>
       <div class="ctl-row">
@@ -667,6 +668,7 @@ async function probeHousing(){
   const wasMap=lastMapConnected,wasProfile=lastProfileConnected;
   housingState=st;lastMapConnected=!!st.connected;lastProfileConnected=!!st.profileConnected;
   const city=st.cityName?' · '+st.cityName:'';
+  document.querySelector('.housing-tools').classList.add('hs-live');
   if(!st.connected){el.textContent=embeddedAmenity?'内嵌采集正在启动…持续失败可退出本功能重试':'本机服务已运行'+city+' · 等待连接贝壳页面';dot.className='hs-dot wait';}
   else if(!st.profileConnected){el.textContent=embeddedAmenity?'地图已连接'+city+' · 在上方贝壳详情页登录后会自动补齐':'地图已连接'+city+' · 打开小区详情页点一次同一按钮，可补容积率与户型';dot.className='hs-dot half';}
   else{el.textContent=(embeddedAmenity?'内嵌采集就绪'+city+' · 查询会自动补齐资料':'贝壳通道就绪'+city+' · 查询会自动补齐资料');dot.className='hs-dot ok';}
@@ -678,6 +680,7 @@ async function probeHousing(){
   housingState={connected:false,cityId:''};lastMapConnected=lastProfileConnected=false;
   el.textContent=embeddedAmenity?'内嵌采集未就绪 · 请稍候，或退出本功能后重试':'本机服务未运行 · 下载后双击打开，再点「连接贝壳」';
   dot.className='hs-dot off';
+  document.querySelector('.housing-tools').classList.remove('hs-live');
  }
  scheduleProbe();
 }
