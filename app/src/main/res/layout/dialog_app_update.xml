@@ -39,7 +39,7 @@
         android:textColor="#8A8E99"
         android:textSize="12sp" />
 
-    <ScrollView
+    <com.example.videodownloader.MaxHeightScrollView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="12dp"
@@ -55,7 +55,7 @@
             android:padding="10dp"
             android:textColor="#555763"
             android:textSize="12.5sp" />
-    </ScrollView>
+    </com.example.videodownloader.MaxHeightScrollView>
 
     <ProgressBar
         android:id="@+id/pbUpdate"
